@@ -2,7 +2,7 @@
 // Extends base-config with: diverse field types, hierarchical catalog, two-tab form,
 // second subsystem, full-rights role.
 // Steps: cf-init → meta-compile → form-add + form-compile → skd-compile
-//        → subsystem-compile → role-compile → cf-edit → cf-validate
+//        → subsystem-compile → role-compile → cf-validate
 
 export const name = 'Сборка конфигурации для web-test';
 export const setup = 'none';
@@ -565,30 +565,8 @@ export const steps = [
     validate: { script: 'role-validate/scripts/role-validate', flag: '-RightsPath', path: 'Roles/Администратор' },
   },
 
-  // ── 7. Register all objects in Configuration.xml ──
-  {
-    name: 'cf-edit: Регистрация объектов в конфигурации',
-    script: 'cf-edit/scripts/cf-edit',
-    input: [
-      { operation: 'add-childObject', value: 'Catalog.Контрагенты' },
-      { operation: 'add-childObject', value: 'Catalog.КонтактныеЛица' },
-      { operation: 'add-childObject', value: 'Catalog.Номенклатура' },
-      { operation: 'add-childObject', value: 'Enum.ВидыНоменклатуры' },
-      { operation: 'add-childObject', value: 'Enum.КатегорииЦен' },
-      { operation: 'add-childObject', value: 'Document.ПриходнаяНакладная' },
-      { operation: 'add-childObject', value: 'InformationRegister.КурсыВалют' },
-      { operation: 'add-childObject', value: 'Constant.ОсновнаяВалюта' },
-      { operation: 'add-childObject', value: 'CommonModule.ОбщиеФункции' },
-      { operation: 'add-childObject', value: 'DataProcessor.ТестовыеОшибки' },
-      { operation: 'add-childObject', value: 'Report.ОстаткиТоваров' },
-      { operation: 'add-childObject', value: 'Subsystem.Склад' },
-      { operation: 'add-childObject', value: 'Subsystem.Администрирование' },
-      { operation: 'add-childObject', value: 'Role.Администратор' },
-    ],
-    args: { '-ConfigPath': '{workDir}', '-DefinitionFile': '{inputFile}' },
-  },
-
-  // ── 8. Final validation ──
+  // ── 7. Final validation ──
+  // (meta-compile, subsystem-compile, role-compile уже регистрируют объекты в Configuration.xml)
   {
     name: 'cf-validate: Финальная валидация конфигурации',
     script: 'cf-validate/scripts/cf-validate',
