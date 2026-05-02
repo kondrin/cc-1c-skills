@@ -19,6 +19,6 @@ export default async function({ navigateSection, openCommand, clickElement, sele
     log(`Контрагент value='${field?.value}'`);
     assert.includes(field?.value || '', 'Север', 'Контрагент должен показать выбранное значение');
 
-    await closeForm();
+    await closeForm({ save: false });
   });
 }

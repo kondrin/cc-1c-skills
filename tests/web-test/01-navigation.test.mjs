@@ -21,7 +21,7 @@ export default async function({ navigateSection, getPageState, openCommand, clos
 
   await step('Открыть справочник Контрагенты', async () => {
     const state = await openCommand('Контрагенты');
-    assert.ok(state.form, 'Форма списка Контрагентов должна открыться');
+    assert.ok(state.form != null, 'Форма списка Контрагентов должна открыться');
     log('Opened: ' + state.title);
     await closeForm();
   });
