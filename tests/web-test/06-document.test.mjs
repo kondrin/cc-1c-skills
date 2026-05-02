@@ -24,11 +24,11 @@ export default async function({ navigateSection, openCommand, clickElement, fill
       { table: 'Товары', add: true }
     );
 
+    const before = await getFormState();
     await clickElement('Провести и закрыть');
     const after = await getFormState();
-    const stillOnDoc = !!after.fields?.find(f => f.name === 'Контрагент');
-    log(`stillOnDoc=${stillOnDoc} form=${after.form}`);
-    assert.ok(!stillOnDoc, 'После Провести и закрыть форма документа должна закрыться (Контрагент-поля нет в текущей форме)');
+    log(`form before=${before.form} after=${after.form}`);
+    assert.notEqual(after.form, before.form, 'После Провести и закрыть текущая форма должна смениться (документ закрылся)');
   });
 
   await step('verify-list: документ виден в списке с Проведён=Да', async () => {
