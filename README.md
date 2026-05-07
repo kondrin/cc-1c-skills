@@ -88,18 +88,18 @@ python tools/cc-1c-skills/scripts/switch.py
 | Claude Code | `.claude/skills/` | [main](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/main) | [port-claude-code-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-claude-code-py) |
 | Cursor | `.cursor/skills/` | [port-cursor](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cursor) | [port-cursor-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cursor-py) |
 | OpenAI Codex | `.codex/skills/` | [port-codex](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-codex) | [port-codex-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-codex-py) |
-| Augment | `.augment/skills/` | _соберите локально_ | _соберите локально_ |
-| Cline | `.cline/skills/` | _соберите локально_ | _соберите локально_ |
-| GitHub Copilot | `.github/skills/` | _соберите локально_ | _соберите локально_ |
-| Kilo Code | `.kilocode/skills/` | _соберите локально_ | _соберите локально_ |
-| Kiro | `.kiro/skills/` | _соберите локально_ | _соберите локально_ |
-| Gemini CLI | `.gemini/skills/` | _соберите локально_ | _соберите локально_ |
-| OpenCode | `.opencode/skills/` | _соберите локально_ | _соберите локально_ |
-| Roo Code | `.roo/skills/` | _соберите локально_ | _соберите локально_ |
-| Windsurf | `.windsurf/skills/` | _соберите локально_ | _соберите локально_ |
-| Agent Skills | `.agents/skills/` | _соберите локально_ | _соберите локально_ |
+| GitHub Copilot | `.github/skills/` | [port-copilot](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-copilot) | [port-copilot-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-copilot-py) |
+| Augment | `.augment/skills/` | [port-augment](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-augment) | [port-augment-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-augment-py) |
+| Cline | `.cline/skills/` | [port-cline](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cline) | [port-cline-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cline-py) |
+| Kilo Code | `.kilocode/skills/` | [port-kilo](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kilo) | [port-kilo-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kilo-py) |
+| Kiro | `.kiro/skills/` | [port-kiro](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kiro) | [port-kiro-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kiro-py) |
+| Gemini CLI | `.gemini/skills/` | [port-gemini](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-gemini) | [port-gemini-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-gemini-py) |
+| OpenCode | `.opencode/skills/` | [port-opencode](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-opencode) | [port-opencode-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-opencode-py) |
+| Roo Code | `.roo/skills/` | [port-roo](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-roo) | [port-roo-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-roo-py) |
+| Windsurf | `.windsurf/skills/` | [port-windsurf](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-windsurf) | [port-windsurf-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-windsurf-py) |
+| Agent Skills | `.agents/skills/` | [port-agents](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-agents) | [port-agents-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-agents-py) |
 
-Готовые ветки `port-*` пересобираются автоматически на каждое изменение в навыках. Платформы со статусом «соберите локально» — на стадии расширения матрицы; пока ставятся [через `switch.py`](#альтернативный-способ--собрать-локально-через-switchpy).
+Готовые ветки `port-*` пересобираются автоматически на каждое изменение в навыках. Если нужна свежая сборка прямо сейчас — соберите [локально через `switch.py`](#альтернативный-способ--собрать-локально-через-switchpy).
 
 Некоторые платформы (Augment, Cline, VS Code/Copilot) также сканируют `.claude/skills/` как fallback — для них достаточно `main`.
 

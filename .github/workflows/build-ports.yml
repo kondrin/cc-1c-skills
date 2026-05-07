@@ -46,13 +46,113 @@ jobs:
             branch: port-codex-py
             label: Codex
             target_dir: .codex/skills
+          - platform: copilot
+            runtime: powershell
+            branch: port-copilot
+            label: GitHub Copilot
+            target_dir: .github/skills
+          - platform: copilot
+            runtime: python
+            branch: port-copilot-py
+            label: GitHub Copilot
+            target_dir: .github/skills
+          - platform: augment
+            runtime: powershell
+            branch: port-augment
+            label: Augment
+            target_dir: .augment/skills
+          - platform: augment
+            runtime: python
+            branch: port-augment-py
+            label: Augment
+            target_dir: .augment/skills
+          - platform: cline
+            runtime: powershell
+            branch: port-cline
+            label: Cline
+            target_dir: .cline/skills
+          - platform: cline
+            runtime: python
+            branch: port-cline-py
+            label: Cline
+            target_dir: .cline/skills
+          - platform: kilo
+            runtime: powershell
+            branch: port-kilo
+            label: Kilo Code
+            target_dir: .kilocode/skills
+          - platform: kilo
+            runtime: python
+            branch: port-kilo-py
+            label: Kilo Code
+            target_dir: .kilocode/skills
+          - platform: kiro
+            runtime: powershell
+            branch: port-kiro
+            label: Kiro
+            target_dir: .kiro/skills
+          - platform: kiro
+            runtime: python
+            branch: port-kiro-py
+            label: Kiro
+            target_dir: .kiro/skills
+          - platform: gemini
+            runtime: powershell
+            branch: port-gemini
+            label: Gemini CLI
+            target_dir: .gemini/skills
+          - platform: gemini
+            runtime: python
+            branch: port-gemini-py
+            label: Gemini CLI
+            target_dir: .gemini/skills
+          - platform: opencode
+            runtime: powershell
+            branch: port-opencode
+            label: OpenCode
+            target_dir: .opencode/skills
+          - platform: opencode
+            runtime: python
+            branch: port-opencode-py
+            label: OpenCode
+            target_dir: .opencode/skills
+          - platform: roo
+            runtime: powershell
+            branch: port-roo
+            label: Roo Code
+            target_dir: .roo/skills
+          - platform: roo
+            runtime: python
+            branch: port-roo-py
+            label: Roo Code
+            target_dir: .roo/skills
+          - platform: windsurf
+            runtime: powershell
+            branch: port-windsurf
+            label: Windsurf
+            target_dir: .windsurf/skills
+          - platform: windsurf
+            runtime: python
+            branch: port-windsurf-py
+            label: Windsurf
+            target_dir: .windsurf/skills
+          - platform: agents
+            runtime: powershell
+            branch: port-agents
+            label: Agent Skills
+            target_dir: .agents/skills
+          - platform: agents
+            runtime: python
+            branch: port-agents-py
+            label: Agent Skills
+            target_dir: .agents/skills
 
     steps:
       - name: Checkout main
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
