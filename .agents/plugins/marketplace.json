@@ -14,10 +14,7 @@
       "policy": {
         "installation": "AVAILABLE"
       },
-      "category": "Development",
-      "interface": {
-        "shortDescription": "PowerShell runtime (Windows-first)"
-      }
+      "category": "Development"
     },
     {
       "name": "1c-skills-py",
@@ -29,10 +26,7 @@
       "policy": {
         "installation": "AVAILABLE"
       },
-      "category": "Development",
-      "interface": {
-        "shortDescription": "Python runtime (Linux/Mac/Windows)"
-      }
+      "category": "Development"
     }
   ]
 }
