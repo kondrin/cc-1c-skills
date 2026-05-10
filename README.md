@@ -1,10 +1,16 @@
 # 1C Skills for Claude Code
 
-> **Work in progress** — навыки находятся в стадии тестирования, отладки и оптимизации.
+> **Проект живой, активно развивается** — добавляются новые возможности, отлавливаются и исправляются баги, производится оптимизация. Следите за обновлениями.
 
 Набор навыков для AI-агентов (в первую очередь для [Claude Code](https://docs.anthropic.com/en/docs/claude-code/skills)), помогающий охватить полный цикл разработки на платформе 1С:Предприятие 8.3 — от создания конфигураций, расширений, внешних обработок и отчётов до загрузки изменений в информационную базу, обновления, запуска, публикации на веб-сервере (портативная версия Apache), тестирования через веб-клиент и записи видеоинструкций.
 
 Навыки дают модели готовые абстракции над XML-форматами и CLI конфигуратора — чтобы работать с сутью задачи, а не с деталями реализации. А веб-тестирование даёт ей глаза и руки для взаимодействия с интерфейсом 1С.
+
+## Версии навыков для разных платформ
+
+> **PS** — версия со скриптами на PowerShell (стандартная, для Windows). **Py** — версия со скриптами на Python (если PowerShell не подходит). Можно начать с **PS** — это основной вариант.
+
+**Claude Code** [PS](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/main) · [Py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-claude-code-py) — **Cursor** [PS](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cursor) · [Py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cursor-py) — **Codex** [PS](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-codex) · [Py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-codex-py) — [Другие платформы →](#поддерживаемые-платформы)
 
 ## Быстрый старт
 
@@ -14,6 +20,21 @@
 МойПроект/
 ├── .claude/skills/    ← скопировать сюда
 └── ...
+```
+
+Или установите как плагин Claude Code:
+
+```
+/plugin marketplace add https://github.com/Nikolay-Shirokov/cc-1c-skills
+/plugin install 1c-skills@cc-1c-skills        # PowerShell (Windows)
+/plugin install 1c-skills-py@cc-1c-skills     # Python (Linux/Mac или если PS недоступен)
+```
+
+Или установите как плагин OpenAI Codex:
+
+```
+codex plugin marketplace add Nikolay-Shirokov/cc-1c-skills
+codex /plugins   # выберите 1c-skills (PowerShell) или 1c-skills-py (Python) и нажмите Install
 ```
 
 Или используйте скрипт установки:
@@ -61,9 +82,37 @@ python tools/cc-1c-skills/scripts/switch.py
 - **1С:Предприятие 8.3** — для сборки/разборки EPF/ERF (навыки генерации XML работают без платформы)
 - **Node.js 18+** — для `/web-test` (тестирование через браузер)
 
+<a id="поддерживаемые-платформы"></a>
 ### Другие AI-платформы
 
-Навыки построены на открытом стандарте [Agent Skills](https://agentskills.io/specification) и совместимы с любой платформой, поддерживающей этот формат. Скрипт `switch.py` копирует навыки в нужный каталог с перезаписью путей:
+Навыки построены на открытом стандарте [Agent Skills](https://agentskills.io/specification) и совместимы с любой платформой, поддерживающей этот формат. Самый быстрый путь — скачать готовую сборку под нужную платформу из ветки ниже (**Code → Download ZIP**) и распаковать в корень своего проекта.
+
+#### Поддерживаемые платформы
+
+| Платформа | Целевой каталог | PowerShell | Python |
+|-----------|----------------|------------|--------|
+| Claude Code | `.claude/skills/` | [main](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/main) | [port-claude-code-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-claude-code-py) |
+| Cursor | `.cursor/skills/` | [port-cursor](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cursor) | [port-cursor-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cursor-py) |
+| OpenAI Codex | `.codex/skills/` | [port-codex](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-codex) | [port-codex-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-codex-py) |
+| GitHub Copilot | `.github/skills/` | [port-copilot](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-copilot) | [port-copilot-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-copilot-py) |
+| Augment | `.augment/skills/` | [port-augment](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-augment) | [port-augment-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-augment-py) |
+| Cline | `.cline/skills/` | [port-cline](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cline) | [port-cline-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-cline-py) |
+| Kilo Code | `.kilocode/skills/` | [port-kilo](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kilo) | [port-kilo-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kilo-py) |
+| Kiro | `.kiro/skills/` | [port-kiro](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kiro) | [port-kiro-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-kiro-py) |
+| Gemini CLI | `.gemini/skills/` | [port-gemini](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-gemini) | [port-gemini-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-gemini-py) |
+| OpenCode | `.opencode/skills/` | [port-opencode](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-opencode) | [port-opencode-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-opencode-py) |
+| Roo Code | `.roo/skills/` | [port-roo](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-roo) | [port-roo-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-roo-py) |
+| Windsurf | `.windsurf/skills/` | [port-windsurf](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-windsurf) | [port-windsurf-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-windsurf-py) |
+| Agent Skills | `.agents/skills/` | [port-agents](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-agents) | [port-agents-py](https://github.com/Nikolay-Shirokov/cc-1c-skills/tree/port-agents-py) |
+
+Готовые ветки `port-*` пересобираются автоматически на каждое изменение в навыках. Если нужна свежая сборка прямо сейчас — соберите [локально через `switch.py`](#альтернативный-способ--собрать-локально-через-switchpy).
+
+Некоторые платформы (Augment, Cline, VS Code/Copilot) также сканируют `.claude/skills/` как fallback — для них достаточно `main`.
+
+<a id="альтернативный-способ--собрать-локально-через-switchpy"></a>
+#### Альтернативный способ — собрать локально через `switch.py`
+
+Если нужна свежая сборка под свою платформу (или платформа ещё не в матрице port-веток):
 
 ```bash
 python scripts/switch.py                                       # интерактивный режим
@@ -79,26 +128,6 @@ python scripts/switch.py --undo cursor                         # удалить 
 **Ссылки vs копии.** Флаг `--link` (экспериментальный) создаёт directory junction (Windows) или symlink (Linux/Mac) вместо копирования файлов. Обновления в источнике автоматически подхватываются во всех подключённых проектах — достаточно `git pull`. Ссылки доступны только для платформы Claude Code (для остальных платформ требуется перезапись путей в SKILL.md). Удаление ссылок: `--undo` — безопасно удаляет только ссылки, не трогая источник.
 
 > ⚠ **Известные ограничения `--link`:** Node.js резолвит `__dirname` через junction к реальному пути источника, а не к каталогу проекта. Это может приводить к тому, что навыки с Node.js-скриптами (например, `/web-test`) будут записывать файлы в каталог репозитория навыков вместо каталога проекта. При возникновении проблем переключитесь на копирование (без `--link`).
-
-Поддерживаемые платформы:
-
-| Платформа | Целевой каталог | `switch.py <platform>` |
-|-----------|----------------|------------------------|
-| Claude Code | `.claude/skills/` | `claude-code` |
-| Augment | `.augment/skills/` | `augment` |
-| Cline | `.cline/skills/` | `cline` |
-| Cursor | `.cursor/skills/` | `cursor` |
-| GitHub Copilot | `.github/skills/` | `copilot` |
-| Kilo Code | `.kilocode/skills/` | `kilo` |
-| Kiro | `.kiro/skills/` | `kiro` |
-| OpenAI Codex | `.codex/skills/` | `codex` |
-| Gemini CLI | `.gemini/skills/` | `gemini` |
-| OpenCode | `.opencode/skills/` | `opencode` |
-| Roo Code | `.roo/skills/` | `roo` |
-| Windsurf | `.windsurf/skills/` | `windsurf` |
-| Agent Skills | `.agents/skills/` | `agents` |
-
-Некоторые платформы (Augment, Cline, VS Code/Copilot) также сканируют `.claude/skills/` как fallback — для них копирование необязательно, но `switch.py` даёт явный контроль над путями.
 
 Автоактивация — основной режим: просто опишите задачу своими словами, ассистент сам подберёт нужный навык по `description` в SKILL.md. Слеш-команды (например `/epf-init`) — для точного контроля, когда нужно вызвать конкретный навык.
 

@@ -37,7 +37,7 @@ __pycache__/
 *.mp4
 
 # Навыки, скопированные для других AI-платформ (генерируются scripts/switch.py)
-.agents/
+.agents/skills/
 .augment/
 .cline/
 .codex/
