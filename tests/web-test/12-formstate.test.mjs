@@ -2,7 +2,7 @@ export const name = 'getFormState: базовая структура — fields,
 export const tags = ['formstate', 'smoke'];
 export const timeout = 60000;
 
-export default async function({ navigateSection, openCommand, clickElement, closeForm, getFormState, assert, step, log }) {
+export default async function({ navigateSection, openCommand, clickElement, closeForm, getFormState, getPage, assert, step, log }) {
 
   await step('basic: getFormState на форме списка возвращает таблицу и команды', async () => {
     await navigateSection('Склад');
@@ -29,6 +29,43 @@ export default async function({ navigateSection, openCommand, clickElement, clos
     assert.ok(named, 'Должно быть поле Наименование');
     assert.equal(named.value, 'ООО Север', 'value поля Наименование');
     assert.ok(named.label, 'У поля есть label');
+    await closeForm();
+  });
+
+  await step('modal: форма выбора Контрагентов открыта как модальная', async () => {
+    await navigateSection('Склад');
+    await openCommand('Приходная накладная');
+    await clickElement('Создать');
+    const page = await getPage();
+    // Найти input Контрагент и фокус, затем F4 → откроется модальная форма выбора
+    const focused = await page.evaluate(`(() => {
+      const inputs = [...document.querySelectorAll('input')];
+      const target = inputs.find(i => /Контрагент/i.test(i.id || '') && i.offsetWidth > 0);
+      if (target) { target.focus(); return target.id; }
+      return null;
+    })()`);
+    log(`focused input id=${focused}`);
+    await page.keyboard.press('F4');
+    await page.waitForTimeout(1500);
+
+    const s = await getFormState();
+    log(`after F4: form=${s.form} formCount=${s.formCount} modal=${s.modal}`);
+    assert.equal(s.modal, true, 'state.modal=true для модальной формы выбора');
+    assert.ok(s.formCount >= 2, 'formCount >= 2 (родитель + модальная)');
+
+    await closeForm();
+    await closeForm({ save: false });
+  });
+
+  await step('tabs: на форме элемента Номенклатуры присутствует tabs[]', async () => {
+    await navigateSection('Склад');
+    await openCommand('Номенклатура');
+    await clickElement('Товары', { dblclick: true });
+    await clickElement('Товар 01', { dblclick: true });
+    const s = await getFormState();
+    log(`tabs: ${JSON.stringify(s.tabs)}`);
+    assert.ok(Array.isArray(s.tabs), 'state.tabs должен быть массивом');
+    assert.ok(s.tabs.length >= 2, `На форме Номенклатуры >= 2 табов (got ${s.tabs.length})`);
     await closeForm();
   });
 }
