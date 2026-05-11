@@ -92,14 +92,18 @@ export default async function({ navigateSection, openCommand, clickElement, clos
     await closeForm({ save: false });
   });
 
-  await step('more-menu: clickElement("Ещё") возвращает submenu[]', async () => {
+  await step('more-menu / submenu-read: clickElement("Ещё") возвращает submenu[] с типовыми пунктами', async () => {
     await navigateSection('Склад');
     await openCommand('Контрагенты');
     const r = await clickElement('Ещё');
     const items = r.submenu || [];
     log(`submenu items: ${items.length} sample=${items.slice(0, 5).join(', ')}`);
+    assert.equal(r.clicked?.kind, 'submenu', 'clicked.kind=submenu');
     assert.ok(Array.isArray(r.submenu), 'clickElement("Ещё") должен вернуть submenu[]');
-    assert.ok(items.length >= 1, 'submenu не должен быть пустым');
+    assert.ok(items.length >= 5, `submenu должен содержать типовые пункты (got ${items.length})`);
+    assert.includes(items, 'Создать', 'пункт «Создать»');
+    assert.includes(items, 'Изменить', 'пункт «Изменить»');
+    assert.includes(items, 'Расширенный поиск', 'пункт «Расширенный поиск»');
     // Закрыть submenu
     const page = await getPage();
     await page.keyboard.press('Escape');

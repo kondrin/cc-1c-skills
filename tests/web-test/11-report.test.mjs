@@ -95,6 +95,29 @@ export default async function({ navigateSection, openCommand, getFormState, getC
     assert.equal(report.totals['Сумма'], baseTotalSum, 'Восстановился исходный итог по Сумме');
   });
 
+  await step('drill-down: dblclick по ячейке Номенклатура открывает форму элемента', async () => {
+    // Сформируем отчёт ещё раз для чистого состояния
+    await clickElement('Сформировать');
+    await wait(3);
+    const r = await readSpreadsheet();
+    const namedIdx = r.data.findIndex(row => row['Номенклатура']);
+    log(`first row with Номенклатура: idx=${namedIdx} value=${r.data[namedIdx]?.['Номенклатура']}`);
+    assert.ok(namedIdx >= 0, 'есть строка с заполненной Номенклатурой');
+
+    const beforeForm = await getFormState();
+    const clicked = await clickElement({ row: namedIdx, column: 'Номенклатура' }, { dblclick: true });
+    log(`clicked: ${JSON.stringify(clicked.clicked)}`);
+    assert.equal(clicked.clicked?.kind, 'spreadsheetCell', 'clicked.kind=spreadsheetCell');
+    await wait(1);
+
+    const after = await getFormState();
+    log(`after drill: form=${after.form} buttons=${after.buttons?.map(b => b.name).join(',')}`);
+    assert.notEqual(after.form, beforeForm.form, 'открыта новая форма (form изменился)');
+    const hasItemButton = after.buttons?.some(b => b.name === 'Записать и закрыть' || b.name === 'Записать');
+    assert.ok(hasItemButton, 'открыта форма элемента (есть «Записать»)');
+    await closeForm();
+  });
+
   await step('cleanup: закрываем форму отчёта', async () => {
     const r = await closeForm();
     log(`closed=${r.closed} formCount=${r.formCount}`);
