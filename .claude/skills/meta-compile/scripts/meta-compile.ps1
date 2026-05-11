@@ -1,4 +1,4 @@
-﻿# meta-compile v1.11 — Compile 1C metadata object from JSON
+﻿# meta-compile v1.12 — Compile 1C metadata object from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -502,6 +502,7 @@ function Parse-AttributeShorthand {
 		fillChecking = if ($val.fillChecking) { "$($val.fillChecking)" } else { "" }
 		indexing = if ($val.indexing) { "$($val.indexing)" } else { "" }
 		multiLine = if ($val.multiLine -eq $true) { $true } else { $false }
+		choiceHistoryOnInput = if ($val.choiceHistoryOnInput) { "$($val.choiceHistoryOnInput)" } else { "" }
 	}
 }
 
@@ -822,7 +823,8 @@ function Emit-Attribute {
 	X "$indent`t`t<CreateOnInput>Auto</CreateOnInput>"
 	X "$indent`t`t<ChoiceForm/>"
 	X "$indent`t`t<LinkByType/>"
-	X "$indent`t`t<ChoiceHistoryOnInput>Auto</ChoiceHistoryOnInput>"
+	$chi = if ($parsed.choiceHistoryOnInput) { $parsed.choiceHistoryOnInput } else { "Auto" }
+	X "$indent`t`t<ChoiceHistoryOnInput>$chi</ChoiceHistoryOnInput>"
 
 	# Use — only for catalog top-level attributes
 	if ($context -eq "catalog") {

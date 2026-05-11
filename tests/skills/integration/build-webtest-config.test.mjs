@@ -140,7 +140,9 @@ export const steps = [
       type: 'Document', name: 'ПриходнаяНакладная',
       attributes: [
         { name: 'Организация', type: 'CatalogRef.Организации' },
-        { name: 'Контрагент', type: 'CatalogRef.Контрагенты' },
+        // choiceHistoryOnInput=DontUse: предотвращает выбор через историю в smoke-тестах
+        // (04-selectvalue/direct-form проверяет open-form path; история обходит его).
+        { name: 'Контрагент', type: 'CatalogRef.Контрагенты', choiceHistoryOnInput: 'DontUse' },
         { name: 'Склад', type: 'String', length: 50 },
         { name: 'Комментарий', type: 'String', length: 200 },
       ],
