@@ -68,4 +68,41 @@ export default async function({ navigateSection, openCommand, clickElement, clos
     assert.ok(s.tabs.length >= 2, `На форме Номенклатуры >= 2 табов (got ${s.tabs.length})`);
     await closeForm();
   });
+
+  await step('subordinate-nav: форма элемента Контрагент возвращает state.navigation с КонтактнымиЛицами', async () => {
+    await navigateSection('Склад');
+    await openCommand('Контрагенты');
+    await clickElement('ООО Север', { dblclick: true });
+    const s = await getFormState();
+    log(`navigation: ${JSON.stringify(s.navigation)}`);
+    assert.ok(Array.isArray(s.navigation), 'state.navigation — массив');
+    assert.ok(s.navigation.length >= 2, 'минимум Основное + один подчинённый');
+    const main = s.navigation.find(n => n.active);
+    assert.ok(main && main.name === 'Основное', 'активная ссылка — Основное');
+    const sub = s.navigation.find(n => /Контактные/.test(n.name));
+    assert.ok(sub, 'есть ссылка на Контактные лица');
+    await closeForm();
+  });
+
+  await step('platform-dialogs: открытый «О программе» виден в state.platformDialogs', async () => {
+    const page = await getPage();
+    await page.click('#captionbarMore');
+    await page.waitForTimeout(800);
+    await page.getByText('О программе...', { exact: true }).click();
+    await page.waitForTimeout(1500);
+    const s = await getFormState();
+    log(`platformDialogs: ${JSON.stringify(s.platformDialogs)}`);
+    assert.ok(Array.isArray(s.platformDialogs) && s.platformDialogs.length === 1,
+      'state.platformDialogs — массив с одним элементом');
+    assert.equal(s.platformDialogs[0].type, 'about', 'type=about');
+    assert.equal(s.platformDialogs[0].title, 'О программе', 'title');
+  });
+
+  await step('platform-dialog-close: closeForm закрывает платформенный диалог', async () => {
+    // About остался открыт с предыдущего шага
+    await closeForm();
+    const s = await getFormState();
+    log(`platformDialogs after closeForm: ${s.platformDialogs?.length || 0}`);
+    assert.ok(!s.platformDialogs?.length, 'после closeForm нет platformDialogs');
+  });
 }
