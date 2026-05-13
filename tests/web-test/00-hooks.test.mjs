@@ -42,6 +42,16 @@ export default async function ({ step, assert, log, testInfo }) {
     assert.equal(typeof testInfo.primaryContext, 'string', 'primaryContext должен быть строкой');
   });
 
+  await step('afterOpenContext отработал хотя бы для default', () => {
+    // Default контекст создаётся до beforeAll → afterOpenContext должен был
+    // отработать как минимум один раз. beforeCloseContext в теле первого
+    // теста ещё не вызывался (контексты живы).
+    assert.ok(_state.afterOpenContext >= 1,
+      `afterOpenContext=${_state.afterOpenContext}, ожидался >= 1 (default-контекст создан)`);
+    assert.equal(_state.beforeCloseContext, 0,
+      `beforeCloseContext=${_state.beforeCloseContext}, ожидался 0 (контексты ещё живы)`);
+  });
+
   await step('afterEach для этого теста ещё не вызывался', () => {
     // В теле теста afterEach НЕ должен быть вызван ни разу для текущего теста.
     // Если 00-hooks запущен первым (что и ожидается), afterEach === 0.

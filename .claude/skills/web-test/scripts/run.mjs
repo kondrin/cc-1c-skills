@@ -511,11 +511,37 @@ async function cmdTest(rawArgs) {
   if (hooks.prepare) await hooks.prepare(hookEnv);
 
   // Lazy context creation: ensures the named browser context exists, creating it on first request.
+  // Fires `afterOpenContext(ctx, name, spec)` once per context — right after createContext succeeds.
+  // The hook receives the same `ctx` that tests use (assembled below), so it can access browser API.
   async function ensureContext(name) {
     if (browser.hasContext(name)) return;
     const spec = contextSpecs[name];
     if (!spec) throw new Error(`Unknown context "${name}". Defined: [${Object.keys(contextSpecs).join(', ')}]`);
     await browser.createContext(name, spec.url, { isolation: spec.isolation || defaultIsolation });
+    if (hooks.afterOpenContext && hookCtx) {
+      try { await hooks.afterOpenContext(hookCtx, name, spec); }
+      catch (e) { hookLog(`afterOpenContext("${name}") threw: ${e.message.split('\n')[0]}`); }
+    }
+  }
+
+  // `hookCtx` is set after buildContext below; ensureContext is also called before ctx exists
+  // (for the default context), so we tolerate `hookCtx === undefined` there — the default
+  // context's afterOpenContext fires once ctx is built, in the explicit call below.
+  let hookCtx = null;
+
+  // Wrap `target.closeContext` so calling it from a test fires `beforeCloseContext(ctx, name, spec)`
+  // before delegating to the bare browser.closeContext. Applied to the flat ctx and each scoped
+  // context (ctx.a / ctx.b) so `await a.closeContext('b')` triggers the hook.
+  function wrapCloseContextHook(target) {
+    const orig = target.closeContext;
+    if (typeof orig !== 'function') return;
+    target.closeContext = async (name) => {
+      if (hooks.beforeCloseContext) {
+        try { await hooks.beforeCloseContext(target, name, contextSpecs[name]); }
+        catch (e) { hookLog(`beforeCloseContext("${name}") threw: ${e.message.split('\n')[0]}`); }
+      }
+      return await orig(name);
+    };
   }
 
   try {
@@ -529,6 +555,14 @@ async function cmdTest(rawArgs) {
     const ctx = buildContext({ noRecord: false });
     ctx.assert = createAssertions();
     ctx.log = (...a) => { /* per-test, overridden below */ };
+    wrapCloseContextHook(ctx);
+    hookCtx = ctx;
+
+    // Default context was created BEFORE hookCtx existed → fire afterOpenContext now.
+    if (hooks.afterOpenContext) {
+      try { await hooks.afterOpenContext(ctx, defaultContextName, contextSpecs[defaultContextName]); }
+      catch (e) { hookLog(`afterOpenContext("${defaultContextName}") threw: ${e.message.split('\n')[0]}`); }
+    }
 
     // beforeAll
     if (hooks.beforeAll) await hooks.beforeAll(ctx);
@@ -630,6 +664,7 @@ async function cmdTest(rawArgs) {
         if (t.contexts && t.contexts.length) {
           for (const cn of t.contexts) {
             ctx[cn] = buildScopedContext(cn);
+            wrapCloseContextHook(ctx[cn]);
             scopedKeys.push(cn);
           }
         }
@@ -722,7 +757,35 @@ async function cmdTest(rawArgs) {
     if (hooks.afterAll) try { await hooks.afterAll(ctx); } catch {}
 
   } finally {
-    // Disconnect
+    // Per-context teardown: fire beforeCloseContext for every remaining slot, then close.
+    // Mirror the `ctx.a.closeContext('b')` invariant: active is some OTHER context while
+    // closing `name`. We keep the first registered context (the default) as the survivor —
+    // it stays active, hooks fire against it, the other slots are closed one by one.
+    // The default itself is closed by disconnect() (no surviving context to switch to).
+    try {
+      const remaining = browser.listContexts();
+      if (remaining.length > 0) {
+        const survivor = remaining[0];
+        try { await browser.setActiveContext(survivor); } catch {}
+        for (let i = remaining.length - 1; i >= 1; i--) {
+          const name = remaining[i];
+          if (hooks.beforeCloseContext && hookCtx) {
+            try { await hooks.beforeCloseContext(hookCtx, name, contextSpecs[name]); }
+            catch (e) { hookLog(`beforeCloseContext("${name}") threw: ${e.message.split('\n')[0]}`); }
+          }
+          try { await browser.closeContext(name); }
+          catch (e) { hookLog(`closeContext("${name}") failed: ${e.message.split('\n')[0]}`); }
+        }
+        // Fire beforeCloseContext for the survivor too — disconnect() actually closes it.
+        if (hooks.beforeCloseContext && hookCtx) {
+          try { await hooks.beforeCloseContext(hookCtx, survivor, contextSpecs[survivor]); }
+          catch (e) { hookLog(`beforeCloseContext("${survivor}") threw: ${e.message.split('\n')[0]}`); }
+        }
+      }
+    } catch (e) {
+      hookLog(`final teardown loop failed: ${e.message.split('\n')[0]}`);
+    }
+    // Disconnect — closes the last remaining context + browser.
     try { await browser.disconnect(); } catch {}
     // Cleanup: infrastructure hooks (same signature as prepare)
     if (hooks.cleanup) try { await hooks.cleanup(hookEnv); } catch {}

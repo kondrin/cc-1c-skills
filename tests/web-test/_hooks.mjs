@@ -1,4 +1,4 @@
-// _hooks.mjs v0.4 — автономный тестовый стенд для web-test + testlevel-хуки + title slides
+// _hooks.mjs v0.5 — автономный стенд + testlevel-хуки + title slides + per-context badge
 //
 // `prepare()` поднимает изолированный стенд по smart-логике:
 //   1) Если нужно пересоздавать БД (config-rebuild или --reload-data) — web-stop
@@ -310,6 +310,8 @@ export const _state = {
   afterAll: 0,
   beforeEach: 0,
   afterEach: 0,
+  afterOpenContext: 0,
+  beforeCloseContext: 0,
   events: [],
   lastTestResult: null,
 };
@@ -362,4 +364,56 @@ export async function afterEach(ctx) {
     _state.lastTestResult = null;
   }
   _state.events.push(`afterEach:${ctx.testInfo?.file || '?'}:${ctx.testResult?.status || '?'}`);
+}
+
+// ── Per-context hooks (M8) ────────────────────────────────────────────────────
+//
+// `afterOpenContext` инжектит persistent DOM-badge с displayName в правый
+// верхний угол страницы контекста — в записанном видео всегда видно, какая
+// вкладка к какому пользователю относится. Badge переживает любые
+// перерисовки 1С (это собственный div с z-index, не часть SPA).
+//
+// `beforeCloseContext` — counter-only (страница вот-вот закроется, делать
+// что-либо с DOM бессмысленно).
+
+async function injectContextBadge(ctx, name, spec) {
+  const label = spec?.displayName || name;
+  // ctx может быть scoped (auto-setActiveContext) или flat — в любом случае
+  // getPage() возвращает активную страницу, которая на момент afterOpenContext
+  // = только что созданный контекст.
+  const page = ctx.getPage?.();
+  if (!page) return;
+  await page.evaluate((text) => {
+    let div = document.getElementById('__web_test_ctx_badge');
+    if (!div) {
+      div = document.createElement('div');
+      div.id = '__web_test_ctx_badge';
+      document.body.appendChild(div);
+    }
+    div.style.cssText = [
+      'position:fixed', 'top:8px', 'right:8px',
+      'padding:4px 10px',
+      'background:rgba(30,30,46,0.85)', 'color:#fff',
+      'font:600 13px Segoe UI,Arial,sans-serif',
+      'border-radius:4px', 'box-shadow:0 2px 6px rgba(0,0,0,0.25)',
+      'z-index:999998', 'pointer-events:none',
+      'letter-spacing:0.3px',
+    ].join(';');
+    div.textContent = text;
+  }, label);
+}
+
+export async function afterOpenContext(ctx, name, spec) {
+  _state.afterOpenContext++;
+  _state.events.push(`afterOpenContext:${name}`);
+  try {
+    await injectContextBadge(ctx, name, spec);
+  } catch {
+    // Не валим прогон если badge не сел — это чисто визуальный bonus.
+  }
+}
+
+export async function beforeCloseContext(_ctx, name, _spec) {
+  _state.beforeCloseContext++;
+  _state.events.push(`beforeCloseContext:${name}`);
 }

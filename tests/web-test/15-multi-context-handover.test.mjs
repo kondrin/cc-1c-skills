@@ -43,4 +43,32 @@ export default async function({ a, b, assert, step, log }) {
     await a.closeForm();
     log('a deleted');
   });
+
+  await step('a: освободить контекст b через closeContext', async () => {
+    // M8: handover завершён, b больше не нужен — освобождаем лицензию.
+    // scoped-обёртка `a.closeContext('b')` сначала setActiveContext('a'),
+    // потом browser.closeContext('b') → 'b' уже неактивен → success.
+    const before = await a.listContexts();
+    assert.includes(before, 'b', 'b должен быть в списке до closeContext');
+    await a.closeContext('b');
+    const after = await a.listContexts();
+    log(`contexts: before=[${before.join(',')}] after=[${after.join(',')}]`);
+    assert.ok(!after.includes('b'), `b должен исчезнуть, но contexts=[${after.join(',')}]`);
+    assert.includes(after, 'a', 'a должен остаться');
+  });
+
+  await step('a: closeContext активного контекста бросает', async () => {
+    // M8 invariant: нельзя закрыть active. scoped a.closeContext('a') сначала
+    // setActiveContext('a'), потом browser.closeContext('a') — 'a' активен → throw.
+    let caught = null;
+    try {
+      await a.closeContext('a');
+    } catch (e) {
+      caught = e;
+    }
+    assert.ok(caught, 'closeContext(active) должен бросить, но не бросил');
+    assert.match(caught.message, /cannot close the active context/,
+      `ожидался текст "cannot close the active context", получено: ${caught.message}`);
+    log(`thrown as expected: ${caught.message.split('\n')[0]}`);
+  });
 }

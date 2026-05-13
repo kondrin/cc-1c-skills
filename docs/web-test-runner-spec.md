@@ -330,23 +330,41 @@ assert.noErrors(state, msg)
 - `afterEach(ctx)` -- после каждого теста. Дополнительно доступен `ctx.testResult`
   с результатом завершившегося теста (status/duration/error/...).
 
+**Контекстный уровень** (на каждый browser-контекст, lifecycle = создан → удалён):
+- `afterOpenContext(ctx, name, spec)` -- сразу после успешного `createContext`.
+  `spec` -- запись из `config.contexts[name]` со всеми custom-полями (`displayName`,
+  `url`, `isolation`, ...). Полезно: инжект persistent overlay/badge,
+  preload-навигация для контекста, регистрация телеметрии.
+- `beforeCloseContext(ctx, name, spec)` -- перед `closeContext` (контекст ещё
+  активен и работает). Полезно: финальный flush, сбор метрик, последний скриншот.
+  Срабатывает как при явном `ctx.closeContext(name)` из теста, так и в
+  финальном teardown раннера перед `disconnect`.
+
+`closeContext(name)` валиден только когда `name !== getActiveContext()` -- иначе
+бросает. В scoped API (`ctx.a.closeContext('b')`) это естественно: scoped-обёртка
+сначала `setActiveContext('a')`, потом close `'b'` -- target всегда не активен.
+
 ### Порядок выполнения
 
 ```
 prepare()                          // без браузера (восстановление БД, публикация)
   browser.launch()                 // запуск процесса браузера
-  создание BrowserContext'ов       // по одному на каждый используемый контекст
-    beforeAll(ctx)                 // браузер готов, контексты созданы
+  createContext(default)           // первый контекст создан
+    afterOpenContext(ctx, default) // hook: контекст готов
+    beforeAll(ctx)                 // браузер готов, default-контекст создан
+      [lazy ensureContext(name)]   // для multi-context тестов
+        afterOpenContext(ctx, name)
       beforeEach(ctx)
         test.setup(ctx)            // подготовка теста
-          test.default(ctx)        // тело теста
+          test.default(ctx)        // тело теста (может вызвать ctx.closeContext)
+            [при ctx.closeContext(x)]: beforeCloseContext(ctx, x) → close(x)
         test.teardown(ctx)         // очистка теста (всегда)
       afterEach(ctx)               // всегда
-      [встроенный сброс]           // всегда (для каждого активного контекста)
+      [встроенный сброс]           // всегда (для каждого живого контекста теста)
       ...следующий тест...
     afterAll(ctx)
-  закрытие всех BrowserContext'ов
-  browser.close()
+  [для каждого оставшегося контекста]: beforeCloseContext → closeContext
+  browser.close()                  // финальный disconnect
 cleanup()                          // без браузера (удаление публикации)
 ```
 

@@ -169,6 +169,23 @@ export async function connect(url, { extensionPath } = {}) {
 }
 
 /**
+ * Best-effort POST /e1cib/logout on a slot to release the 1C session license.
+ * Silent — if page is closed or session info missing, just returns.
+ * @param {object} slot   { page, sessionPrefix, seanceId } from contexts Map
+ * @param {number} [waitMs=500]  pause after logout fetch (gives 1C time to process)
+ */
+async function _logoutSlot(slot, waitMs = 500) {
+  if (!slot?.page || slot.page.isClosed() || !slot.seanceId || !slot.sessionPrefix) return;
+  try {
+    const logoutUrl = `${slot.sessionPrefix}/e1cib/logout?seanceId=${slot.seanceId}`;
+    await slot.page.evaluate(async (url) => {
+      await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"root":{}}' });
+    }, logoutUrl);
+    await slot.page.waitForTimeout(waitMs);
+  } catch {}
+}
+
+/**
  * Gracefully terminate the 1C session and close the browser.
  * Sends POST /e1cib/logout to release the license before closing.
  */
@@ -181,15 +198,7 @@ export async function disconnect() {
       try { await stopRecording(); } catch {}
     }
     for (const [, slot] of contexts.entries()) {
-      if (slot.page && !slot.page.isClosed() && slot.seanceId && slot.sessionPrefix) {
-        try {
-          const logoutUrl = `${slot.sessionPrefix}/e1cib/logout?seanceId=${slot.seanceId}`;
-          await slot.page.evaluate(async (url) => {
-            await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"root":{}}' });
-          }, logoutUrl);
-          await slot.page.waitForTimeout(500);
-        } catch {}
-      }
+      await _logoutSlot(slot);
     }
     contexts.clear();
     activeContextName = null;
@@ -203,19 +212,7 @@ export async function disconnect() {
 
   if (browser) {
     // Graceful logout — release the 1C license (single-session connect path)
-    if (page && !page.isClosed() && seanceId && sessionPrefix) {
-      try {
-        const logoutUrl = `${sessionPrefix}/e1cib/logout?seanceId=${seanceId}`;
-        await page.evaluate(async (url) => {
-          await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: '{"root":{}}'
-          });
-        }, logoutUrl);
-        await page.waitForTimeout(1000);
-      } catch {}
-    }
+    await _logoutSlot({ page, sessionPrefix, seanceId }, 1000);
     await browser.close().catch(() => {});
     browser = null;
     page = null;
@@ -430,6 +427,32 @@ export function getActiveContext() {
 
 export function hasContext(name) {
   return contexts.has(name);
+}
+
+/**
+ * Close a named context: logout, close its page (tab mode) or BrowserContext
+ * (window mode), remove from registry. Cannot close the currently active
+ * context — caller must setActiveContext to another first. This keeps the
+ * recorder/page invariants simple: recorder is always attached to the
+ * active slot, which closeContext never touches.
+ *
+ * @throws if name is not registered or equals the active context.
+ */
+export async function closeContext(name) {
+  if (!contexts.has(name)) {
+    throw new Error(`Context "${name}" not found. Available: [${[...contexts.keys()].join(', ')}]`);
+  }
+  if (name === activeContextName) {
+    throw new Error(`closeContext: cannot close the active context "${name}". setActiveContext to another context first.`);
+  }
+  const slot = contexts.get(name);
+  await _logoutSlot(slot);
+  if (activeMode === 'tab') {
+    try { await slot.page.close(); } catch {}
+  } else {
+    try { await slot.context.close(); } catch {}
+  }
+  contexts.delete(name);
 }
 
 /**
