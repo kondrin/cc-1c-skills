@@ -18,7 +18,7 @@
  */
 import http from 'http';
 import * as browser from './browser.mjs';
-import { readFileSync, writeFileSync, unlinkSync, existsSync, readdirSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, unlinkSync, existsSync, readdirSync, mkdirSync, copyFileSync, statSync } from 'fs';
 import { resolve, dirname, basename, relative } from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
@@ -821,6 +821,7 @@ async function cmdTest(rawArgs) {
 
   if (opts.format === 'allure') {
     writeAllure(results, reportDir, severityIndex);
+    syncAllureExtras(testDir, reportDir);
   } else if (opts.format === 'junit') {
     writeFileSync(resolve(opts.report), buildJUnit(report, testDir));
   } else if (opts.report) {
@@ -828,6 +829,28 @@ async function cmdTest(rawArgs) {
   }
 
   if (failCount > 0) process.exit(1);
+}
+
+/**
+ * Copy any files from `<testDir>/_allure/` into `reportDir`. Convention for
+ * Allure customization that doesn't fit inside per-test JSON:
+ *   - `categories.json` — failure classification (regex → bucket)
+ *   - `environment.properties` — values shown in the Environment widget
+ *   - `executor.json` — CI/CD metadata
+ * Underscored folder mirrors `_hooks.mjs` convention (infra, not a test).
+ * Silent if folder absent.
+ */
+function syncAllureExtras(testDir, reportDir) {
+  const extrasDir = resolve(testDir, '_allure');
+  if (!existsSync(extrasDir)) return;
+  try {
+    if (!statSync(extrasDir).isDirectory()) return;
+  } catch { return; }
+  for (const entry of readdirSync(extrasDir, { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    try { copyFileSync(resolve(extrasDir, entry.name), resolve(reportDir, entry.name)); }
+    catch { /* best-effort */ }
+  }
 }
 
 function writeAllure(results, reportDir, severityIndex) {

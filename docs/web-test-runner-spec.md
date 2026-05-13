@@ -752,6 +752,32 @@ await step('Кладовщик проверяет статус', async () => {
 
 Пример: `tags: ['smoke', 'recording']` + `severity: { critical: ['smoke'], minor: ['recording'] }` → severity = `critical` (5 > 2).
 
+#### Доп. файлы Allure через `<testDir>/_allure/`
+
+Раннер ищет каталог `_allure/` рядом с тестами и копирует все его файлы в
+`reportDir` перед генерацией отчёта. Конвенция для статичной настройки
+Allure, которой нет места внутри per-test JSON:
+
+| Файл | Назначение |
+|------|-----------|
+| `categories.json` | Классификация падений по regex (группировка failed-тестов в виджете Categories — «timeout», «license-flake», «1C modal» etc.) |
+| `environment.properties` | `key=value` строки в виджет Environment (URL, версия 1С, ветка git, build-номер) |
+| `executor.json` | CI/CD-метаданные (Jenkins URL, GitHub run-id и т.п.) |
+
+Underscore в имени — параллель `_hooks.mjs` (инфраструктура, не тест).
+Discovery каталог `_allure/` пропускает по общему правилу (`startsWith('_')`).
+Если каталога нет — no-op.
+
+Пример `categories.json` (минимальный):
+```json
+[
+  { "name": "Timeout", "messageRegex": "Timeout \\(\\d+ms\\)" },
+  { "name": "Assertion", "messageRegex": "(Expected|AssertionError).*" }
+]
+```
+
+Полный пример с 1С-специфичными паттернами — см. `tests/web-test/_allure/categories.json`.
+
 ### JUnit XML (`--format=junit`)
 
 ```xml
