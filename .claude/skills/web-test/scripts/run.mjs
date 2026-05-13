@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// web-test run v1.11 — CLI runner for 1C web client automation
+// web-test run v1.12 — CLI runner for 1C web client automation
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 /**
  * CLI runner for 1C web client automation.
@@ -408,10 +408,10 @@ async function cmdTest(rawArgs) {
   const defaultIsolation = config.isolation || 'tab';
   if (config.contexts && typeof config.contexts === 'object' && Object.keys(config.contexts).length) {
     for (const [n, spec] of Object.entries(config.contexts)) {
-      contextSpecs[n] = { url: spec.url, isolation: spec.isolation };
+      contextSpecs[n] = { ...spec };
     }
     defaultContextName = config.defaultContext || Object.keys(config.contexts)[0];
-    if (url) contextSpecs[defaultContextName] = { url }; // CLI override of default
+    if (url) contextSpecs[defaultContextName] = { ...contextSpecs[defaultContextName], url }; // CLI override of default url (preserve custom fields)
   } else {
     const fallbackUrl = url || config.url;
     if (!fallbackUrl) die('No URL provided and no webtest.config.mjs found');
@@ -572,6 +572,23 @@ async function cmdTest(rawArgs) {
         let stepIdx = 0;
         const t0 = Date.now();
 
+        // testInfo — declarative metadata about the current test, visible
+        // to test body and hooks (beforeEach/afterEach). Overwritten on
+        // each attempt and each test (no delete, mirrors ctx.log/step lifecycle).
+        ctx.testInfo = {
+          name: t.name,
+          file: basename(t.file),
+          filePath: t.file,
+          tags: t.tags,
+          timeout: t.timeout,
+          attempt,
+          maxAttempts,
+          param: t.param,
+          contexts: Object.fromEntries(testContextNames.map(n => [n, contextSpecs[n]])),
+          primaryContext: testContextNames[0],
+        };
+        ctx.testResult = null; // set right before afterEach
+
         let videoFile = null;
         if (opts.record) {
           videoFile = resolve(reportDir, `${testIdx}-${slugify(t.name)}.mp4`);
@@ -631,6 +648,8 @@ async function cmdTest(rawArgs) {
 
           // per-test teardown
           if (t.teardown) try { await t.teardown(ctx); } catch {}
+          // Expose testResult to afterEach (preliminary — full testResult assembled below).
+          ctx.testResult = { status: 'passed', duration: elapsed(t0), attempts: attempt, error: null, steps };
           // afterEach
           if (hooks.afterEach) try { await hooks.afterEach(ctx); } catch {}
           // Built-in state reset across all contexts the test used
@@ -661,6 +680,9 @@ async function cmdTest(rawArgs) {
 
           // per-test teardown (always)
           if (t.teardown) try { await t.teardown(ctx); } catch {}
+          // Expose preliminary testResult to afterEach (final testResult assembled below).
+          const errInfo = { message: e.message, step: e.onecError?.step, screenshot: shotFile };
+          ctx.testResult = { status: 'failed', duration: elapsed(t0), attempts: attempt, error: errInfo, steps };
           // afterEach (always)
           if (hooks.afterEach) try { await hooks.afterEach(ctx); } catch {}
           // Built-in state reset across all contexts the test used

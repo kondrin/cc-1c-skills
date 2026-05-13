@@ -159,6 +159,50 @@ export default async function({ кладовщик, менеджер, step }) {
 - `assert.*` -- хелперы утверждений (см. раздел 5)
 - `log(...args)` -- добавить в вывод теста
 
+### Метаданные теста (`ctx.testInfo`)
+
+Декларативная информация о текущем тесте. Раннер выставляет `ctx.testInfo`
+перед каждой попыткой (до `beforeEach`), хук и тело теста могут читать.
+Не предназначено для мутации.
+
+```js
+ctx.testInfo = {
+  name,             // 'Навигация по разделам' (с подставленными params)
+  file,             // '01-navigation.test.mjs' (basename)
+  filePath,         // '01-navigation.test.mjs' (relative к testDir)
+  tags,             // ['nav', 'smoke']
+  timeout,          // 60000 (ms)
+  attempt,          // 1..maxAttempts (1-based)
+  maxAttempts,      // 1 + retry
+  param,            // { ... } | undefined (для export const params)
+  contexts: {       // объект, всегда 1+ ключей; зеркалит config.contexts
+    a: { url, isolation, ...customFields },
+    b: { ... },
+  },
+  primaryContext,   // 'a' — имя контекста, активного на входе в тест
+                    // (= t.context для single, t.contexts[0] для multi)
+}
+```
+
+Доступ к специфике контекста: `testInfo.contexts[testInfo.primaryContext].displayName`.
+`primaryContext` — декларация теста, не зависит от runtime-состояния
+`getActiveContext()` (которое может меняться внутри теста).
+
+### Результат теста в afterEach (`ctx.testResult`)
+
+Только в `afterEach`. До запуска теста — `null`. После — заполняется
+раннером перед вызовом хука:
+
+```js
+ctx.testResult = {
+  status,      // 'passed' | 'failed'
+  duration,    // ms
+  attempts,    // фактически выполнено попыток (1..maxAttempts)
+  error,       // { message, step?, screenshot? } | null
+  steps,       // массив step-результатов
+}
+```
+
 ### Мульти-контекст
 
 При `export const contexts = ['a', 'b']`:
@@ -282,8 +326,9 @@ assert.noErrors(state, msg)
 **Тестовый уровень** (с контекстом браузера):
 - `beforeAll(ctx)` -- после подключения, перед первым тестом
 - `afterAll(ctx)` -- после последнего теста, до отключения
-- `beforeEach(ctx)` -- перед каждым тестом
-- `afterEach(ctx)` -- после каждого теста
+- `beforeEach(ctx)` -- перед каждым тестом. На входе уже доступен `ctx.testInfo` (см. §3).
+- `afterEach(ctx)` -- после каждого теста. Дополнительно доступен `ctx.testResult`
+  с результатом завершившегося теста (status/duration/error/...).
 
 ### Порядок выполнения
 
@@ -377,13 +422,16 @@ URL должен быть передан через CLI.
 
 ```js
 export default {
-  // Контексты: именованные URL для разных пользователей/ролей
+  // Контексты: именованные URL для разных пользователей/ролей.
+  // Рекомендация: латинский ID контекста (`clerk`, `manager`) + кириллический
+  // `displayName` для UI/слайдов. Любые custom-поля пробрасываются как есть
+  // и доступны хукам через `ctx.testInfo.contexts[name]` (см. §3).
   contexts: {
-    кладовщик: { url: 'http://localhost/app-clerk/ru_RU' },
-    менеджер:  { url: 'http://localhost/app-manager/ru_RU' },
-    админ:     { url: 'http://localhost/app-admin/ru_RU' },
+    clerk:   { url: 'http://localhost/app-clerk/ru_RU',   displayName: 'Кладовщик' },
+    manager: { url: 'http://localhost/app-manager/ru_RU', displayName: 'Менеджер' },
+    admin:   { url: 'http://localhost/app-admin/ru_RU',   displayName: 'Админ' },
   },
-  defaultContext: 'кладовщик',
+  defaultContext: 'clerk',
 
   // Значения по умолчанию (переопределяются флагами CLI)
   timeout: 30000,
@@ -392,6 +440,10 @@ export default {
   record: false,
 };
 ```
+
+Кириллица в ID контекстов работает, но смешанный регистр затрудняет ergonomics
+(`testInfo.contexts.кладовщик.displayName` vs `testInfo.contexts.clerk.displayName`).
+Рекомендуем разделять технический ID и человекочитаемое имя.
 
 **Упрощённая форма** (один контекст, без именованных):
 

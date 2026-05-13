@@ -7,8 +7,11 @@
 // конфликтовать с ручной разведкой и работать поверх отдельного Apache на :9191.
 export default {
   contexts: {
-    a: { url: 'http://localhost:9191/webtest-runner/ru_RU' },
-    b: { url: 'http://localhost:9191/webtest-runner/ru_RU' },
+    // `displayName` — человекочитаемое имя контекста, видно хукам через
+    // testInfo.contexts[name].displayName (например для showTitleSlide).
+    // Custom-поля любого типа пробрасываются как есть.
+    a: { url: 'http://localhost:9191/webtest-runner/ru_RU', displayName: 'Пользователь A' },
+    b: { url: 'http://localhost:9191/webtest-runner/ru_RU', displayName: 'Пользователь B' },
   },
   defaultContext: 'a',
   // isolation: 'tab' (default) — persistent context, tabs in one window, 1С extension loads.
