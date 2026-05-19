@@ -1,4 +1,4 @@
-﻿# skd-edit v1.19 — Atomic 1C DCS editor
+﻿# skd-edit v1.20 — Atomic 1C DCS editor
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -203,7 +203,15 @@ function Read-FieldProperties($fieldEl) {
 				}
 			}
 			"valueType" {
-				# Read type info — store the raw element for now, we'll use type from parsed if overridden
+				# Preserve the entire <valueType> OuterXml so rebuild can re-emit qualifiers
+				# (StringQualifiers, NumberQualifiers, DateQualifiers, etc.) that would
+				# otherwise be lost. Also extract Type string for type-override shorthand.
+				$raw = $ch.OuterXml
+				# .NET OuterXml re-declares xmlns on every element where the prefix is in
+				# scope (because the fragment is treated as standalone). Strip these since
+				# the parent context at insertion point already provides them.
+				$raw = [regex]::Replace($raw, ' xmlns(?::\w+)?="[^"]*"', '')
+				$props["_rawValueType"] = $raw
 				$typeEl = $null
 				foreach ($gc in $ch.ChildNodes) {
 					if ($gc.NodeType -eq 'Element' -and $gc.LocalName -eq 'Type') {
@@ -727,7 +735,7 @@ function Build-ValueTypeXml {
 
 	if ($typeStr -eq "boolean") {
 		$lines += "$indent<v8:Type>xs:boolean</v8:Type>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	if ($typeStr -match '^string(\((\d+)\))?$') {
@@ -737,7 +745,7 @@ function Build-ValueTypeXml {
 		$lines += "$indent`t<v8:Length>$len</v8:Length>"
 		$lines += "$indent`t<v8:AllowedLength>Variable</v8:AllowedLength>"
 		$lines += "$indent</v8:StringQualifiers>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	if ($typeStr -match '^decimal\((\d+),(\d+)(,nonneg)?\)$') {
@@ -750,7 +758,7 @@ function Build-ValueTypeXml {
 		$lines += "$indent`t<v8:FractionDigits>$fraction</v8:FractionDigits>"
 		$lines += "$indent`t<v8:AllowedSign>$sign</v8:AllowedSign>"
 		$lines += "$indent</v8:NumberQualifiers>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	if ($typeStr -match '^(date|dateTime)$') {
@@ -762,26 +770,26 @@ function Build-ValueTypeXml {
 		$lines += "$indent<v8:DateQualifiers>"
 		$lines += "$indent`t<v8:DateFractions>$fractions</v8:DateFractions>"
 		$lines += "$indent</v8:DateQualifiers>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	if ($typeStr -eq "StandardPeriod") {
 		$lines += "$indent<v8:Type>v8:StandardPeriod</v8:Type>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	if ($typeStr -match '^(CatalogRef|DocumentRef|EnumRef|ChartOfAccountsRef|ChartOfCharacteristicTypesRef)\.') {
 		$lines += "$indent<v8:Type xmlns:d5p1=`"http://v8.1c.ru/8.1/data/enterprise/current-config`">d5p1:$(Esc-Xml $typeStr)</v8:Type>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	if ($typeStr.Contains('.')) {
 		$lines += "$indent<v8:Type xmlns:d5p1=`"http://v8.1c.ru/8.1/data/enterprise/current-config`">d5p1:$(Esc-Xml $typeStr)</v8:Type>"
-		return $lines -join "`r`n"
+		return $lines -join "`n"
 	}
 
 	$lines += "$indent<v8:Type>$(Esc-Xml $typeStr)</v8:Type>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-MLTextXml {
@@ -793,7 +801,7 @@ function Build-MLTextXml {
 	$lines += "$indent`t`t<v8:content>$(Esc-Xml $text)</v8:content>"
 	$lines += "$indent`t</v8:item>"
 	$lines += "$indent</$tag>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-RoleXml {
@@ -812,7 +820,7 @@ function Build-RoleXml {
 		}
 	}
 	$lines += "$indent</role>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-RestrictionXml {
@@ -834,7 +842,7 @@ function Build-RestrictionXml {
 		}
 	}
 	$lines += "$indent</useRestriction>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-FieldFragment {
@@ -857,14 +865,18 @@ function Build-FieldFragment {
 	$roleXml = Build-RoleXml -roles $parsed.roles -indent "$i`t"
 	if ($roleXml) { $lines += $roleXml }
 
-	if ($parsed.type) {
+	if ($parsed.rawValueType) {
+		# Preserve original <valueType> verbatim — keeps qualifiers (StringQualifiers,
+		# NumberQualifiers, DateQualifiers, …) that aren't expressible via shorthand.
+		$lines += "$i`t" + $parsed.rawValueType
+	} elseif ($parsed.type) {
 		$lines += "$i`t<valueType>"
 		$lines += (Build-ValueTypeXml -typeStr $parsed.type -indent "$i`t`t")
 		$lines += "$i`t</valueType>"
 	}
 
 	$lines += "$i</field>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-TotalFragment {
@@ -876,7 +888,7 @@ function Build-TotalFragment {
 	$lines += "$i`t<dataPath>$(Esc-Xml $parsed.dataPath)</dataPath>"
 	$lines += "$i`t<expression>$(Esc-Xml $parsed.expression)</expression>"
 	$lines += "$i</totalField>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-CalcFieldFragment {
@@ -903,7 +915,7 @@ function Build-CalcFieldFragment {
 	}
 
 	$lines += "$i</calculatedField>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-ParamValueXml {
@@ -1010,7 +1022,7 @@ function Build-ParamFragment {
 	}
 
 	$lines += "$i</parameter>"
-	$fragments += ($lines -join "`r`n")
+	$fragments += ($lines -join "`n")
 
 	if ($parsed.autoDates) {
 		$paramName = $parsed.name
@@ -1027,7 +1039,7 @@ function Build-ParamFragment {
 		$bLines += "$i`t<useRestriction>true</useRestriction>"
 		$bLines += "$i`t<expression>$(Esc-Xml "&$paramName.ДатаНачала")</expression>"
 		$bLines += "$i</parameter>"
-		$fragments += ($bLines -join "`r`n")
+		$fragments += ($bLines -join "`n")
 
 		$eLines = @()
 		$eLines += "$i<parameter>"
@@ -1040,7 +1052,7 @@ function Build-ParamFragment {
 		$eLines += "$i`t<useRestriction>true</useRestriction>"
 		$eLines += "$i`t<expression>$(Esc-Xml "&$paramName.ДатаОкончания")</expression>"
 		$eLines += "$i</parameter>"
-		$fragments += ($eLines -join "`r`n")
+		$fragments += ($eLines -join "`n")
 	}
 
 	return ,$fragments
@@ -1075,7 +1087,7 @@ function Build-FilterItemFragment {
 	}
 
 	$lines += "$i</dcsset:item>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-SelectionItemFragment {
@@ -1116,7 +1128,7 @@ function Build-SelectionItemFragment {
 		$lines += "$i`t<dcsset:field>$(Esc-Xml $fieldName)</dcsset:field>"
 		$lines += "$i</dcsset:item>"
 	}
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-DataParamFragment {
@@ -1158,7 +1170,7 @@ function Build-DataParamFragment {
 	}
 
 	$lines += "$i</dcscor:item>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-OrderItemFragment {
@@ -1174,7 +1186,7 @@ function Build-OrderItemFragment {
 		$lines += "$i`t<dcsset:orderType>$($parsed.direction)</dcsset:orderType>"
 		$lines += "$i</dcsset:item>"
 	}
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-DataSetLinkFragment {
@@ -1191,7 +1203,7 @@ function Build-DataSetLinkFragment {
 		$lines += "$i`t<parameter>$(Esc-Xml $parsed.parameter)</parameter>"
 	}
 	$lines += "$i</dataSetLink>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-DataSetQueryFragment {
@@ -1204,7 +1216,7 @@ function Build-DataSetQueryFragment {
 	$lines += "$i`t<dataSource>$(Esc-Xml $parsed.dataSource)</dataSource>"
 	$lines += "$i`t<query>$(Esc-Xml $parsed.query)</query>"
 	$lines += "$i</dataSet>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-VariantFragment {
@@ -1230,7 +1242,7 @@ function Build-VariantFragment {
 	$lines += "$i`t`t</dcsset:item>"
 	$lines += "$i`t</dcsset:settings>"
 	$lines += "$i</settingsVariant>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Emit-FilterComparison {
@@ -1312,7 +1324,7 @@ function Build-ConditionalAppearanceItemFragment {
 	$lines += "$i`t</dcsset:appearance>"
 
 	$lines += "$i</dcsset:item>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-StructureItemFragment {
@@ -1364,7 +1376,7 @@ function Build-StructureItemFragment {
 	}
 
 	$lines += "$i</dcsset:item>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 function Build-OutputParamFragment {
@@ -1392,7 +1404,7 @@ function Build-OutputParamFragment {
 	}
 
 	$lines += "$i</dcscor:item>"
-	return $lines -join "`r`n"
+	return $lines -join "`n"
 }
 
 # --- 5. XML helpers ---
@@ -1437,7 +1449,9 @@ function Get-ChildIndent($container) {
 }
 
 function Insert-BeforeElement($container, $newNode, $refNode, $childIndent) {
-	$ws = $xmlDoc.CreateWhitespace("`r`n$childIndent")
+	# LF line endings — 1С DCS files use LF consistently; CRLF causes idempotency
+	# leaks when modify-* removes one whitespace and inserts a different-style one.
+	$ws = $xmlDoc.CreateWhitespace("`n$childIndent")
 	if ($refNode) {
 		$container.InsertBefore($ws, $refNode) | Out-Null
 		$container.InsertBefore($newNode, $ws) | Out-Null
@@ -1450,7 +1464,7 @@ function Insert-BeforeElement($container, $newNode, $refNode, $childIndent) {
 			$container.AppendChild($ws) | Out-Null
 			$container.AppendChild($newNode) | Out-Null
 			$parentIndent = if ($childIndent.Length -gt 1) { $childIndent.Substring(0, $childIndent.Length - 1) } else { "" }
-			$closeWs = $xmlDoc.CreateWhitespace("`r`n$parentIndent")
+			$closeWs = $xmlDoc.CreateWhitespace("`n$parentIndent")
 			$container.AppendChild($closeWs) | Out-Null
 		}
 	}
@@ -1728,6 +1742,10 @@ function Get-ContainerChildIndent($container) {
 $script:RawOriginal = [System.IO.File]::ReadAllText($resolvedPath, [System.Text.Encoding]::UTF8)
 $rootOpenMatch = [regex]::Match($script:RawOriginal, '<DataCompositionSchema\b[^>]*>')
 if ($rootOpenMatch.Success) { $script:RawRootOpening = $rootOpenMatch.Value } else { $script:RawRootOpening = $null }
+
+# Detect line ending convention so save can normalize back to whatever the source used.
+# 1С Designer writes CRLF on Windows; LF-edited files should stay LF.
+$script:LineEnding = if ($script:RawOriginal.Contains("`r`n")) { "`r`n" } else { "`n" }
 
 $xmlDoc = New-Object System.Xml.XmlDocument
 $xmlDoc.PreserveWhitespace = $true
@@ -2021,7 +2039,7 @@ switch ($Operation) {
 							}
 						}
 						$valueLines = Build-ParamValueXml -type $declaredType -value $value -indent $childIndent
-						$fragXml = $valueLines -join "`r`n"
+						$fragXml = $valueLines -join "`n"
 
 						$wasExisting = ($null -ne $existing)
 						if ($existing) {
@@ -2107,7 +2125,7 @@ switch ($Operation) {
 				}
 				foreach ($av in $avItems) {
 					$avLines = Build-AvailableValueFragment -item $av -declaredType $declaredType -indent $childIndent
-					$fragXml = $avLines -join "`r`n"
+					$fragXml = $avLines -join "`n"
 					$nodes = Import-Fragment $xmlDoc $fragXml
 					foreach ($node in $nodes) {
 						Insert-BeforeElement $paramEl $node $refNode $childIndent
@@ -2671,7 +2689,7 @@ switch ($Operation) {
 				$lines += "$itemIndent`t<dcsset:periodAdditionBegin xsi:type=`"xs:dateTime`">0001-01-01T00:00:00</dcsset:periodAdditionBegin>"
 				$lines += "$itemIndent`t<dcsset:periodAdditionEnd xsi:type=`"xs:dateTime`">0001-01-01T00:00:00</dcsset:periodAdditionEnd>"
 				$lines += "$itemIndent</dcsset:item>"
-				$fragXml = $lines -join "`r`n"
+				$fragXml = $lines -join "`n"
 				$nodes = Import-Fragment $xmlDoc $fragXml
 				foreach ($node in $nodes) {
 					Insert-BeforeElement $giEl $node $null $itemIndent
@@ -2992,7 +3010,7 @@ switch ($Operation) {
 				} else {
 					$valLines += "$itemIndent<dcscor:value xsi:type=`"xs:string`">$(Esc-Xml "$($parsed.value)")</dcscor:value>"
 				}
-				$valXml = $valLines -join "`r`n"
+				$valXml = $valLines -join "`n"
 				$valNodes = Import-Fragment $xmlDoc $valXml
 				foreach ($node in $valNodes) {
 					Insert-BeforeElement $dpItem $node $null $itemIndent
@@ -3056,6 +3074,9 @@ switch ($Operation) {
 				type = if ($parsed.type) { $parsed.type } else { $existing.type }
 				roles = if ($parsed.roles -and $parsed.roles.Count -gt 0) { $parsed.roles } else { $existing.roles }
 				restrict = if ($parsed.restrict -and $parsed.restrict.Count -gt 0) { $parsed.restrict } else { $existing.restrict }
+				# Preserve raw <valueType> only when user did NOT override type via shorthand —
+				# otherwise the override path rebuilds valueType from $parsed.type.
+				rawValueType = if ($parsed.type) { $null } else { $existing._rawValueType }
 			}
 
 			# Remember position (NextSibling after whitespace)
@@ -3143,7 +3164,7 @@ switch ($Operation) {
 				$lines += "$fieldIndent`t<dcscom:$k>$(Esc-Xml $kv[$k])</dcscom:$k>"
 			}
 			$lines += "$fieldIndent</role>"
-			$fragXml = $lines -join "`r`n"
+			$fragXml = $lines -join "`n"
 
 			# Insert before <valueType>, else before <inputParameters>, else at end
 			$refNode = $null
@@ -3460,6 +3481,14 @@ $content = [regex]::Replace(
 #   (3) normalize self-closing tags: `.NET XmlDocument` adds a space before `/>`
 #       (`<foo bar="x" />`) but 1C-Designer writes `<foo bar="x"/>`. Strip the space.
 $content = [regex]::Replace($content, '(?<=\S) />', '/>')
+
+#   (4) normalize line endings to match source — operations may mix LF (from new
+#       fragments) with whatever the source used (CRLF on Windows, LF on Linux/git).
+if ($script:LineEnding -eq "`r`n") {
+	$content = $content -replace '(?<!\r)\n', "`r`n"
+} else {
+	$content = $content -replace "`r`n", "`n"
+}
 
 $enc = New-Object System.Text.UTF8Encoding($true)
 [System.IO.File]::WriteAllText($resolvedPath, $content, $enc)

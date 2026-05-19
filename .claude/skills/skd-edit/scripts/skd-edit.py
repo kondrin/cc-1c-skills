@@ -1,4 +1,4 @@
-# skd-edit v1.19 — Atomic 1C DCS editor (Python port)
+# skd-edit v1.20 — Atomic 1C DCS editor (Python port)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import os
@@ -231,6 +231,13 @@ def read_field_properties(field_el):
                         if isinstance(gc.tag, str) and local_name(gc) == "content":
                             props["title"] = (gc.text or "").strip()
         elif ln == "valueType":
+            # Preserve full <valueType> serialization so rebuild can re-emit qualifiers
+            # (StringQualifiers, NumberQualifiers, DateQualifiers, …) that aren't
+            # expressible via shorthand. Strip xmlns declarations that lxml re-emits when
+            # serializing a sub-element (parent context already provides them).
+            raw = etree.tostring(ch, encoding="unicode")
+            raw = re.sub(r' xmlns(?::\w+)?="[^"]*"', "", raw)
+            props["_rawValueType"] = raw
             for gc in ch:
                 if isinstance(gc.tag, str) and local_name(gc) == "Type":
                     props["_rawTypeText"] = (gc.text or "").strip()
@@ -683,7 +690,7 @@ def build_value_type_xml(type_str, indent):
 
     if type_str == "boolean":
         lines.append(f"{indent}<v8:Type>xs:boolean</v8:Type>")
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     m = re.match(r'^string(\((\d+)\))?$', type_str)
     if m:
@@ -693,7 +700,7 @@ def build_value_type_xml(type_str, indent):
         lines.append(f"{indent}\t<v8:Length>{length}</v8:Length>")
         lines.append(f"{indent}\t<v8:AllowedLength>Variable</v8:AllowedLength>")
         lines.append(f"{indent}</v8:StringQualifiers>")
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     m = re.match(r'^decimal\((\d+),(\d+)(,nonneg)?\)$', type_str)
     if m:
@@ -705,7 +712,7 @@ def build_value_type_xml(type_str, indent):
         lines.append(f"{indent}\t<v8:FractionDigits>{fraction}</v8:FractionDigits>")
         lines.append(f"{indent}\t<v8:AllowedSign>{sign}</v8:AllowedSign>")
         lines.append(f"{indent}</v8:NumberQualifiers>")
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     m = re.match(r'^(date|dateTime)$', type_str)
     if m:
@@ -714,22 +721,22 @@ def build_value_type_xml(type_str, indent):
         lines.append(f"{indent}<v8:DateQualifiers>")
         lines.append(f"{indent}\t<v8:DateFractions>{fractions}</v8:DateFractions>")
         lines.append(f"{indent}</v8:DateQualifiers>")
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     if type_str == "StandardPeriod":
         lines.append(f"{indent}<v8:Type>v8:StandardPeriod</v8:Type>")
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     if re.match(r'^(CatalogRef|DocumentRef|EnumRef|ChartOfAccountsRef|ChartOfCharacteristicTypesRef)\.', type_str):
         lines.append(f'{indent}<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:{esc_xml(type_str)}</v8:Type>')
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     if "." in type_str:
         lines.append(f'{indent}<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:{esc_xml(type_str)}</v8:Type>')
-        return "\r\n".join(lines)
+        return "\n".join(lines)
 
     lines.append(f"{indent}<v8:Type>{esc_xml(type_str)}</v8:Type>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_mltext_xml(tag, text, indent):
@@ -741,7 +748,7 @@ def build_mltext_xml(tag, text, indent):
         f"{indent}\t</v8:item>",
         f"{indent}</{tag}>",
     ]
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_role_xml(roles, indent):
@@ -755,7 +762,7 @@ def build_role_xml(roles, indent):
         else:
             lines.append(f"{indent}\t<dcscom:{role}>true</dcscom:{role}>")
     lines.append(f"{indent}</role>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_restriction_xml(restrict, indent):
@@ -768,7 +775,7 @@ def build_restriction_xml(restrict, indent):
         if xml_name:
             lines.append(f"{indent}\t<{xml_name}>true</{xml_name}>")
     lines.append(f"{indent}</useRestriction>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_field_fragment(parsed, indent):
@@ -787,13 +794,17 @@ def build_field_fragment(parsed, indent):
     if role_xml:
         lines.append(role_xml)
 
-    if parsed.get("type"):
+    if parsed.get("rawValueType"):
+        # Preserve original <valueType> verbatim — keeps qualifiers (StringQualifiers,
+        # NumberQualifiers, DateQualifiers, …) that aren't expressible via shorthand.
+        lines.append(f"{i}\t" + parsed["rawValueType"])
+    elif parsed.get("type"):
         lines.append(f"{i}\t<valueType>")
         lines.append(build_value_type_xml(parsed["type"], f"{i}\t\t"))
         lines.append(f"{i}\t</valueType>")
 
     lines.append(f"{i}</field>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_total_fragment(parsed, indent):
@@ -804,7 +815,7 @@ def build_total_fragment(parsed, indent):
         f"{i}\t<expression>{esc_xml(parsed['expression'])}</expression>",
         f"{i}</totalField>",
     ]
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_calc_field_fragment(parsed, indent):
@@ -823,7 +834,7 @@ def build_calc_field_fragment(parsed, indent):
         lines.append(build_value_type_xml(parsed["type"], f"{i}\t\t"))
         lines.append(f"{i}\t</valueType>")
     lines.append(f"{i}</calculatedField>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_param_value_xml(type_str, value, indent, tag_name="value", tag_ns=""):
@@ -897,7 +908,7 @@ def build_param_fragment(parsed, indent):
         lines.append(f"{i}\t<use>Always</use>")
 
     lines.append(f"{i}</parameter>")
-    fragments.append("\r\n".join(lines))
+    fragments.append("\n".join(lines))
 
     if parsed.get("autoDates"):
         param_name = parsed["name"]
@@ -914,7 +925,7 @@ def build_param_fragment(parsed, indent):
             f"{i}\t<expression>{esc_xml('&' + param_name + '.\u0414\u0430\u0442\u0430\u041d\u0430\u0447\u0430\u043b\u0430')}</expression>",
             f"{i}</parameter>",
         ]
-        fragments.append("\r\n".join(b_lines))
+        fragments.append("\n".join(b_lines))
 
         e_lines = [
             f"{i}<parameter>",
@@ -928,7 +939,7 @@ def build_param_fragment(parsed, indent):
             f"{i}\t<expression>{esc_xml('&' + param_name + '.\u0414\u0430\u0442\u0430\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f')}</expression>",
             f"{i}</parameter>",
         ]
-        fragments.append("\r\n".join(e_lines))
+        fragments.append("\n".join(e_lines))
 
     return fragments
 
@@ -955,7 +966,7 @@ def build_filter_item_fragment(parsed, indent):
         lines.append(f"{i}\t<dcsset:userSettingID>{esc_xml(uid)}</dcsset:userSettingID>")
 
     lines.append(f"{i}</dcsset:item>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_selection_item_fragment(field_name, indent):
@@ -986,13 +997,13 @@ def build_selection_item_fragment(field_name, indent):
             lines.append(f"{i}\t</dcsset:item>")
         lines.append(f"{i}\t<dcsset:placement>Auto</dcsset:placement>")
         lines.append(f"{i}</dcsset:item>")
-        return "\r\n".join(lines)
+        return "\n".join(lines)
     lines = [
         f'{i}<dcsset:item xsi:type="dcsset:SelectedItemField">',
         f"{i}\t<dcsset:field>{esc_xml(field_name)}</dcsset:field>",
         f"{i}</dcsset:item>",
     ]
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_data_param_fragment(parsed, indent):
@@ -1027,7 +1038,7 @@ def build_data_param_fragment(parsed, indent):
         lines.append(f"{i}\t<dcsset:userSettingID>{esc_xml(uid)}</dcsset:userSettingID>")
 
     lines.append(f"{i}</dcscor:item>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_order_item_fragment(parsed, indent):
@@ -1040,7 +1051,7 @@ def build_order_item_fragment(parsed, indent):
         f"{i}\t<dcsset:orderType>{parsed['direction']}</dcsset:orderType>",
         f"{i}</dcsset:item>",
     ]
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_data_set_link_fragment(parsed, indent):
@@ -1055,7 +1066,7 @@ def build_data_set_link_fragment(parsed, indent):
     if parsed.get("parameter"):
         lines.append(f"{i}\t<parameter>{esc_xml(parsed['parameter'])}</parameter>")
     lines.append(f"{i}</dataSetLink>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_data_set_query_fragment(parsed, indent):
@@ -1067,7 +1078,7 @@ def build_data_set_query_fragment(parsed, indent):
         f"{i}\t<query>{esc_xml(parsed['query'])}</query>",
         f"{i}</dataSet>",
     ]
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_variant_fragment(parsed, indent):
@@ -1092,7 +1103,7 @@ def build_variant_fragment(parsed, indent):
         f"{i}\t</dcsset:settings>",
         f"{i}</settingsVariant>",
     ]
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def _emit_filter_comparison(lines, f, indent):
@@ -1159,7 +1170,7 @@ def build_conditional_appearance_item_fragment(parsed, indent):
     lines.append(f"{i}\t</dcsset:appearance>")
 
     lines.append(f"{i}</dcsset:item>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_structure_item_fragment(item, indent):
@@ -1196,7 +1207,7 @@ def build_structure_item_fragment(item, indent):
             lines.append(build_structure_item_fragment(child, f"{i}\t"))
 
     lines.append(f"{i}</dcsset:item>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 def build_output_param_fragment(parsed, indent):
@@ -1219,7 +1230,7 @@ def build_output_param_fragment(parsed, indent):
         lines.append(f'{i}\t<dcscor:value xsi:type="{ptype}">{esc_xml(val)}</dcscor:value>')
 
     lines.append(f"{i}</dcscor:item>")
-    return "\r\n".join(lines)
+    return "\n".join(lines)
 
 
 # ── 5. XML helpers ──────────────────────────────────────────
@@ -1505,6 +1516,9 @@ raw_original_text = raw_original_bytes.lstrip(b"\xef\xbb\xbf").decode("utf-8")
 _root_open_m = re.search(r"<DataCompositionSchema\b[^>]*>", raw_original_text, re.DOTALL)
 raw_root_opening = _root_open_m.group(0) if _root_open_m else None
 
+# Detect line ending convention so save can normalize back to whatever the source used.
+line_ending = "\r\n" if "\r\n" in raw_original_text else "\n"
+
 xml_parser = etree.XMLParser(remove_blank_text=False)
 tree = etree.parse(resolved_path, xml_parser)
 xml_doc = tree.getroot()
@@ -1739,7 +1753,7 @@ elif operation == "modify-parameter":
                                 declared_type = re.sub(r'^d\d+p\d+:', '', (tnode.text or "").strip())
                                 break
                     value_lines = build_param_value_xml(declared_type, value, child_indent)
-                    frag_xml = "\r\n".join(value_lines)
+                    frag_xml = "\n".join(value_lines)
                     was_existing = existing is not None
                     if existing is not None:
                         # Find next-element sibling as ref before removing
@@ -1798,7 +1812,7 @@ elif operation == "modify-parameter":
                     break
             for av in av_items:
                 av_lines = build_available_value_fragment(av, declared_type, child_indent)
-                frag_xml = "\r\n".join(av_lines)
+                frag_xml = "\n".join(av_lines)
                 nodes = import_fragment(xml_doc, frag_xml)
                 for node in nodes:
                     insert_before_element(param_el, node, ref_node, child_indent)
@@ -2223,7 +2237,7 @@ elif operation == "modify-structure":
                 f'{item_indent}\t<dcsset:periodAdditionEnd xsi:type="xs:dateTime">0001-01-01T00:00:00</dcsset:periodAdditionEnd>',
                 f'{item_indent}</dcsset:item>',
             ]
-            frag_xml = "\r\n".join(lines)
+            frag_xml = "\n".join(lines)
             for node in import_fragment(xml_doc, frag_xml):
                 insert_before_element(gi_el, node, None, item_indent)
 
@@ -2486,7 +2500,7 @@ elif operation == "modify-dataParameter":
             else:
                 val_lines.append(f'{item_indent}<dcscor:value xsi:type="xs:string">{esc_xml(str(pv))}</dcscor:value>')
 
-            val_xml = "\r\n".join(val_lines)
+            val_xml = "\n".join(val_lines)
             val_nodes = import_fragment(xml_doc, val_xml)
             for node in val_nodes:
                 insert_before_element(dp_item, node, None, item_indent)
@@ -2532,6 +2546,8 @@ elif operation == "modify-field":
             "type": parsed["type"] if parsed.get("type") else existing["type"],
             "roles": parsed["roles"] if parsed.get("roles") else existing["roles"],
             "restrict": parsed["restrict"] if parsed.get("restrict") else existing["restrict"],
+            # Preserve raw <valueType> only when user did NOT override type via shorthand.
+            "rawValueType": None if parsed.get("type") else existing.get("_rawValueType"),
         }
 
         # Find next element sibling for position
@@ -2605,7 +2621,7 @@ elif operation == "set-field-role":
         for k, v in kv:
             lines.append(f"{field_indent}\t<dcscom:{k}>{esc_xml(v)}</dcscom:{k}>")
         lines.append(f"{field_indent}</role>")
-        frag_xml = "\r\n".join(lines)
+        frag_xml = "\n".join(lines)
 
         ref_node = next((ch for ch in field_el if isinstance(ch.tag, str) and local_name(ch) in ("valueType", "inputParameters") and etree.QName(ch.tag).namespace == SCH_NS), None)
         for node in import_fragment(xml_doc, frag_xml):
@@ -2870,6 +2886,12 @@ xml_text = re.sub(
 # Normalize self-closing tags: lxml writes `<foo bar="x"/>` already (no space), but be
 # defensive — strip any space before `/>` so PS and PY ports stay byte-equivalent.
 xml_text = re.sub(r"(?<=\S) />", "/>", xml_text)
+
+# Normalize line endings to match source.
+if line_ending == "\r\n":
+    xml_text = re.sub(r"(?<!\r)\n", "\r\n", xml_text)
+else:
+    xml_text = xml_text.replace("\r\n", "\n")
 xml_bytes = xml_text.encode("utf-8")
 
 if not xml_bytes.endswith(b"\n"):
