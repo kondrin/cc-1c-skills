@@ -1,4 +1,4 @@
-# skd-edit v1.18 — Atomic 1C DCS editor (Python port)
+# skd-edit v1.19 — Atomic 1C DCS editor (Python port)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import os
@@ -10,6 +10,10 @@ from lxml import etree
 
 sys.stdout.reconfigure(encoding="utf-8")
 sys.stderr.reconfigure(encoding="utf-8")
+
+# Dirty flag — set to True by every successful mutation. If still False at save time,
+# the file is left untouched (NO-OP operations like [WARN] not found don't rewrite).
+dirty = False
 
 # ── arg parsing ──────────────────────────────────────────────
 
@@ -1492,6 +1496,15 @@ def get_container_child_indent(container):
 
 # ── 6. Load XML ─────────────────────────────────────────────
 
+# Capture raw original BEFORE parse — needed at save time to restore exact root
+# <DataCompositionSchema xmlns=...> opening tag (lxml's tostring() collapses multi-line
+# xmlns into one line) and to detect NO-OP via byte-equality as a safety net.
+with open(resolved_path, "rb") as _f:
+    raw_original_bytes = _f.read()
+raw_original_text = raw_original_bytes.lstrip(b"\xef\xbb\xbf").decode("utf-8")
+_root_open_m = re.search(r"<DataCompositionSchema\b[^>]*>", raw_original_text, re.DOTALL)
+raw_root_opening = _root_open_m.group(0) if _root_open_m else None
+
 xml_parser = etree.XMLParser(remove_blank_text=False)
 tree = etree.parse(resolved_path, xml_parser)
 xml_doc = tree.getroot()
@@ -1532,7 +1545,7 @@ if operation == "add-field":
         for node in nodes:
             insert_before_element(ds_node, node, ref_node, child_indent)
 
-        print(f'[OK] Field "{parsed["dataPath"]}" added to dataset "{ds_name}"')
+        dirty = True; print(f'[OK] Field "{parsed["dataPath"]}" added to dataset "{ds_name}"')
 
         if not no_selection:
             settings = resolve_variant_settings()
@@ -1547,7 +1560,7 @@ if operation == "add-field":
                 sel_nodes = import_fragment(xml_doc, sel_xml)
                 for node in sel_nodes:
                     insert_before_element(selection, node, None, sel_indent)
-                print(f'[OK] Field "{parsed["dataPath"]}" added to selection of variant "{var_name}"')
+                dirty = True; print(f'[OK] Field "{parsed["dataPath"]}" added to selection of variant "{var_name}"')
 
 elif operation == "add-total":
     for val in values:
@@ -1579,7 +1592,7 @@ elif operation == "add-total":
         for node in nodes:
             insert_before_element(xml_doc, node, ref_node, child_indent)
 
-        print(f'[OK] TotalField "{parsed["dataPath"]}" = {parsed["expression"]} added')
+        dirty = True; print(f'[OK] TotalField "{parsed["dataPath"]}" = {parsed["expression"]} added')
 
 elif operation == "add-calculated-field":
     for val in values:
@@ -1610,7 +1623,7 @@ elif operation == "add-calculated-field":
         for node in nodes:
             insert_before_element(xml_doc, node, ref_node, child_indent)
 
-        print(f'[OK] CalculatedField "{parsed["dataPath"]}" = {parsed["expression"]} added')
+        dirty = True; print(f'[OK] CalculatedField "{parsed["dataPath"]}" = {parsed["expression"]} added')
 
         if not no_selection:
             settings = resolve_variant_settings()
@@ -1625,7 +1638,7 @@ elif operation == "add-calculated-field":
                 sel_nodes = import_fragment(xml_doc, sel_xml)
                 for node in sel_nodes:
                     insert_before_element(selection, node, None, sel_indent)
-                print(f'[OK] Field "{parsed["dataPath"]}" added to selection of variant "{var_name}"')
+                dirty = True; print(f'[OK] Field "{parsed["dataPath"]}" added to selection of variant "{var_name}"')
 
 elif operation == "add-parameter":
     for val in values:
@@ -1657,9 +1670,9 @@ elif operation == "add-parameter":
             for node in nodes:
                 insert_before_element(xml_doc, node, ref_node, child_indent)
 
-        print(f'[OK] Parameter "{parsed["name"]}" added')
+        dirty = True; print(f'[OK] Parameter "{parsed["name"]}" added')
         if parsed.get("autoDates"):
-            print('[OK] Auto-parameters "\u0414\u0430\u0442\u0430\u041d\u0430\u0447\u0430\u043b\u0430", "\u0414\u0430\u0442\u0430\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f" added')
+            dirty = True; print('[OK] Auto-parameters "\u0414\u0430\u0442\u0430\u041d\u0430\u0447\u0430\u043b\u0430", "\u0414\u0430\u0442\u0430\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f" added')
 
 elif operation == "modify-parameter":
     for val in values:
@@ -1700,7 +1713,7 @@ elif operation == "modify-parameter":
             title_frag = build_mltext_xml("title", title_val, child_indent)
             for node in import_fragment(xml_doc, title_frag):
                 insert_before_element(param_el, node, title_ref, child_indent)
-            print(f'[OK] Parameter "{param_name}": title set to "{title_val}"')
+            dirty = True; print(f'[OK] Parameter "{param_name}": title set to "{title_val}"')
 
         # Separate availableValue=... from simple kv pairs
         simple_rest = rest
@@ -1739,10 +1752,10 @@ elif operation == "modify-parameter":
                     for node in nodes:
                         insert_before_element(param_el, node, ref_node, child_indent)
                     verb = "updated" if was_existing else "added"
-                    print(f'[OK] Parameter "{param_name}": value {verb} to {value}')
+                    dirty = True; print(f'[OK] Parameter "{param_name}": value {verb} to {value}')
                 elif existing is not None:
                     existing.text = value
-                    print(f'[OK] Parameter "{param_name}": {key} updated to {value}')
+                    dirty = True; print(f'[OK] Parameter "{param_name}": {key} updated to {value}')
                 else:
                     # Schema order: ...value, useRestriction, availableValue*, denyIncompleteValues, use
                     ref_node = None
@@ -1752,7 +1765,7 @@ elif operation == "modify-parameter":
                     nodes = import_fragment(xml_doc, frag_xml)
                     for node in nodes:
                         insert_before_element(param_el, node, ref_node, child_indent)
-                    print(f'[OK] Parameter "{param_name}": {key}={value} added')
+                    dirty = True; print(f'[OK] Parameter "{param_name}": {key}={value} added')
 
         # Process availableValue
         if av_part:
@@ -1789,7 +1802,7 @@ elif operation == "modify-parameter":
                 nodes = import_fragment(xml_doc, frag_xml)
                 for node in nodes:
                     insert_before_element(param_el, node, ref_node, child_indent)
-            print(f'[OK] Parameter "{param_name}": availableValue set to {len(av_items)} item(s)')
+            dirty = True; print(f'[OK] Parameter "{param_name}": availableValue set to {len(av_items)} item(s)')
 
         if flag_hidden:
             ur_el = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) == "useRestriction" and etree.QName(ch.tag).namespace == SCH_NS), None)
@@ -1810,7 +1823,7 @@ elif operation == "modify-parameter":
                 for node in import_fragment(xml_doc, f"{child_indent}<availableAsField>false</availableAsField>"):
                     insert_before_element(param_el, node, ref_node, child_indent)
 
-            print(f'[OK] Parameter "{param_name}": @hidden applied')
+            dirty = True; print(f'[OK] Parameter "{param_name}": @hidden applied')
 
         if flag_always:
             use_el = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) == "use" and etree.QName(ch.tag).namespace == SCH_NS), None)
@@ -1820,7 +1833,7 @@ elif operation == "modify-parameter":
             else:
                 for node in import_fragment(xml_doc, f"{child_indent}<use>Always</use>"):
                     insert_before_element(param_el, node, None, child_indent)
-            print(f'[OK] Parameter "{param_name}": @always applied')
+            dirty = True; print(f'[OK] Parameter "{param_name}": @always applied')
 
 elif operation == "rename-parameter":
     root = xml_doc
@@ -1883,7 +1896,7 @@ elif operation == "rename-parameter":
                             gc.text = new_name
                             dp_updated += 1
 
-        print(f'[OK] Parameter renamed: "{old_name}" => "{new_name}" (expressions updated: {expr_updated}, dataParameters updated: {dp_updated})')
+        dirty = True; print(f'[OK] Parameter renamed: "{old_name}" => "{new_name}" (expressions updated: {expr_updated}, dataParameters updated: {dp_updated})')
 
 elif operation == "reorder-parameters":
     root = xml_doc
@@ -1940,7 +1953,7 @@ elif operation == "reorder-parameters":
         for pe in new_order:
             insert_before_element(root, pe, anchor, child_indent)
 
-        print(f'[OK] Parameters reordered ({len(all_params)} total, {len(order)} explicit)')
+        dirty = True; print(f'[OK] Parameters reordered ({len(all_params)} total, {len(order)} explicit)')
 
 elif operation == "add-filter":
     settings = resolve_variant_settings()
@@ -1953,7 +1966,7 @@ elif operation == "add-filter":
         nodes = import_fragment(xml_doc, frag_xml)
         for node in nodes:
             insert_before_element(filter_el, node, None, filter_indent)
-        print(f'[OK] Filter "{parsed["field"]} {parsed["op"]}" added to variant "{var_name}"')
+        dirty = True; print(f'[OK] Filter "{parsed["field"]} {parsed["op"]}" added to variant "{var_name}"')
 
 elif operation == "add-dataParameter":
     settings = resolve_variant_settings()
@@ -1966,7 +1979,7 @@ elif operation == "add-dataParameter":
         nodes = import_fragment(xml_doc, frag_xml)
         for node in nodes:
             insert_before_element(dp_el, node, None, dp_indent)
-        print(f'[OK] DataParameter "{parsed["parameter"]}" added to variant "{var_name}"')
+        dirty = True; print(f'[OK] DataParameter "{parsed["parameter"]}" added to variant "{var_name}"')
 
 elif operation == "add-order":
     settings = resolve_variant_settings()
@@ -1999,7 +2012,7 @@ elif operation == "add-order":
             insert_before_element(order_el, node, None, order_indent)
 
         desc = "Auto" if parsed["field"] == "Auto" else f"{parsed['field']} {parsed['direction']}"
-        print(f'[OK] Order "{desc}" added to variant "{var_name}"')
+        dirty = True; print(f'[OK] Order "{desc}" added to variant "{var_name}"')
 
 elif operation == "add-selection":
     settings = resolve_variant_settings()
@@ -2052,7 +2065,7 @@ elif operation == "add-selection":
         for node in sel_nodes:
             insert_before_element(selection, node, None, sel_indent)
         target = f'group "{group_name}"' if group_name else f'variant "{var_name}"'
-        print(f'[OK] Selection "{field_name}" added to {target}')
+        dirty = True; print(f'[OK] Selection "{field_name}" added to {target}')
 
 elif operation == "set-query":
     ds_node = resolve_data_set()
@@ -2062,7 +2075,7 @@ elif operation == "set-query":
         print(f"No <query> element found in dataset '{ds_name}'", file=sys.stderr)
         sys.exit(1)
     query_el.text = resolve_query_value(value_arg, query_base_dir)
-    print(f'[OK] Query replaced in dataset "{ds_name}"')
+    dirty = True; print(f'[OK] Query replaced in dataset "{ds_name}"')
 
 elif operation == "patch-query":
     ds_node = resolve_data_set()
@@ -2095,7 +2108,7 @@ elif operation == "patch-query":
 
         query_el.text = query_text.replace(old_str, new_str)
         suffix = " (1 occurrence)" if once else f" ({count} occurrence(s))"
-        print(f'[OK] Query patched in dataset "{ds_name}": replaced \'{old_str}\'{suffix}')
+        dirty = True; print(f'[OK] Query patched in dataset "{ds_name}": replaced \'{old_str}\'{suffix}')
 
 elif operation == "set-outputParameter":
     settings = resolve_variant_settings()
@@ -2108,9 +2121,9 @@ elif operation == "set-outputParameter":
         existing_param = find_element_by_child_value(output_el, "item", "parameter", parsed["key"], COR_NS)
         if existing_param is not None:
             remove_node_with_whitespace(existing_param)
-            print(f'[OK] Replaced outputParameter "{parsed["key"]}" in variant "{var_name}"')
+            dirty = True; print(f'[OK] Replaced outputParameter "{parsed["key"]}" in variant "{var_name}"')
         else:
-            print(f'[OK] OutputParameter "{parsed["key"]}" added to variant "{var_name}"')
+            dirty = True; print(f'[OK] OutputParameter "{parsed["key"]}" added to variant "{var_name}"')
 
         frag_xml = build_output_param_fragment(parsed, output_indent)
         nodes = import_fragment(xml_doc, frag_xml)
@@ -2136,7 +2149,7 @@ elif operation == "set-structure":
         for node in nodes:
             insert_before_element(settings, node, ref_node, settings_indent)
 
-    print(f'[OK] Structure set in variant "{var_name}": {value_arg}')
+    dirty = True; print(f'[OK] Structure set in variant "{var_name}": {value_arg}')
 
 elif operation == "modify-structure":
     settings = resolve_variant_settings()
@@ -2215,7 +2228,7 @@ elif operation == "modify-structure":
                 insert_before_element(gi_el, node, None, item_indent)
 
         desc = "details" if not t["groupBy"] else ", ".join(t["groupBy"])
-        print(f'[OK] Group "{t["name"]}" groupItems updated: {desc}')
+        dirty = True; print(f'[OK] Group "{t["name"]}" groupItems updated: {desc}')
 
 elif operation == "add-dataSetLink":
     for val in values:
@@ -2244,7 +2257,7 @@ elif operation == "add-dataSetLink":
         desc = f"{parsed['source']} > {parsed['dest']} on {parsed['sourceExpr']} = {parsed['destExpr']}"
         if parsed.get("parameter"):
             desc += f" [param {parsed['parameter']}]"
-        print(f'[OK] DataSetLink "{desc}" added')
+        dirty = True; print(f'[OK] DataSetLink "{desc}" added')
 
 elif operation == "add-dataSet":
     child_indent = get_child_indent(xml_doc)
@@ -2286,7 +2299,7 @@ elif operation == "add-dataSet":
         for node in nodes:
             insert_before_element(xml_doc, node, ref_node, child_indent)
 
-        print(f'[OK] DataSet "{parsed["name"]}" added (dataSource={ds_source_name})')
+        dirty = True; print(f'[OK] DataSet "{parsed["name"]}" added (dataSource={ds_source_name})')
 
 elif operation == "add-variant":
     child_indent = get_child_indent(xml_doc)
@@ -2325,7 +2338,7 @@ elif operation == "add-variant":
         for node in nodes:
             insert_before_element(xml_doc, node, ref_node, child_indent)
 
-        print(f'[OK] Variant "{parsed["name"]}" ["{parsed["presentation"]}"] added')
+        dirty = True; print(f'[OK] Variant "{parsed["name"]}" ["{parsed["presentation"]}"] added')
 
 elif operation == "add-conditionalAppearance":
     settings = resolve_variant_settings()
@@ -2348,7 +2361,7 @@ elif operation == "add-conditionalAppearance":
                 desc += f" when {flt['field']} {flt['op']}"
         if parsed.get("fields"):
             desc += f" for {', '.join(parsed['fields'])}"
-        print(f'[OK] ConditionalAppearance "{desc}" added to variant "{var_name}"')
+        dirty = True; print(f'[OK] ConditionalAppearance "{desc}" added to variant "{var_name}"')
 
 elif operation == "clear-selection":
     settings = resolve_variant_settings()
@@ -2356,7 +2369,7 @@ elif operation == "clear-selection":
     selection = find_first_element(settings, ["selection"], SET_NS)
     if selection is not None:
         clear_container_children(selection)
-        print(f'[OK] Selection cleared in variant "{var_name}"')
+        dirty = True; print(f'[OK] Selection cleared in variant "{var_name}"')
     else:
         print(f'[INFO] No selection section in variant "{var_name}"')
 
@@ -2366,7 +2379,7 @@ elif operation == "clear-order":
     order_el = find_first_element(settings, ["order"], SET_NS)
     if order_el is not None:
         clear_container_children(order_el)
-        print(f'[OK] Order cleared in variant "{var_name}"')
+        dirty = True; print(f'[OK] Order cleared in variant "{var_name}"')
     else:
         print(f'[INFO] No order section in variant "{var_name}"')
 
@@ -2376,7 +2389,7 @@ elif operation == "clear-filter":
     filter_el = find_first_element(settings, ["filter"], SET_NS)
     if filter_el is not None:
         clear_container_children(filter_el)
-        print(f'[OK] Filter cleared in variant "{var_name}"')
+        dirty = True; print(f'[OK] Filter cleared in variant "{var_name}"')
     else:
         print(f'[INFO] No filter section in variant "{var_name}"')
 
@@ -2386,7 +2399,7 @@ elif operation == "clear-conditionalAppearance":
     ca_el = find_first_element(settings, ["conditionalAppearance"], SET_NS)
     if ca_el is not None:
         clear_container_children(ca_el)
-        print(f'[OK] ConditionalAppearance cleared in variant "{var_name}"')
+        dirty = True; print(f'[OK] ConditionalAppearance cleared in variant "{var_name}"')
     else:
         print(f'[INFO] No conditionalAppearance section in variant "{var_name}"')
 
@@ -2430,7 +2443,7 @@ elif operation == "modify-filter":
             uid = new_uuid() if parsed["userSettingID"] == "auto" else parsed["userSettingID"]
             set_or_create_child_element(filter_item, "userSettingID", SET_NS, uid, item_indent)
 
-        print(f'[OK] Filter "{parsed["field"]}" modified in variant "{var_name}"')
+        dirty = True; print(f'[OK] Filter "{parsed["field"]}" modified in variant "{var_name}"')
 
 elif operation == "modify-dataParameter":
     settings = resolve_variant_settings()
@@ -2496,7 +2509,7 @@ elif operation == "modify-dataParameter":
             uid = new_uuid() if parsed["userSettingID"] == "auto" else parsed["userSettingID"]
             set_or_create_child_element(dp_item, "userSettingID", SET_NS, uid, item_indent)
 
-        print(f'[OK] DataParameter "{parsed["parameter"]}" modified in variant "{var_name}"')
+        dirty = True; print(f'[OK] DataParameter "{parsed["parameter"]}" modified in variant "{var_name}"')
 
 elif operation == "modify-field":
     ds_node = resolve_data_set()
@@ -2540,7 +2553,7 @@ elif operation == "modify-field":
         for node in nodes:
             insert_before_element(ds_node, node, next_sib, child_indent)
 
-        print(f'[OK] Field "{field_name}" modified in dataset "{ds_name}"')
+        dirty = True; print(f'[OK] Field "{field_name}" modified in dataset "{ds_name}"')
 
 elif operation == "set-field-role":
     ds_node = resolve_data_set()
@@ -2578,7 +2591,7 @@ elif operation == "set-field-role":
 
         # Empty spec — remove only
         if not flags and not kv:
-            print(f'[OK] Field "{data_path}" role cleared')
+            dirty = True; print(f'[OK] Field "{data_path}" role cleared')
             continue
 
         # Build new <role>
@@ -2603,7 +2616,7 @@ elif operation == "set-field-role":
             parts.append(" ".join(f"@{f}" for f in flags))
         if kv:
             parts.append(" ".join(f"{k}={v}" for k, v in kv))
-        print(f'[OK] Field "{data_path}" role set: {" ".join(parts)}')
+        dirty = True; print(f'[OK] Field "{data_path}" role set: {" ".join(parts)}')
 
 elif operation == "remove-field":
     ds_node = resolve_data_set()
@@ -2615,7 +2628,7 @@ elif operation == "remove-field":
             print(f'[WARN] Field "{field_name}" not found in dataset "{ds_name}"')
             continue
         remove_node_with_whitespace(field_el)
-        print(f'[OK] Field "{field_name}" removed from dataset "{ds_name}"')
+        dirty = True; print(f'[OK] Field "{field_name}" removed from dataset "{ds_name}"')
 
         try:
             settings = resolve_variant_settings()
@@ -2625,7 +2638,7 @@ elif operation == "remove-field":
                 sel_item = find_element_by_child_value(selection, "item", "field", field_name, SET_NS)
                 if sel_item is not None:
                     remove_node_with_whitespace(sel_item)
-                    print(f'[OK] Field "{field_name}" removed from selection of variant "{var_name}"')
+                    dirty = True; print(f'[OK] Field "{field_name}" removed from selection of variant "{var_name}"')
         except SystemExit:
             pass
 
@@ -2637,7 +2650,7 @@ elif operation == "remove-total":
             print(f'[WARN] TotalField "{data_path}" not found')
             continue
         remove_node_with_whitespace(total_el)
-        print(f'[OK] TotalField "{data_path}" removed')
+        dirty = True; print(f'[OK] TotalField "{data_path}" removed')
 
 elif operation == "remove-calculated-field":
     for val in values:
@@ -2647,7 +2660,7 @@ elif operation == "remove-calculated-field":
             print(f'[WARN] CalculatedField "{data_path}" not found')
             continue
         remove_node_with_whitespace(calc_el)
-        print(f'[OK] CalculatedField "{data_path}" removed')
+        dirty = True; print(f'[OK] CalculatedField "{data_path}" removed')
 
         try:
             settings = resolve_variant_settings()
@@ -2657,7 +2670,7 @@ elif operation == "remove-calculated-field":
                 sel_item = find_element_by_child_value(selection, "item", "field", data_path, SET_NS)
                 if sel_item is not None:
                     remove_node_with_whitespace(sel_item)
-                    print(f'[OK] Field "{data_path}" removed from selection of variant "{var_name}"')
+                    dirty = True; print(f'[OK] Field "{data_path}" removed from selection of variant "{var_name}"')
         except SystemExit:
             pass
 
@@ -2669,7 +2682,7 @@ elif operation == "remove-parameter":
             print(f'[WARN] Parameter "{param_name}" not found')
             continue
         remove_node_with_whitespace(param_el)
-        print(f'[OK] Parameter "{param_name}" removed')
+        dirty = True; print(f'[OK] Parameter "{param_name}" removed')
 
 elif operation == "remove-filter":
     settings = resolve_variant_settings()
@@ -2685,7 +2698,7 @@ elif operation == "remove-filter":
             print(f'[WARN] Filter for "{field_name}" not found in variant "{var_name}"')
             continue
         remove_node_with_whitespace(filter_item)
-        print(f'[OK] Filter for "{field_name}" removed from variant "{var_name}"')
+        dirty = True; print(f'[OK] Filter for "{field_name}" removed from variant "{var_name}"')
 
 elif operation == "add-drilldown":
     # String-based manipulation — templates use dcsat namespace with inline xmlns
@@ -2816,7 +2829,7 @@ elif operation == "add-drilldown":
                 cell_count += 1
                 search_start = cell_end + 1
 
-            print(f"[OK] {drill_name} \u2192 {tpl_name} (param + {cell_count} cell(s))")
+            dirty = True; print(f"[OK] {drill_name} \u2192 {tpl_name} (param + {cell_count} cell(s))")
 
     # Apply insertions in reverse order to preserve offsets.
     # For same position: reverse insertion order so first resource ends up first in file.
@@ -2829,13 +2842,36 @@ elif operation == "add-drilldown":
     with open(resolved_path, "wb") as f:
         f.write(b'\xef\xbb\xbf')
         f.write(raw_text.encode("utf-8"))
-    print(f"[OK] Saved {resolved_path}")
+    dirty = True; print(f"[OK] Saved {resolved_path}")
     sys.exit(0)
 
 # ── 9. Save ─────────────────────────────────────────────────
 
+if not dirty:
+    print("[INFO] No changes -- file untouched")
+    sys.exit(0)
+
 xml_bytes = etree.tostring(tree, xml_declaration=True, encoding="UTF-8")
 xml_bytes = xml_bytes.replace(b"<?xml version='1.0' encoding='UTF-8'?>", b'<?xml version="1.0" encoding="utf-8"?>')
+
+# Format-preserve post-processing (mirrors PS path):
+#   (1) restore the original raw <DataCompositionSchema ...> opening tag — lxml collapses
+#       multi-line xmlns into one line.
+#   (2) re-escape `"` to &quot; inside <query>/<expression> text content; scope anchored
+#       to those tag names so xsi:type="..." attribute quotes are untouched.
+xml_text = xml_bytes.decode("utf-8")
+if raw_root_opening:
+    xml_text = re.sub(r"<DataCompositionSchema\b[^>]*>", lambda m: raw_root_opening, xml_text, count=1, flags=re.DOTALL)
+xml_text = re.sub(
+    r"(<(?:\w+:)?(?:query|expression)\b[^>]*>)([\s\S]*?)(</(?:\w+:)?(?:query|expression)>)",
+    lambda m: m.group(1) + m.group(2).replace('"', '&quot;') + m.group(3),
+    xml_text,
+)
+# Normalize self-closing tags: lxml writes `<foo bar="x"/>` already (no space), but be
+# defensive — strip any space before `/>` so PS and PY ports stay byte-equivalent.
+xml_text = re.sub(r"(?<=\S) />", "/>", xml_text)
+xml_bytes = xml_text.encode("utf-8")
+
 if not xml_bytes.endswith(b"\n"):
     xml_bytes += b"\n"
 with open(resolved_path, "wb") as f:

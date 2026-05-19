@@ -1,0 +1,9 @@
+{
+  "name": "modify-parameter title сохраняет &quot; и многострочный xmlns в неизменённых местах",
+  "setup": "fixture:roundtrip-base",
+  "params": {
+    "templatePath": "Template.xml",
+    "operation": "modify-parameter",
+    "value": "Период [Новый период]"
+  }
+}

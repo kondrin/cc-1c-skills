@@ -342,6 +342,31 @@ function normalizeContent(text, config) {
 
 // ─── Snapshot comparison ────────────────────────────────────────────────────
 
+// Capture raw byte contents of every file in dir, keyed by relative path.
+// Used by idempotency checks to verify byte-equality after a re-run.
+function snapshotWorkDirBytes(dir) {
+  const files = listFilesRecursive(dir);
+  const map = new Map();
+  for (const rel of files) {
+    map.set(rel, readFileSync(join(dir, rel)));
+  }
+  return map;
+}
+
+// Compare two byte-snapshots. Returns null if identical, else a list of diff lines.
+function diffByteSnapshots(before, after) {
+  const diffs = [];
+  for (const [rel, b1] of before) {
+    if (!after.has(rel)) { diffs.push(`removed: ${rel}`); continue; }
+    const b2 = after.get(rel);
+    if (b1.length !== b2.length || !b1.equals(b2)) diffs.push(`changed: ${rel} (${b1.length} -> ${b2.length} bytes)`);
+  }
+  for (const rel of after.keys()) {
+    if (!before.has(rel)) diffs.push(`added: ${rel}`);
+  }
+  return diffs.length === 0 ? null : diffs;
+}
+
 function listFilesRecursive(dir, base = '') {
   const result = [];
   if (!existsSync(dir)) return result;
@@ -571,6 +596,23 @@ async function runCaseAsync(testCase, opts) {
           }
         }
       }
+
+      // Idempotency check: re-run the same script with the same args and assert
+      // every file in workDir is byte-identical to the first-run output.
+      if (errors.length === 0 && caseData.idempotent && !workspace.readOnly) {
+        const before = snapshotWorkDirBytes(workDir);
+        try {
+          const execCwd = skillConfig.cwd === 'workDir' ? workDir : undefined;
+          await execSkillAsync(opts.runtime, scriptPath, args, execCwd);
+        } catch (e) {
+          errors.push(`Idempotency rerun failed: exitCode=${e.status}\nstderr: ${(e.stderr || '').substring(0, 300)}`);
+        }
+        if (errors.length === 0) {
+          const after = snapshotWorkDirBytes(workDir);
+          const diffs = diffByteSnapshots(before, after);
+          if (diffs) errors.push(`Idempotency: workspace changed on rerun:\n  ${diffs.join('\n  ')}`);
+        }
+      }
     }
 
     // Post-run validation (on real output, before cleanup)
@@ -725,6 +767,22 @@ function runCase(testCase, opts) {
               }
             }
           }
+        }
+      }
+
+      // Idempotency check: re-run the same script and assert byte-equality.
+      if (errors.length === 0 && caseData.idempotent && !workspace.readOnly) {
+        const before = snapshotWorkDirBytes(workDir);
+        try {
+          const execCwd = skillConfig.cwd === 'workDir' ? workDir : undefined;
+          execSkillRaw(opts.runtime, scriptPath, args, execCwd);
+        } catch (e) {
+          errors.push(`Idempotency rerun failed: exitCode=${e.status}\nstderr: ${(e.stderr || '').substring(0, 300)}`);
+        }
+        if (errors.length === 0) {
+          const after = snapshotWorkDirBytes(workDir);
+          const diffs = diffByteSnapshots(before, after);
+          if (diffs) errors.push(`Idempotency: workspace changed on rerun:\n  ${diffs.join('\n  ')}`);
         }
       }
     }

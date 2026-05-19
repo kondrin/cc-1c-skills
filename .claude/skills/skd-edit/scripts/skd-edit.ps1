@@ -1,4 +1,4 @@
-﻿# skd-edit v1.18 — Atomic 1C DCS editor
+﻿# skd-edit v1.19 — Atomic 1C DCS editor
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -27,6 +27,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+# Dirty flag — set to $true by every successful mutation. If still $false at save time,
+# the file is left untouched (NO-OP operations like [WARN] not found don't rewrite).
+$script:Dirty = $false
 
 # --- 1. Resolve path ---
 
@@ -1717,6 +1721,14 @@ function Get-ContainerChildIndent($container) {
 
 # --- 6. Load XML ---
 
+# Capture raw original BEFORE DOM parse — needed at save time to:
+#   (a) restore exact root <DataCompositionSchema xmlns=...> opening tag (DOM serializer
+#       collapses multi-line xmlns into a single line);
+#   (b) detect NO-OP via byte-equality as an extra safety net.
+$script:RawOriginal = [System.IO.File]::ReadAllText($resolvedPath, [System.Text.Encoding]::UTF8)
+$rootOpenMatch = [regex]::Match($script:RawOriginal, '<DataCompositionSchema\b[^>]*>')
+if ($rootOpenMatch.Success) { $script:RawRootOpening = $rootOpenMatch.Value } else { $script:RawRootOpening = $null }
+
 $xmlDoc = New-Object System.Xml.XmlDocument
 $xmlDoc.PreserveWhitespace = $true
 $xmlDoc.Load($resolvedPath)
@@ -1767,7 +1779,7 @@ switch ($Operation) {
 				Insert-BeforeElement $dsNode $node $refNode $childIndent
 			}
 
-			Write-Host "[OK] Field `"$($parsed.dataPath)`" added to dataset `"$dsName`""
+			$script:Dirty = $true; Write-Host "[OK] Field `"$($parsed.dataPath)`" added to dataset `"$dsName`""
 
 			if (-not $NoSelection) {
 				$settings = Resolve-VariantSettings
@@ -1783,7 +1795,7 @@ switch ($Operation) {
 					foreach ($node in $selNodes) {
 						Insert-BeforeElement $selection $node $null $selIndent
 					}
-					Write-Host "[OK] Field `"$($parsed.dataPath)`" added to selection of variant `"$varName`""
+					$script:Dirty = $true; Write-Host "[OK] Field `"$($parsed.dataPath)`" added to selection of variant `"$varName`""
 				}
 			}
 		}
@@ -1819,7 +1831,7 @@ switch ($Operation) {
 				Insert-BeforeElement $root $node $refNode $childIndent
 			}
 
-			Write-Host "[OK] TotalField `"$($parsed.dataPath)`" = $($parsed.expression) added"
+			$script:Dirty = $true; Write-Host "[OK] TotalField `"$($parsed.dataPath)`" = $($parsed.expression) added"
 		}
 	}
 
@@ -1853,7 +1865,7 @@ switch ($Operation) {
 				Insert-BeforeElement $root $node $refNode $childIndent
 			}
 
-			Write-Host "[OK] CalculatedField `"$($parsed.dataPath)`" = $($parsed.expression) added"
+			$script:Dirty = $true; Write-Host "[OK] CalculatedField `"$($parsed.dataPath)`" = $($parsed.expression) added"
 
 			if (-not $NoSelection) {
 				$settings = Resolve-VariantSettings
@@ -1869,7 +1881,7 @@ switch ($Operation) {
 					foreach ($node in $selNodes) {
 						Insert-BeforeElement $selection $node $null $selIndent
 					}
-					Write-Host "[OK] Field `"$($parsed.dataPath)`" added to selection of variant `"$varName`""
+					$script:Dirty = $true; Write-Host "[OK] Field `"$($parsed.dataPath)`" added to selection of variant `"$varName`""
 				}
 			}
 		}
@@ -1907,9 +1919,9 @@ switch ($Operation) {
 				}
 			}
 
-			Write-Host "[OK] Parameter `"$($parsed.name)`" added"
+			$script:Dirty = $true; Write-Host "[OK] Parameter `"$($parsed.name)`" added"
 			if ($parsed.autoDates) {
-				Write-Host "[OK] Auto-parameters `"ДатаНачала`", `"ДатаОкончания`" added"
+				$script:Dirty = $true; Write-Host "[OK] Auto-parameters `"ДатаНачала`", `"ДатаОкончания`" added"
 			}
 		}
 	}
@@ -1966,7 +1978,7 @@ switch ($Operation) {
 				foreach ($node in $titleNodes) {
 					Insert-BeforeElement $paramEl $node $titleRef $childIndent
 				}
-				Write-Host "[OK] Parameter `"$paramName`": title set to `"$titleVal`""
+				$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": title set to `"$titleVal`""
 			}
 
 			# Separate availableValue=... from simple kv pairs
@@ -2033,10 +2045,10 @@ switch ($Operation) {
 							Insert-BeforeElement $paramEl $node $refNode $childIndent
 						}
 						$verb = if ($wasExisting) { "updated" } else { "added" }
-						Write-Host "[OK] Parameter `"$paramName`": value $verb to $value"
+						$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": value $verb to $value"
 					} elseif ($existing) {
 						$existing.InnerText = $value
-						Write-Host "[OK] Parameter `"$paramName`": $key updated to $value"
+						$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": $key updated to $value"
 					} else {
 						# Schema order: ...value, useRestriction, availableValue*, denyIncompleteValues, use
 						$refNode = $null
@@ -2052,7 +2064,7 @@ switch ($Operation) {
 						foreach ($node in $nodes) {
 							Insert-BeforeElement $paramEl $node $refNode $childIndent
 						}
-						Write-Host "[OK] Parameter `"$paramName`": $key=$value added"
+						$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": $key=$value added"
 					}
 				}
 			}
@@ -2101,7 +2113,7 @@ switch ($Operation) {
 						Insert-BeforeElement $paramEl $node $refNode $childIndent
 					}
 				}
-				Write-Host "[OK] Parameter `"$paramName`": availableValue set to $($avItems.Count) item(s)"
+				$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": availableValue set to $($avItems.Count) item(s)"
 			}
 
 			# Process @hidden / @always flags (idempotent)
@@ -2138,7 +2150,7 @@ switch ($Operation) {
 					foreach ($node in $nodes) { Insert-BeforeElement $paramEl $node $refNode $childIndent }
 				}
 
-				Write-Host "[OK] Parameter `"$paramName`": @hidden applied"
+				$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": @hidden applied"
 			}
 
 			if ($flagAlways) {
@@ -2152,7 +2164,7 @@ switch ($Operation) {
 					$nodes = Import-Fragment $xmlDoc "$childIndent<use>Always</use>"
 					foreach ($node in $nodes) { Insert-BeforeElement $paramEl $node $null $childIndent }
 				}
-				Write-Host "[OK] Parameter `"$paramName`": @always applied"
+				$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`": @always applied"
 			}
 		}
 	}
@@ -2230,7 +2242,7 @@ switch ($Operation) {
 				}
 			}
 
-			Write-Host "[OK] Parameter renamed: `"$oldName`" => `"$newName`" (expressions updated: $exprUpdated, dataParameters updated: $dpUpdated)"
+			$script:Dirty = $true; Write-Host "[OK] Parameter renamed: `"$oldName`" => `"$newName`" (expressions updated: $exprUpdated, dataParameters updated: $dpUpdated)"
 		}
 	}
 
@@ -2307,7 +2319,7 @@ switch ($Operation) {
 				Insert-BeforeElement $root $pe $anchor $childIndent
 			}
 
-			Write-Host "[OK] Parameters reordered ($($allParams.Count) total, $($order.Count) explicit)"
+			$script:Dirty = $true; Write-Host "[OK] Parameters reordered ($($allParams.Count) total, $($order.Count) explicit)"
 		}
 	}
 
@@ -2327,7 +2339,7 @@ switch ($Operation) {
 				Insert-BeforeElement $filterEl $node $null $filterIndent
 			}
 
-			Write-Host "[OK] Filter `"$($parsed.field) $($parsed.op)`" added to variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Filter `"$($parsed.field) $($parsed.op)`" added to variant `"$varName`""
 		}
 	}
 
@@ -2347,7 +2359,7 @@ switch ($Operation) {
 				Insert-BeforeElement $dpEl $node $null $dpIndent
 			}
 
-			Write-Host "[OK] DataParameter `"$($parsed.parameter)`" added to variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] DataParameter `"$($parsed.parameter)`" added to variant `"$varName`""
 		}
 	}
 
@@ -2389,7 +2401,7 @@ switch ($Operation) {
 			}
 
 			$desc = if ($parsed.field -eq "Auto") { "Auto" } else { "$($parsed.field) $($parsed.direction)" }
-			Write-Host "[OK] Order `"$desc`" added to variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Order `"$desc`" added to variant `"$varName`""
 		}
 	}
 
@@ -2452,7 +2464,7 @@ switch ($Operation) {
 			}
 
 			$target = if ($groupName) { "group `"$groupName`"" } else { "variant `"$varName`"" }
-			Write-Host "[OK] Selection `"$fieldName`" added to $target"
+			$script:Dirty = $true; Write-Host "[OK] Selection `"$fieldName`" added to $target"
 		}
 	}
 
@@ -2469,7 +2481,7 @@ switch ($Operation) {
 		# InnerText setter handles XML escaping automatically
 		$queryEl.InnerText = Resolve-QueryValue $Value $script:queryBaseDir
 
-		Write-Host "[OK] Query replaced in dataset `"$dsName`""
+		$script:Dirty = $true; Write-Host "[OK] Query replaced in dataset `"$dsName`""
 	}
 
 	"patch-query" {
@@ -2510,7 +2522,7 @@ switch ($Operation) {
 
 			$queryEl.InnerText = $queryText.Replace($oldStr, $newStr)
 			$suffix = if ($once) { " (1 occurrence)" } else { " ($count occurrence(s))" }
-			Write-Host "[OK] Query patched in dataset `"$dsName`": replaced '$oldStr'$suffix"
+			$script:Dirty = $true; Write-Host "[OK] Query patched in dataset `"$dsName`": replaced '$oldStr'$suffix"
 		}
 	}
 
@@ -2528,9 +2540,9 @@ switch ($Operation) {
 			$existingParam = Find-ElementByChildValue $outputEl "item" "parameter" $parsed.key $corNs
 			if ($existingParam) {
 				Remove-NodeWithWhitespace $existingParam
-				Write-Host "[OK] Replaced outputParameter `"$($parsed.key)`" in variant `"$varName`""
+				$script:Dirty = $true; Write-Host "[OK] Replaced outputParameter `"$($parsed.key)`" in variant `"$varName`""
 			} else {
-				Write-Host "[OK] OutputParameter `"$($parsed.key)`" added to variant `"$varName`""
+				$script:Dirty = $true; Write-Host "[OK] OutputParameter `"$($parsed.key)`" added to variant `"$varName`""
 			}
 
 			$fragXml = Build-OutputParamFragment -parsed $parsed -indent $outputIndent
@@ -2572,7 +2584,7 @@ switch ($Operation) {
 			}
 		}
 
-		Write-Host "[OK] Structure set in variant `"$varName`": $Value"
+		$script:Dirty = $true; Write-Host "[OK] Structure set in variant `"$varName`": $Value"
 	}
 
 	"modify-structure" {
@@ -2667,7 +2679,7 @@ switch ($Operation) {
 			}
 
 			$desc = if ($t.groupBy.Count -eq 0) { "details" } else { $t.groupBy -join ', ' }
-			Write-Host "[OK] Group `"$($t.name)`" groupItems updated: $desc"
+			$script:Dirty = $true; Write-Host "[OK] Group `"$($t.name)`" groupItems updated: $desc"
 		}
 	}
 
@@ -2697,7 +2709,7 @@ switch ($Operation) {
 
 			$desc = "$($parsed.source) > $($parsed.dest) on $($parsed.sourceExpr) = $($parsed.destExpr)"
 			if ($parsed.parameter) { $desc += " [param $($parsed.parameter)]" }
-			Write-Host "[OK] DataSetLink `"$desc`" added"
+			$script:Dirty = $true; Write-Host "[OK] DataSetLink `"$desc`" added"
 		}
 	}
 
@@ -2749,7 +2761,7 @@ switch ($Operation) {
 				Insert-BeforeElement $root $node $refNode $childIndent
 			}
 
-			Write-Host "[OK] DataSet `"$($parsed.name)`" added (dataSource=$dsSourceName)"
+			$script:Dirty = $true; Write-Host "[OK] DataSet `"$($parsed.name)`" added (dataSource=$dsSourceName)"
 		}
 	}
 
@@ -2795,7 +2807,7 @@ switch ($Operation) {
 				Insert-BeforeElement $root $node $refNode $childIndent
 			}
 
-			Write-Host "[OK] Variant `"$($parsed.name)`" [`"$($parsed.presentation)`"] added"
+			$script:Dirty = $true; Write-Host "[OK] Variant `"$($parsed.name)`" [`"$($parsed.presentation)`"] added"
 		}
 	}
 
@@ -2818,7 +2830,7 @@ switch ($Operation) {
 			$desc = "$($parsed.param) = $($parsed.value)"
 			if ($parsed.filter) { $desc += " when $($parsed.filter.field) $($parsed.filter.op)" }
 			if ($parsed.fields -and $parsed.fields.Count -gt 0) { $desc += " for $($parsed.fields -join ', ')" }
-			Write-Host "[OK] ConditionalAppearance `"$desc`" added to variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] ConditionalAppearance `"$desc`" added to variant `"$varName`""
 		}
 	}
 
@@ -2828,7 +2840,7 @@ switch ($Operation) {
 		$selection = Find-FirstElement $settings @("selection") $setNs
 		if ($selection) {
 			Clear-ContainerChildren $selection
-			Write-Host "[OK] Selection cleared in variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Selection cleared in variant `"$varName`""
 		} else {
 			Write-Host "[INFO] No selection section in variant `"$varName`""
 		}
@@ -2840,7 +2852,7 @@ switch ($Operation) {
 		$orderEl = Find-FirstElement $settings @("order") $setNs
 		if ($orderEl) {
 			Clear-ContainerChildren $orderEl
-			Write-Host "[OK] Order cleared in variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Order cleared in variant `"$varName`""
 		} else {
 			Write-Host "[INFO] No order section in variant `"$varName`""
 		}
@@ -2852,7 +2864,7 @@ switch ($Operation) {
 		$filterEl = Find-FirstElement $settings @("filter") $setNs
 		if ($filterEl) {
 			Clear-ContainerChildren $filterEl
-			Write-Host "[OK] Filter cleared in variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Filter cleared in variant `"$varName`""
 		} else {
 			Write-Host "[INFO] No filter section in variant `"$varName`""
 		}
@@ -2864,7 +2876,7 @@ switch ($Operation) {
 		$caEl = Find-FirstElement $settings @("conditionalAppearance") $setNs
 		if ($caEl) {
 			Clear-ContainerChildren $caEl
-			Write-Host "[OK] ConditionalAppearance cleared in variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] ConditionalAppearance cleared in variant `"$varName`""
 		} else {
 			Write-Host "[INFO] No conditionalAppearance section in variant `"$varName`""
 		}
@@ -2927,7 +2939,7 @@ switch ($Operation) {
 				Set-OrCreateChildElement $filterItem "userSettingID" $setNs $uid $itemIndent
 			}
 
-			Write-Host "[OK] Filter `"$($parsed.field)`" modified in variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Filter `"$($parsed.field)`" modified in variant `"$varName`""
 		}
 	}
 
@@ -3014,7 +3026,7 @@ switch ($Operation) {
 				Set-OrCreateChildElement $dpItem "userSettingID" $setNs $uid $itemIndent
 			}
 
-			Write-Host "[OK] DataParameter `"$($parsed.parameter)`" modified in variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] DataParameter `"$($parsed.parameter)`" modified in variant `"$varName`""
 		}
 	}
 
@@ -3065,7 +3077,7 @@ switch ($Operation) {
 				Insert-BeforeElement $dsNode $node $nextSib $childIndent
 			}
 
-			Write-Host "[OK] Field `"$fieldName`" modified in dataset `"$dsName`""
+			$script:Dirty = $true; Write-Host "[OK] Field `"$fieldName`" modified in dataset `"$dsName`""
 		}
 	}
 
@@ -3112,7 +3124,7 @@ switch ($Operation) {
 
 			# Empty spec — remove only
 			if ($flags.Count -eq 0 -and $kv.Count -eq 0) {
-				Write-Host "[OK] Field `"$dataPath`" role cleared"
+				$script:Dirty = $true; Write-Host "[OK] Field `"$dataPath`" role cleared"
 				continue
 			}
 
@@ -3146,7 +3158,7 @@ switch ($Operation) {
 			$desc = @()
 			if ($flags.Count -gt 0) { $desc += ($flags | ForEach-Object { "@$_" }) -join ' ' }
 			if ($kv.Count -gt 0) { $desc += ($kv.Keys | ForEach-Object { "$_=$($kv[$_])" }) -join ' ' }
-			Write-Host "[OK] Field `"$dataPath`" role set: $($desc -join ' ')"
+			$script:Dirty = $true; Write-Host "[OK] Field `"$dataPath`" role set: $($desc -join ' ')"
 		}
 	}
 
@@ -3164,7 +3176,7 @@ switch ($Operation) {
 			}
 
 			Remove-NodeWithWhitespace $fieldEl
-			Write-Host "[OK] Field `"$fieldName`" removed from dataset `"$dsName`""
+			$script:Dirty = $true; Write-Host "[OK] Field `"$fieldName`" removed from dataset `"$dsName`""
 
 			# Also remove from selection in variant
 			try {
@@ -3175,7 +3187,7 @@ switch ($Operation) {
 					$selItem = Find-ElementByChildValue $selection "item" "field" $fieldName $setNs
 					if ($selItem) {
 						Remove-NodeWithWhitespace $selItem
-						Write-Host "[OK] Field `"$fieldName`" removed from selection of variant `"$varName`""
+						$script:Dirty = $true; Write-Host "[OK] Field `"$fieldName`" removed from selection of variant `"$varName`""
 					}
 				}
 			} catch {
@@ -3196,7 +3208,7 @@ switch ($Operation) {
 			}
 
 			Remove-NodeWithWhitespace $totalEl
-			Write-Host "[OK] TotalField `"$dataPath`" removed"
+			$script:Dirty = $true; Write-Host "[OK] TotalField `"$dataPath`" removed"
 		}
 	}
 
@@ -3212,7 +3224,7 @@ switch ($Operation) {
 			}
 
 			Remove-NodeWithWhitespace $calcEl
-			Write-Host "[OK] CalculatedField `"$dataPath`" removed"
+			$script:Dirty = $true; Write-Host "[OK] CalculatedField `"$dataPath`" removed"
 
 			# Also remove from selection
 			try {
@@ -3223,7 +3235,7 @@ switch ($Operation) {
 					$selItem = Find-ElementByChildValue $selection "item" "field" $dataPath $setNs
 					if ($selItem) {
 						Remove-NodeWithWhitespace $selItem
-						Write-Host "[OK] Field `"$dataPath`" removed from selection of variant `"$varName`""
+						$script:Dirty = $true; Write-Host "[OK] Field `"$dataPath`" removed from selection of variant `"$varName`""
 					}
 				}
 			} catch { }
@@ -3242,7 +3254,7 @@ switch ($Operation) {
 			}
 
 			Remove-NodeWithWhitespace $paramEl
-			Write-Host "[OK] Parameter `"$paramName`" removed"
+			$script:Dirty = $true; Write-Host "[OK] Parameter `"$paramName`" removed"
 		}
 	}
 
@@ -3266,7 +3278,7 @@ switch ($Operation) {
 			}
 
 			Remove-NodeWithWhitespace $filterItem
-			Write-Host "[OK] Filter for `"$fieldName`" removed from variant `"$varName`""
+			$script:Dirty = $true; Write-Host "[OK] Filter for `"$fieldName`" removed from variant `"$varName`""
 		}
 	}
 
@@ -3400,7 +3412,7 @@ switch ($Operation) {
 					$searchStart = $cellEnd + 1
 				}
 
-				Write-Host "[OK] $drillName → $tplName (param + $cellCount cell(s))"
+				$script:Dirty = $true; Write-Host "[OK] $drillName → $tplName (param + $cellCount cell(s))"
 			}
 		}
 
@@ -3415,15 +3427,40 @@ switch ($Operation) {
 		# Write directly — skip DOM save
 		$enc = New-Object System.Text.UTF8Encoding($true)
 		[System.IO.File]::WriteAllText($resolvedPath, $rawText, $enc)
-		Write-Host "[OK] Saved $resolvedPath"
+		$script:Dirty = $true; Write-Host "[OK] Saved $resolvedPath"
 		exit 0
 	}
 }
 
 # --- 9. Save ---
 
+if (-not $script:Dirty) {
+	Write-Host "[INFO] No changes -- file untouched"
+	exit 0
+}
+
 $content = $xmlDoc.OuterXml
 $content = $content -replace '(?<=<\?xml[^?]*encoding=")utf-8(?=")', 'UTF-8'
+
+# Format-preserve post-processing:
+#   (1) restore the original raw <DataCompositionSchema ...> opening tag — DOM collapses
+#       multi-line xmlns declarations into one line.
+if ($script:RawRootOpening) {
+	$content = [regex]::Replace($content, '<DataCompositionSchema\b[^>]*>', { param($m) $script:RawRootOpening })
+}
+
+#   (2) re-escape `"` to &quot; inside <query>/<expression> text content (1C-style).
+#       Scope is anchored to those tag names so xsi:type="..." attribute quotes are untouched.
+$content = [regex]::Replace(
+	$content,
+	'(<(?:\w+:)?(?:query|expression)\b[^>]*>)([\s\S]*?)(</(?:\w+:)?(?:query|expression)>)',
+	{ param($m) $m.Groups[1].Value + $m.Groups[2].Value.Replace('"', '&quot;') + $m.Groups[3].Value }
+)
+
+#   (3) normalize self-closing tags: `.NET XmlDocument` adds a space before `/>`
+#       (`<foo bar="x" />`) but 1C-Designer writes `<foo bar="x"/>`. Strip the space.
+$content = [regex]::Replace($content, '(?<=\S) />', '/>')
+
 $enc = New-Object System.Text.UTF8Encoding($true)
 [System.IO.File]::WriteAllText($resolvedPath, $content, $enc)
 
