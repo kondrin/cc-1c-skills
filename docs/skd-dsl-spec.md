@@ -124,7 +124,8 @@
   "Организация: CatalogRef.Организации @dimension",
   "Служебное: string #noFilter #noOrder",
   "Счёт: CatalogRef.Хозрасчетный @account",
-  "Сумма: decimal(15,2) @balance"
+  "Сумма: decimal(15,2) @balance",
+  "СуммаНач: decimal(15,2) @balance balanceGroupName=Сумма balanceType=OpeningBalance"
 ]
 ```
 
@@ -146,9 +147,9 @@
 
 ### Парсинг shorthand
 
-1. Разделить по пробелам; найти `@`-роли и `#`-ограничения
+1. Извлечь `@`-роли (regex `@(\w+)`), `#`-ограничения (`#(\w+)`), KV-пары роли (`(\w+)=(\S+)`)
 2. Остаток до первого `:` — `dataPath` (и `field` по умолчанию)
-3. После `:` до `@`/`#` — тип
+3. После `:` — тип
 
 ### Типы
 
@@ -192,21 +193,35 @@
 
 ### Роли
 
-| DSL shorthand | Объектная форма | XML |
-|---------------|----------------|-----|
-| `@dimension` | `"role": "dimension"` или `{"dimension": true}` | `<dcscom:dimension>true</dcscom:dimension>` |
-| `@account` | `"role": "account"` или `{"account": true}` | `<dcscom:account>true</dcscom:account>` |
-| `@balance` | `"role": "balance"` или `{"balance": true}` | `<dcscom:balance>true</dcscom:balance>` |
-| `@period` | `"role": "period"` или `{"period": true}` | `<dcscom:periodNumber>1</dcscom:periodNumber>` + `<dcscom:periodType>Main</dcscom:periodType>` |
+Принимаются четыре формы:
 
-Объектная форма с доп. полями:
 ```json
-"role": {
-  "account": true,
-  "accountTypeExpression": "Счёт.ВидСчёта",
-  "balanceGroup": "/Остатки"
-}
+"role": "dimension"                                                  // одиночный флаг
+"role": ["dimension", "required"]                                    // массив флагов
+"role": "balance balanceGroupName=Сумма balanceType=OpeningBalance"  // shorthand
+"role": { "balance": true, "balanceGroupName": "Сумма", "balanceType": "OpeningBalance" }
 ```
+
+Shorthand-формат может быть встроен прямо в shorthand поля:
+
+```
+"Сумма: decimal(15,2) @balance balanceGroupName=Сумма balanceType=OpeningBalance"
+```
+
+**Парсинг shorthand**: `@(\w+)` → boolean флаги; `(\w+)=(\S+)` → строковые KV; остаток — `dataPath[: type]`.
+
+**Поддерживаемые ключи**:
+
+| Категория | Ключи |
+|-----------|-------|
+| `@`-флаги (boolean) | `@dimension`, `@account`, `@balance`, `@period`, `@required`, `@autoOrder`, `@ignoreNullValues` |
+| Строковые KV | `balanceGroupName`, `balanceType` (`OpeningBalance`/`ClosingBalance`), `parentDimension`, `accountTypeExpression`, `expression`, `orderType` (`Asc`/`Desc`), `periodNumber`, `periodType` |
+
+Whitelist'а нет — любой `<dcscom:KEY>` принимается; перечисленные — типичные. `@period` — sugar для `periodNumber=1` + `periodType=Main` (можно переопределить явно).
+
+**XML-выход**: `<dcscom:KEY>true</dcscom:KEY>` для флагов; `<dcscom:KEY>VALUE</dcscom:KEY>` для KV.
+
+> Устаревший ключ `balanceGroup` в object-форме принимается как alias для `balanceGroupName` (имя элемента в реальном XML — `balanceGroupName`).
 
 ### Ограничения
 

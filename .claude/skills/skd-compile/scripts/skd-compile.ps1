@@ -1,4 +1,4 @@
-﻿# skd-compile v1.27 — Compile 1C DCS from JSON
+﻿# skd-compile v1.28 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -340,6 +340,7 @@ function Parse-FieldShorthand {
 	$result = @{
 		dataPath = ""; field = ""; title = ""; type = ""
 		roles = @(); restrict = @(); appearance = [ordered]@{}
+		roleExtras = [ordered]@{}
 	}
 
 	# Extract @roles
@@ -356,6 +357,11 @@ function Parse-FieldShorthand {
 	}
 	$s = [regex]::Replace($s, '\s*#\w+', '')
 
+	# Extract role kv=value (e.g. balanceGroupName=Сумма balanceType=OpeningBalance)
+	$kvMatches = [regex]::Matches($s, '(\w+)=(\S+)')
+	foreach ($m in $kvMatches) { $result.roleExtras[$m.Groups[1].Value] = $m.Groups[2].Value }
+	$s = [regex]::Replace($s, '\s*\w+=\S+', '')
+
 	# Split name: type
 	$s = $s.Trim()
 	if ($s.Contains(':')) {
@@ -368,6 +374,55 @@ function Parse-FieldShorthand {
 
 	$result.field = $result.dataPath
 	return $result
+}
+
+# Universal role spec parser: string / array / object / null
+# Returns @{ tokens = @(...); extras = [ordered]@{...} }
+function Parse-RoleSpec {
+	param($spec)
+	$tokens = @()
+	$extras = [ordered]@{}
+
+	if ($null -ne $spec) {
+		if ($spec -is [string]) {
+			if ($spec -notmatch '\s' -and $spec -notmatch '=') {
+				$tokens += $spec
+			} else {
+				$s = $spec.Trim()
+				foreach ($m in [regex]::Matches($s, '@(\w+)')) { $tokens += $m.Groups[1].Value }
+				$s = [regex]::Replace($s, '\s*@\w+', '').Trim()
+				foreach ($m in [regex]::Matches($s, '(\w+)=(\S+)')) { $extras[$m.Groups[1].Value] = $m.Groups[2].Value }
+			}
+		} elseif ($spec -is [array] -or $spec -is [System.Collections.IList]) {
+			foreach ($t in $spec) { $tokens += "$t" }
+		} elseif ($spec.PSObject -and $spec.PSObject.Properties) {
+			foreach ($prop in $spec.PSObject.Properties) {
+				$val = $prop.Value
+				if ($val -is [bool]) {
+					if ($val) { $tokens += $prop.Name }
+				} elseif ($val -is [int] -or $val -is [long] -or $val -is [double] -or $val -is [string]) {
+					$extras[$prop.Name] = "$val"
+				}
+			}
+		} elseif ($spec -is [hashtable] -or $spec -is [System.Collections.IDictionary]) {
+			foreach ($k in $spec.Keys) {
+				$val = $spec[$k]
+				if ($val -is [bool]) {
+					if ($val) { $tokens += "$k" }
+				} elseif ($val -is [int] -or $val -is [long] -or $val -is [double] -or $val -is [string]) {
+					$extras["$k"] = "$val"
+				}
+			}
+		}
+	}
+
+	# Deprecated alias: balanceGroup → balanceGroupName (старое имя в коде compile, в реальном XML — Name)
+	if ($extras.Contains('balanceGroup') -and -not $extras.Contains('balanceGroupName')) {
+		$extras['balanceGroupName'] = $extras['balanceGroup']
+		$extras.Remove('balanceGroup')
+	}
+
+	return @{ tokens = $tokens; extras = $extras }
 }
 
 # --- 6. Total field shorthand parser ---
@@ -687,18 +742,13 @@ function Emit-Field {
 			roles = @()
 			restrict = @()
 			appearance = [ordered]@{}
+			roleExtras = [ordered]@{}
 		}
-		# Parse role
+		# Parse role (string shorthand / array / object — единый формат с /skd-edit set-field-role)
 		if ($fieldDef.role) {
-			if ($fieldDef.role -is [string]) {
-				$f.roles = @($fieldDef.role)
-			} else {
-				# Object form — collect truthy keys
-				$roleObj = $fieldDef.role
-				foreach ($prop in $roleObj.PSObject.Properties) {
-					if ($prop.Value -eq $true) { $f.roles += $prop.Name }
-				}
-			}
+			$parsed = Parse-RoleSpec $fieldDef.role
+			$f.roles = $parsed.tokens
+			$f.roleExtras = $parsed.extras
 		}
 		# Parse restrictions
 		if ($fieldDef.restrict) {
@@ -716,10 +766,6 @@ function Emit-Field {
 		# attrRestrict
 		if ($fieldDef.attrRestrict) {
 			$f["attrRestrict"] = @($fieldDef.attrRestrict)
-		}
-		# role object extras
-		if ($fieldDef.role -and $fieldDef.role -isnot [string]) {
-			$f["roleObj"] = $fieldDef.role
 		}
 	}
 
@@ -761,24 +807,23 @@ function Emit-Field {
 	}
 
 	# Role
-	if ($f.roles.Count -gt 0 -or $f["roleObj"]) {
+	$hasExtras = $f["roleExtras"] -and $f["roleExtras"].Count -gt 0
+	if ($f.roles.Count -gt 0 -or $hasExtras) {
 		X "$indent`t<role>"
 		foreach ($role in $f.roles) {
 			if ($role -eq "period") {
-				# @period -> periodNumber + periodType (not <dcscom:period>)
-				X "$indent`t`t<dcscom:periodNumber>1</dcscom:periodNumber>"
-				X "$indent`t`t<dcscom:periodType>Main</dcscom:periodType>"
+				# @period — sugar для periodNumber=1 + periodType=Main; extras могут переопределить.
+				$pnInExtras = $hasExtras -and $f["roleExtras"].Contains('periodNumber')
+				$ptInExtras = $hasExtras -and $f["roleExtras"].Contains('periodType')
+				if (-not $pnInExtras) { X "$indent`t`t<dcscom:periodNumber>1</dcscom:periodNumber>" }
+				if (-not $ptInExtras) { X "$indent`t`t<dcscom:periodType>Main</dcscom:periodType>" }
 			} else {
 				X "$indent`t`t<dcscom:$role>true</dcscom:$role>"
 			}
 		}
-		if ($f["roleObj"]) {
-			$ro = $f["roleObj"]
-			if ($ro.accountTypeExpression) {
-				X "$indent`t`t<dcscom:accountTypeExpression>$(Esc-Xml "$($ro.accountTypeExpression)")</dcscom:accountTypeExpression>"
-			}
-			if ($ro.balanceGroup) {
-				X "$indent`t`t<dcscom:balanceGroup>$(Esc-Xml "$($ro.balanceGroup)")</dcscom:balanceGroup>"
+		if ($hasExtras) {
+			foreach ($k in $f["roleExtras"].Keys) {
+				X "$indent`t`t<dcscom:$k>$(Esc-Xml "$($f["roleExtras"][$k])")</dcscom:$k>"
 			}
 		}
 		X "$indent`t</role>"

@@ -94,7 +94,14 @@ powershell.exe -NoProfile -File "${CLAUDE_SKILL_DIR}/scripts/skd-compile.ps1" -V
 
 Составной тип (несколько типов значений) — массив в объектной форме: `"type": ["CatalogRef.A", "CatalogRef.B"]`. Квалификаторы (`(N)`, `(D,F)`) применяются к каждому элементу.
 
-Роли: `@dimension`, `@account`, `@balance`, `@period`.
+Роли (shorthand или объект):
+
+- `@`-флаги: `@dimension`, `@account`, `@balance`, `@period`, `@required`, `@autoOrder`, `@ignoreNullValues`
+- KV: `balanceGroupName`, `balanceType` (`OpeningBalance`/`ClosingBalance`), `parentDimension`, `accountTypeExpression`, `expression`, `orderType` (`Asc`/`Desc`), `periodNumber`, `periodType`
+
+```
+"Сумма: decimal(15,2) @balance balanceGroupName=Сумма balanceType=OpeningBalance"
+```
 
 Ограничения: `#noField`, `#noFilter`, `#noGroup`, `#noOrder`.
 

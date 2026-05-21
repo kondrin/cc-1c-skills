@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.26 — Compile 1C DCS from JSON
+# skd-compile v1.28 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -218,6 +218,7 @@ def parse_field_shorthand(s):
     result = {
         'dataPath': '', 'field': '', 'title': '', 'type': '',
         'roles': [], 'restrict': [], 'appearance': {},
+        'roleExtras': {},
     }
 
     # Extract @roles
@@ -232,6 +233,11 @@ def parse_field_shorthand(s):
         result['restrict'].append(m)
     s = re.sub(r'\s*#\w+', '', s)
 
+    # Extract role kv=value (e.g. balanceGroupName=Сумма)
+    for m in re.finditer(r'(\w+)=(\S+)', s):
+        result['roleExtras'][m.group(1)] = m.group(2)
+    s = re.sub(r'\s*\w+=\S+', '', s)
+
     # Split name: type
     s = s.strip()
     if ':' in s:
@@ -243,6 +249,42 @@ def parse_field_shorthand(s):
 
     result['field'] = result['dataPath']
     return result
+
+
+# Universal role spec parser: string / list / dict / None
+# Returns {'tokens': [...], 'extras': {...}}
+def parse_role_spec(spec):
+    tokens = []
+    extras = {}
+
+    if spec is None:
+        pass
+    elif isinstance(spec, str):
+        if ' ' not in spec and '=' not in spec:
+            tokens.append(spec)
+        else:
+            s = spec.strip()
+            for m in re.finditer(r'@(\w+)', s):
+                tokens.append(m.group(1))
+            s = re.sub(r'\s*@\w+', '', s).strip()
+            for m in re.finditer(r'(\w+)=(\S+)', s):
+                extras[m.group(1)] = m.group(2)
+    elif isinstance(spec, list):
+        for t in spec:
+            tokens.append(str(t))
+    elif isinstance(spec, dict):
+        for k, v in spec.items():
+            if isinstance(v, bool):
+                if v:
+                    tokens.append(k)
+            elif isinstance(v, (int, float, str)):
+                extras[k] = str(v)
+
+    # Deprecated alias: balanceGroup → balanceGroupName
+    if 'balanceGroup' in extras and 'balanceGroupName' not in extras:
+        extras['balanceGroupName'] = extras.pop('balanceGroup')
+
+    return {'tokens': tokens, 'extras': extras}
 
 
 # --- Total field shorthand parser ---
@@ -523,16 +565,13 @@ def emit_field(lines, field_def, indent):
             'roles': [],
             'restrict': [],
             'appearance': {},
+            'roleExtras': {},
         }
-        # Parse role
-        if field_def.get('role'):
-            if isinstance(field_def['role'], str):
-                f['roles'] = [field_def['role']]
-            else:
-                # Object form -- collect truthy keys
-                for k, v in field_def['role'].items():
-                    if v is True:
-                        f['roles'].append(k)
+        # Parse role (string shorthand / list / dict — единый формат с /skd-edit set-field-role)
+        if field_def.get('role') is not None:
+            parsed = parse_role_spec(field_def['role'])
+            f['roles'] = parsed['tokens']
+            f['roleExtras'] = parsed['extras']
         # Parse restrictions
         if field_def.get('restrict'):
             f['restrict'] = list(field_def['restrict'])
@@ -545,9 +584,6 @@ def emit_field(lines, field_def, indent):
         # attrRestrict
         if field_def.get('attrRestrict'):
             f['attrRestrict'] = list(field_def['attrRestrict'])
-        # role object extras
-        if field_def.get('role') and not isinstance(field_def['role'], str):
-            f['roleObj'] = field_def['role']
 
     lines.append(f'{indent}<field xsi:type="DataSetFieldField">')
     lines.append(f'{indent}\t<dataPath>{esc_xml(f["dataPath"])}</dataPath>')
@@ -580,20 +616,21 @@ def emit_field(lines, field_def, indent):
         lines.append(f'{indent}\t</attributeUseRestriction>')
 
     # Role
-    if (f.get('roles') and len(f['roles']) > 0) or f.get('roleObj'):
+    extras = f.get('roleExtras') or {}
+    has_extras = len(extras) > 0
+    if (f.get('roles') and len(f['roles']) > 0) or has_extras:
         lines.append(f'{indent}\t<role>')
         for role in f.get('roles', []):
             if role == 'period':
-                lines.append(f'{indent}\t\t<dcscom:periodNumber>1</dcscom:periodNumber>')
-                lines.append(f'{indent}\t\t<dcscom:periodType>Main</dcscom:periodType>')
+                # @period — sugar для periodNumber=1 + periodType=Main; extras могут переопределить.
+                if 'periodNumber' not in extras:
+                    lines.append(f'{indent}\t\t<dcscom:periodNumber>1</dcscom:periodNumber>')
+                if 'periodType' not in extras:
+                    lines.append(f'{indent}\t\t<dcscom:periodType>Main</dcscom:periodType>')
             else:
                 lines.append(f'{indent}\t\t<dcscom:{role}>true</dcscom:{role}>')
-        if f.get('roleObj'):
-            ro = f['roleObj']
-            if ro.get('accountTypeExpression'):
-                lines.append(f'{indent}\t\t<dcscom:accountTypeExpression>{esc_xml(str(ro["accountTypeExpression"]))}</dcscom:accountTypeExpression>')
-            if ro.get('balanceGroup'):
-                lines.append(f'{indent}\t\t<dcscom:balanceGroup>{esc_xml(str(ro["balanceGroup"]))}</dcscom:balanceGroup>')
+        for k, v in extras.items():
+            lines.append(f'{indent}\t\t<dcscom:{k}>{esc_xml(str(v))}</dcscom:{k}>')
         lines.append(f'{indent}\t</role>')
 
     # ValueType
