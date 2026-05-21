@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.15 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.16 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -933,9 +933,8 @@ function Build-Template {
 	$rows = @()
 	$widths = $null
 	$minHeight = $null
-	$detectedStyle = $null
-	$styleMismatch = $false
-	$hasAnyNonEmptyFp = $false  # true если хоть одна ячейка имеет стилевые атрибуты
+	$cellStyleMap = @{}       # "r,c" → имя стиля для конкретной ячейки (null для merge/no-style)
+	$hasAnyStyledCell = $false
 	$drilldownByParam = @{}   # param name → field name (X from Расшифровка_X)
 
 	$rowIdx = 0
@@ -950,23 +949,17 @@ function Build-Template {
 			$perCell = Get-CellPerCellAttrs $appNode
 			$content = Get-CellContent $cellNode $perCell
 
-			# Style detection (skip empty cells with no appearance, and merge cells)
+			# Style detection (skip merge cells)
 			if ($appNode -and -not $perCell.mergeV -and -not $perCell.mergeH) {
 				$cellPreset = Extract-CellPreset $appNode
 				if ($null -ne $cellPreset) {
-					# Ячейка имеет стилевые атрибуты — match против effectivePresets, иначе аллоцируем custom
-					$hasAnyNonEmptyFp = $true
 					$matched = Match-PresetByShape $cellPreset
 					if ($null -eq $matched) {
 						$matched = Allocate-CustomStyle $cellPreset
 					}
-					if ($null -eq $detectedStyle) {
-						$detectedStyle = $matched
-					} elseif ($matched -ne $detectedStyle) {
-						$styleMismatch = $true
-					}
+					$cellStyleMap["$rowIdx,$colIdx"] = $matched
+					$hasAnyStyledCell = $true
 				}
-				# Если cellPreset = $null — ячейка без стилевых атрибутов (только per-cell width/merge), не контрибутирует.
 			}
 
 			# Drilldown attachment
@@ -985,6 +978,42 @@ function Build-Template {
 		if ($rowIdx -eq 0 -and $rowWidths.Count -gt 0) { $widths = $rowWidths }
 		$rows += ,$cells
 		$rowIdx++
+	}
+
+	# Template default = наиболее частый стиль ячеек.
+	$templateDefault = $null
+	if ($hasAnyStyledCell) {
+		$counts = @{}
+		foreach ($k in $cellStyleMap.Keys) {
+			$name = $cellStyleMap[$k]
+			if (-not $counts.ContainsKey($name)) { $counts[$name] = 0 }
+			$counts[$name]++
+		}
+		$maxCount = 0
+		foreach ($name in $counts.Keys) {
+			if ($counts[$name] -gt $maxCount) {
+				$maxCount = $counts[$name]
+				$templateDefault = $name
+			}
+		}
+	}
+
+	# Если есть ячейки со стилем, отличным от template default — оборачиваем их в object form.
+	if ($templateDefault) {
+		$rowsOut = @()
+		for ($r = 0; $r -lt $rows.Count; $r++) {
+			$newRow = @()
+			for ($c = 0; $c -lt $rows[$r].Count; $c++) {
+				$key = "$r,$c"
+				if ($cellStyleMap.ContainsKey($key) -and $cellStyleMap[$key] -ne $templateDefault) {
+					$newRow += [ordered]@{ value = $rows[$r][$c]; style = $cellStyleMap[$key] }
+				} else {
+					$newRow += $rows[$r][$c]
+				}
+			}
+			$rowsOut += ,$newRow
+		}
+		$rows = $rowsOut
 	}
 
 	# Template parameters (and drilldown folding)
@@ -1014,14 +1043,11 @@ function Build-Template {
 	}
 
 	# Decide output form
-	if ($detectedStyle -and -not $styleMismatch) {
-		$tmplObj['style'] = $detectedStyle
-	} elseif (-not $hasAnyNonEmptyFp -and $rows.Count -gt 0) {
+	if ($templateDefault) {
+		$tmplObj['style'] = $templateDefault
+	} elseif ($rows.Count -gt 0) {
 		# Все ячейки без стилевых атрибутов — это шаблон "без стиля"
 		$tmplObj['style'] = 'none'
-	} elseif ($styleMismatch -or ($null -eq $detectedStyle -and $hasAnyNonEmptyFp)) {
-		# Couldn't unify style — emit sentinel
-		$tmplObj['__unsupported__'] = (New-Sentinel -kind 'TemplateStyleMismatch' -loc $loc -detail 'Шаблон содержит ячейки с непокрытым/неоднородным оформлением (Кольцо 2)')['__unsupported__']
 	}
 	if ($widths)    { $tmplObj['widths']    = $widths }
 	if ($minHeight) { $tmplObj['minHeight'] = $minHeight }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.32 — Compile 1C DCS from JSON
+# skd-compile v1.33 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -1325,6 +1325,26 @@ def _emit_cell_appearance(lines, style, width=0, v_merge=False, h_merge=False, m
     lines.append('\t\t\t\t</dcsat:appearance>')
 
 
+# Cell может быть string ("text"/"{param}"/"|"/">"/null) или объектом {value, style}.
+def _get_cell_value(cell):
+    if cell is None:
+        return None
+    if isinstance(cell, str):
+        return cell
+    if isinstance(cell, dict) and 'value' in cell:
+        return cell['value']
+    return None
+
+
+def _get_cell_style_or_default(cell, default_style):
+    if isinstance(cell, dict) and 'style' in cell:
+        s_name = str(cell['style'])
+        if s_name in AREA_STYLE_PRESETS:
+            return AREA_STYLE_PRESETS[s_name]
+        print(f"Warning: Unknown cell style preset '{s_name}', falling back to template default", file=sys.stderr)
+    return default_style
+
+
 def _emit_area_template_dsl(lines, t):
     style_name = str(t.get('style', '')) or 'data'
     if style_name not in AREA_STYLE_PRESETS:
@@ -1342,8 +1362,8 @@ def _emit_area_template_dsl(lines, t):
     for r in range(len(rows) - 1, 0, -1):
         v_merge[r] = {}
         for c in range(col_count):
-            cell_val = rows[r][c] if c < len(rows[r]) else None
-            if isinstance(cell_val, str) and cell_val == '|':
+            cell_val = _get_cell_value(rows[r][c]) if c < len(rows[r]) else None
+            if cell_val == '|':
                 v_merge[r][c] = True
     if 0 not in v_merge:
         v_merge[0] = {}
@@ -1353,8 +1373,8 @@ def _emit_area_template_dsl(lines, t):
     for r in range(len(rows)):
         h_merge[r] = {}
         for c in range(col_count):
-            cell_val = rows[r][c] if c < len(rows[r]) else None
-            if isinstance(cell_val, str) and cell_val == '>':
+            cell_val = _get_cell_value(rows[r][c]) if c < len(rows[r]) else None
+            if cell_val == '>':
                 h_merge[r][c] = True
 
     # Build drilldown map: param_name -> drilldown_value
@@ -1371,15 +1391,17 @@ def _emit_area_template_dsl(lines, t):
     for r in range(len(rows)):
         lines.append('\t\t\t<dcsat:item xsi:type="dcsat:TableRow">')
         for c in range(col_count):
-            cell_val = rows[r][c] if c < len(rows[r]) else None
+            cell_raw = rows[r][c] if c < len(rows[r]) else None
+            cell_val = _get_cell_value(cell_raw)
+            cell_style = _get_cell_style_or_default(cell_raw, style)
             w = float(widths[c]) if c < len(widths) else 0
             is_v_merged = v_merge.get(r, {}).get(c, False)
             is_h_merged = h_merge.get(r, {}).get(c, False)
             lines.append('\t\t\t\t<dcsat:tableCell>')
             if is_v_merged:
-                _emit_cell_appearance(lines, style, w, True)
+                _emit_cell_appearance(lines, cell_style, w, True)
             elif is_h_merged:
-                _emit_cell_appearance(lines, style, w, h_merge=True)
+                _emit_cell_appearance(lines, cell_style, w, h_merge=True)
             else:
                 cell_extra_items = []
                 if cell_val is not None and str(cell_val) != '':
@@ -1407,7 +1429,7 @@ def _emit_area_template_dsl(lines, t):
                         emit_mltext(lines, '\t\t\t\t\t\t', 'dcsat:value', cell_str)
                         lines.append('\t\t\t\t\t</dcsat:item>')
                 h = min_height if r == 0 else 0
-                _emit_cell_appearance(lines, style, w, False, False, h, cell_extra_items or None)
+                _emit_cell_appearance(lines, cell_style, w, False, False, h, cell_extra_items or None)
             lines.append('\t\t\t\t</dcsat:tableCell>')
         lines.append('\t\t\t</dcsat:item>')
 

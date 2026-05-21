@@ -1,4 +1,4 @@
-﻿# skd-compile v1.32 — Compile 1C DCS from JSON
+﻿# skd-compile v1.33 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -1603,6 +1603,28 @@ function Emit-CellAppearance {
 	X "`t`t`t`t</dcsat:appearance>"
 }
 
+# Cell может быть string ("text"/"{param}"/"|"/">"/null) или объектом {value, style}.
+# Helpers извлекают значение и эффективный стиль ячейки.
+function Get-CellValue {
+	param($cell)
+	if ($null -eq $cell) { return $null }
+	if ($cell -is [string]) { return $cell }
+	if ($cell.PSObject -and $cell.PSObject.Properties['value']) { return $cell.value }
+	return $null
+}
+
+function Get-CellStyleOrDefault {
+	param($cell, $defaultStyle)
+	if ($null -ne $cell -and -not ($cell -is [string]) -and $cell.PSObject -and $cell.PSObject.Properties['style']) {
+		$sName = "$($cell.style)"
+		if ($script:areaStylePresets.ContainsKey($sName)) {
+			return $script:areaStylePresets[$sName]
+		}
+		Write-Warning "Unknown cell style preset '$sName', falling back to template default"
+	}
+	return $defaultStyle
+}
+
 function Emit-AreaTemplateDSL {
 	param($t)
 	$styleName = if ($t.style) { "$($t.style)" } else { "data" }
@@ -1622,10 +1644,8 @@ function Emit-AreaTemplateDSL {
 	for ($r = $rows.Count - 1; $r -ge 1; $r--) {
 		$vMerge[$r] = @{}
 		for ($c = 0; $c -lt $colCount; $c++) {
-			$cellVal = $rows[$r][$c]
-			if ($cellVal -is [string] -and $cellVal -eq '|') {
-				$vMerge[$r][$c] = $true
-			}
+			$cellValStr = Get-CellValue $rows[$r][$c]
+			if ($cellValStr -eq '|') { $vMerge[$r][$c] = $true }
 		}
 	}
 	if (-not $vMerge.ContainsKey(0)) { $vMerge[0] = @{} }
@@ -1635,10 +1655,8 @@ function Emit-AreaTemplateDSL {
 	for ($r = 0; $r -lt $rows.Count; $r++) {
 		$hMerge[$r] = @{}
 		for ($c = 0; $c -lt $colCount; $c++) {
-			$cellVal = $rows[$r][$c]
-			if ($cellVal -is [string] -and $cellVal -eq '>') {
-				$hMerge[$r][$c] = $true
-			}
+			$cellValStr = Get-CellValue $rows[$r][$c]
+			if ($cellValStr -eq '>') { $hMerge[$r][$c] = $true }
 		}
 	}
 
@@ -1657,17 +1675,19 @@ function Emit-AreaTemplateDSL {
 	for ($r = 0; $r -lt $rows.Count; $r++) {
 		X "`t`t`t<dcsat:item xsi:type=`"dcsat:TableRow`">"
 		for ($c = 0; $c -lt $colCount; $c++) {
-			$cellVal = $rows[$r][$c]
+			$cellRaw = $rows[$r][$c]
+			$cellVal = Get-CellValue $cellRaw
+			$cellStyle = Get-CellStyleOrDefault $cellRaw $style
 			$w = if ($c -lt $widths.Count) { [double]$widths[$c] } else { 0 }
 			$isVMerged = $vMerge[$r][$c] -eq $true
 			$isHMerged = $hMerge[$r][$c] -eq $true
 			X "`t`t`t`t<dcsat:tableCell>"
 			if ($isVMerged) {
 				# Vertically merged cell — only appearance with vMerge flag + width
-				Emit-CellAppearance $style $w $true
+				Emit-CellAppearance $cellStyle $w $true
 			} elseif ($isHMerged) {
 				# Horizontally merged cell — only appearance with hMerge flag + width
-				Emit-CellAppearance $style $w $false $true
+				Emit-CellAppearance $cellStyle $w $false $true
 			} else {
 				# Cell value
 				if ($null -ne $cellVal -and $cellVal -ne '') {
@@ -1700,7 +1720,7 @@ function Emit-AreaTemplateDSL {
 				# Appearance
 				$h = if ($r -eq 0) { $minHeight } else { 0 }
 				if (-not $cellExtraItems) { $cellExtraItems = @() }
-				Emit-CellAppearance $style $w $false $false $h $cellExtraItems
+				Emit-CellAppearance $cellStyle $w $false $false $h $cellExtraItems
 				$cellExtraItems = @()
 			}
 			X "`t`t`t`t</dcsat:tableCell>"
