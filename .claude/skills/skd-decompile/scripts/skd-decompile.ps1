@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.8 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.9 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -214,35 +214,47 @@ function Get-ValueTypeShorthand {
 	return ,$shorts
 }
 
-# <role> → array of @tokens; if non-simple — null + sentinel via $script:roleSentinel
-function Get-RoleTokens {
+# <role> → @{ tokens, extras } where:
+#   tokens — list of @-flags (для shorthand или массива role: [...])
+#   extras — hashtable с accountTypeExpression/balanceGroup и т.п. (форсит object-форму)
+# Если попадается non-dcscom-child или periodNumber≠1 — sentinel.
+function Get-RoleInfo {
 	param($roleNode, [string]$loc)
 	if (-not $roleNode) { return $null }
 	$tokens = @()
+	$extras = [ordered]@{}
 	$hasComplex = $false
 	foreach ($child in $roleNode.ChildNodes) {
 		if ($child.NodeType -ne [System.Xml.XmlNodeType]::Element) { continue }
 		if ($child.NamespaceURI -ne $NS_COM) { $hasComplex = $true; continue }
 		switch ($child.LocalName) {
-			'dimension' { if ($child.InnerText -eq 'true') { $tokens += '@dimension' } }
-			'account'   { if ($child.InnerText -eq 'true') { $tokens += '@account' } }
-			'balance'   { if ($child.InnerText -eq 'true') { $tokens += '@balance' } }
 			'periodNumber' {
-				# Expect periodNumber=1 + periodType=Main → @period
 				$pType = Get-Text $roleNode "dcscom:periodType"
 				if ($child.InnerText -eq '1' -and $pType -eq 'Main') { $tokens += '@period' } else { $hasComplex = $true }
 			}
-			'periodType' { } # handled with periodNumber above
+			'periodType' { } # paired с periodNumber
+			'accountTypeExpression' {
+				if ($child.InnerText) { $extras['accountTypeExpression'] = $child.InnerText }
+			}
+			'balanceGroup' {
+				if ($child.InnerText) { $extras['balanceGroup'] = $child.InnerText }
+			}
 			default {
-				$hasComplex = $true
+				# Любой dcscom:KEY с true → @KEY (compile принимает любой ключ в object form role).
+				if ($child.InnerText -eq 'true') {
+					$tokens += '@' + $child.LocalName
+				} elseif ($child.InnerText -eq 'false' -or -not $child.InnerText) {
+					# Игнорируем явный false (не нужно эмитить — это дефолт)
+				} else {
+					$hasComplex = $true
+				}
 			}
 		}
 	}
 	if ($hasComplex) {
-		# emit sentinel separately so caller can attach it to field obj
-		$null = New-Sentinel -kind 'ComplexRole' -loc $loc -detail 'Роль с дополнительными атрибутами не сворачивается в @-флаг'
+		$null = New-Sentinel -kind 'ComplexRole' -loc $loc -detail 'Роль с не-bool атрибутами не сворачивается в DSL'
 	}
-	return $tokens
+	return [ordered]@{ tokens = $tokens; extras = $extras }
 }
 
 # <useRestriction> → array of #tokens
@@ -279,22 +291,53 @@ function Get-AppearanceDict {
 	return $dict
 }
 
+# Check field/parameter inputParameters block for non-empty ChoiceParameters/ChoiceParameterLinks
+# and add warnings (silent-drop visibility — данные действительно теряются, но видно в warnings.md).
+function Check-InputParameters {
+	param($parentNode, [string]$loc)
+	$ip = $parentNode.SelectSingleNode("r:inputParameters", $ns)
+	if (-not $ip) { return }
+	foreach ($it in $ip.SelectNodes("dcscor:item", $ns)) {
+		$pName = Get-Text $it "dcscor:parameter"
+		$val = $it.SelectSingleNode("dcscor:value", $ns)
+		if (-not $val) { continue }
+		$vType = Get-LocalXsiType $val
+		if ($vType -eq 'ChoiceParameters' -or $vType -eq 'ChoiceParameterLinks') {
+			# Empty (no inner items) — silently skip; it's a no-op default.
+			$inner = $val.SelectNodes("dcscor:item", $ns)
+			if ($inner.Count -eq 0) { continue }
+			$null = Add-Warning -kind "SilentDrop:$vType" -loc "$loc/inputParameters/$pName" -detail "Параметр выбора '$pName' ($vType с $($inner.Count) элементами) не воспроизводится в DSL"
+		}
+	}
+}
+
 # Build a field JSON entry (shorthand if possible, object form otherwise)
 function Build-Field {
 	param($fieldNode, [string]$loc)
+	# Silent-drop detection (non-blocking warnings only)
+	Check-InputParameters -parentNode $fieldNode -loc $loc
+	$orderExpr = $fieldNode.SelectSingleNode("r:orderExpression", $ns)
+	if ($orderExpr) {
+		$expr = Get-Text $orderExpr "dcscom:expression"
+		if ($expr) {
+			$null = Add-Warning -kind 'SilentDrop:orderExpression' -loc "$loc/orderExpression" -detail "Поле имеет orderExpression='$expr' — не воспроизводится в DSL"
+		}
+	}
 	$dataPath = Get-Text $fieldNode "r:dataPath"
 	$fieldName = Get-Text $fieldNode "r:field"
 	$titleNode = $fieldNode.SelectSingleNode("r:title", $ns)
 	$title = Get-MLText $titleNode
 	$valueTypeNode = $fieldNode.SelectSingleNode("r:valueType", $ns)
 	$typeShort = Get-ValueTypeShorthand $valueTypeNode
-	$roleTokens = Get-RoleTokens $fieldNode.SelectSingleNode("r:role", $ns) "$loc/role"
+	$roleInfo = Get-RoleInfo $fieldNode.SelectSingleNode("r:role", $ns) "$loc/role"
+	$roleTokens = if ($roleInfo) { $roleInfo.tokens } else { @() }
+	$roleExtras = if ($roleInfo) { $roleInfo.extras } else { [ordered]@{} }
 	$restrictTokens = Get-RestrictionTokens $fieldNode.SelectSingleNode("r:useRestriction", $ns)
 	$appNode = $fieldNode.SelectSingleNode("r:appearance", $ns)
 	$appearance = Get-AppearanceDict $appNode
 	$presExpr = Get-Text $fieldNode "r:presentationExpression"
 
-	$needsObject = $title -or $appearance -or $presExpr -or ($typeShort -is [array])
+	$needsObject = $title -or $appearance -or $presExpr -or ($typeShort -is [array]) -or ($roleExtras -and $roleExtras.Count -gt 0)
 
 	if (-not $needsObject) {
 		# shorthand: "Name: type @role #restrict"
@@ -314,7 +357,13 @@ function Build-Field {
 	if ($dataPath -and $dataPath -ne $fieldName) { $obj['dataPath'] = $dataPath }
 	if ($title) { $obj['title'] = $title }
 	if ($typeShort) { $obj['type'] = $typeShort }
-	if ($roleTokens) {
+	if ($roleExtras -and $roleExtras.Count -gt 0) {
+		# Object form: keys = @-flags + extras
+		$roleObj = [ordered]@{}
+		foreach ($t in $roleTokens) { $roleObj[($t -replace '^@','')] = $true }
+		foreach ($k in $roleExtras.Keys) { $roleObj[$k] = $roleExtras[$k] }
+		$obj['role'] = $roleObj
+	} elseif ($roleTokens) {
 		if ($roleTokens.Count -eq 1) { $obj['role'] = $roleTokens[0] -replace '^@','' }
 		else { $obj['role'] = ($roleTokens | ForEach-Object { $_ -replace '^@','' }) }
 	}
@@ -398,6 +447,8 @@ function Get-StandardPeriodVariant {
 # Build parameter → shorthand or object form
 function Build-Parameter {
 	param($pNode, [string]$loc)
+	# Silent-drop detection
+	Check-InputParameters -parentNode $pNode -loc $loc
 	$name = Get-Text $pNode "r:name"
 	$titleNode = $pNode.SelectSingleNode("r:title", $ns)
 	$title = Get-MLText $titleNode
@@ -991,6 +1042,11 @@ function Build-ConditionalAppearance {
 	$i = 0
 	foreach ($it in $caNode.SelectNodes("dcsset:item", $ns)) {
 		$entry = [ordered]@{}
+		# Silent-drop: scope (fields/groups/overall) — не воспроизводится в DSL
+		$scopeNode = $it.SelectSingleNode("dcsset:scope", $ns)
+		if ($scopeNode -and $scopeNode.HasChildNodes) {
+			$null = Add-Warning -kind 'SilentDrop:scope' -loc "$loc/$i/scope" -detail "conditionalAppearance item имеет scope — не воспроизводится в DSL"
+		}
 		$selNode = $it.SelectSingleNode("dcsset:selection", $ns)
 		if ($selNode -and $selNode.SelectNodes("dcsset:item", $ns).Count -gt 0) {
 			$entry['selection'] = Build-Selection -selNode $selNode -loc "$loc/$i/selection"
