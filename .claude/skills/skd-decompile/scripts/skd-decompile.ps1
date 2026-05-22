@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.32 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.33 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -1283,6 +1283,24 @@ function Get-FilterValue {
 	return $txt
 }
 
+# Same as Get-FilterValue, но дополнительно возвращает xsi:type значения,
+# чтобы caller мог сохранить valueType (например, dcscor:Field — для field-to-field
+# comparison). Format: @{ value = ...; type = '<xsi-type-or-null>' }.
+function Get-FilterValueWithType {
+	param($valNode)
+	if (-not $valNode) { return @{ value = '_'; type = $null } }
+	$rawType = $valNode.GetAttribute("type", $NS_XSI)
+	$nil = $valNode.GetAttribute("nil", $NS_XSI)
+	if ($nil -eq 'true') { return @{ value = '_'; type = $null } }
+	$vType = Get-LocalXsiType $valNode
+	if ($vType -eq 'LocalStringType') {
+		return @{ value = (Get-MLText $valNode); type = $rawType }
+	}
+	$txt = $valNode.InnerText
+	if (-not $txt) { return @{ value = '_'; type = $rawType } }
+	return @{ value = $txt; type = $rawType }
+}
+
 # Convert filter item node → shorthand string or object form
 function Build-FilterItem {
 	param($itemNode, [string]$loc)
@@ -1322,6 +1340,7 @@ function Build-FilterItem {
 	$rightNodes = @($itemNode.SelectNodes("dcsset:right", $ns))
 	$value = $null
 	$valueIsArrayFlag = $false
+	$valueTypeAttr = $null  # явный xsi:type, если не дефолтный (например, dcscor:Field)
 	if ($rightNodes.Count -eq 1) {
 		$rn = $rightNodes[0]
 		if ((Get-LocalXsiType $rn) -eq 'ValueListType') {
@@ -1329,7 +1348,12 @@ function Build-FilterItem {
 			$value = @()
 			$valueIsArrayFlag = $true
 		} else {
-			$value = Get-FilterValue $rn
+			$vt = Get-FilterValueWithType $rn
+			$value = $vt.value
+			# Сохраняем тип только если он не дефолтный (auto-detect compile вернёт xs:*)
+			if ($vt.type -and $vt.type -notmatch '^xs:') {
+				$valueTypeAttr = $vt.type
+			}
 		}
 	} elseif ($rightNodes.Count -gt 1) {
 		# Несколько значений → массив (InList с конкретными значениями)
@@ -1359,8 +1383,9 @@ function Build-FilterItem {
 	# Переход в object form:
 	# - userSettingPresentation,
 	# - явный viewMode=Normal (отсутствие тоже нужно сохранить),
-	# - массивное value (multi-right или пустой ValueList)
-	if ($userPresNode -or $viewMode -eq 'Normal' -or $valueIsArrayFlag) {
+	# - массивное value (multi-right или пустой ValueList),
+	# - явный valueType (например, dcscor:Field — field-to-field comparison)
+	if ($userPresNode -or $viewMode -eq 'Normal' -or $valueIsArrayFlag -or $valueTypeAttr) {
 		$obj = [ordered]@{ field = $field; op = $op }
 		if ($op -notin $noValueOps -and $null -ne $value) {
 			if ($valueIsArrayFlag) {
@@ -1372,6 +1397,7 @@ function Build-FilterItem {
 				$obj['value'] = $value
 			}
 		}
+		if ($valueTypeAttr) { $obj['valueType'] = $valueTypeAttr }
 		if ($use -eq 'false') { $obj['use'] = $false }
 		if ($userId) { $obj['userSettingID'] = 'auto' }
 		if ($viewMode) { $obj['viewMode'] = $viewMode }
