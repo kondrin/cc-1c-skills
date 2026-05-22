@@ -123,6 +123,7 @@
 			</v8:NumberQualifiers>
 		</valueType>
 		<value xsi:type="xs:decimal">0</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>ПараметрЦелое</name>
@@ -135,6 +136,7 @@
 			</v8:NumberQualifiers>
 		</valueType>
 		<value xsi:type="xs:decimal">0</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>ПараметрКоличество</name>
@@ -147,6 +149,7 @@
 			</v8:NumberQualifiers>
 		</valueType>
 		<value xsi:type="xs:decimal">0</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<settingsVariant>
 		<dcsset:name>Основной</dcsset:name>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.49 — Compile 1C DCS from JSON
+# skd-compile v1.50 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -1078,9 +1078,12 @@ def emit_single_param(lines, p, parsed):
         parsed['availableAsField'] = False
         parsed['useRestriction'] = True
 
-    # UseRestriction
-    if parsed.get('useRestriction') is True or (p is not None and not isinstance(p, str) and p.get('useRestriction') is True):
-        lines.append('\t\t<useRestriction>true</useRestriction>')
+    # UseRestriction — платформа всегда эмитит этот тег у параметра (true/false)
+    ur_emit = (
+        parsed.get('useRestriction') is True
+        or (p is not None and not isinstance(p, str) and p.get('useRestriction') is True)
+    )
+    lines.append(f'\t\t<useRestriction>{"true" if ur_emit else "false"}</useRestriction>')
 
     # Expression
     if parsed.get('expression'):

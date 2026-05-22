@@ -1,4 +1,4 @@
-﻿# skd-compile v1.49 — Compile 1C DCS from JSON
+﻿# skd-compile v1.50 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -1257,10 +1257,11 @@ function Emit-SingleParam {
 		$parsed.useRestriction = $true
 	}
 
-	# UseRestriction
-	if ($parsed.useRestriction -eq $true -or ($p -isnot [string] -and $p.useRestriction -eq $true)) {
-		X "`t`t<useRestriction>true</useRestriction>"
-	}
+	# UseRestriction — платформа всегда эмитит этот тег у параметра (true/false)
+	$urEmit = $false
+	if ($parsed.useRestriction -eq $true) { $urEmit = $true }
+	elseif ($p -isnot [string] -and $p.useRestriction -eq $true) { $urEmit = $true }
+	X ("`t`t<useRestriction>" + $(if ($urEmit) { 'true' } else { 'false' }) + "</useRestriction>")
 
 	# Expression
 	if ($parsed.expression) {

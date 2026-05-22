@@ -103,6 +103,7 @@
 			<v8:startDate>0001-01-01T00:00:00</v8:startDate>
 			<v8:endDate>0001-01-01T00:00:00</v8:endDate>
 		</value>
+		<useRestriction>false</useRestriction>
 		<denyIncompleteValues>true</denyIncompleteValues>
 		<use>Always</use>
 	</parameter>
@@ -148,12 +149,14 @@
 			<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:CatalogRef.Организации</v8:Type>
 		</valueType>
 		<value xsi:nil="true"/>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>СписокДокументов</name>
 		<valueType>
 			<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:CatalogRef.Документы</v8:Type>
 		</valueType>
+		<useRestriction>false</useRestriction>
 		<valueListAllowed>true</valueListAllowed>
 	</parameter>
 	<parameter>
@@ -175,6 +178,7 @@
 			<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:EnumRef.Округления</v8:Type>
 		</valueType>
 		<value xsi:type="dcscor:DesignTimeValue">Перечисление.Округления.Окр1</value>
+		<useRestriction>false</useRestriction>
 		<availableValue>
 			<value xsi:type="dcscor:DesignTimeValue">Перечисление.Округления.Окр1_00</value>
 			<presentation xsi:type="v8:LocalStringType">

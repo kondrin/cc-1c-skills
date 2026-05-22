@@ -38,6 +38,7 @@
 			<v8:startDate>0001-01-01T00:00:00</v8:startDate>
 			<v8:endDate>0001-01-01T00:00:00</v8:endDate>
 		</value>
+		<useRestriction>false</useRestriction>
 		<denyIncompleteValues>true</denyIncompleteValues>
 		<use>Always</use>
 	</parameter>
@@ -87,6 +88,7 @@
 			<v8:startDate>0001-01-01T00:00:00</v8:startDate>
 			<v8:endDate>0001-01-01T00:00:00</v8:endDate>
 		</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>Флаг</name>
@@ -94,6 +96,7 @@
 			<v8:Type>xs:boolean</v8:Type>
 		</valueType>
 		<value xsi:type="xs:boolean">true</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>Сумма</name>
@@ -106,6 +109,7 @@
 			</v8:NumberQualifiers>
 		</valueType>
 		<value xsi:type="xs:decimal">0</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>Ставка</name>
@@ -118,6 +122,7 @@
 			</v8:NumberQualifiers>
 		</valueType>
 		<value xsi:type="xs:decimal">13.5</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>Метка</name>
@@ -129,6 +134,7 @@
 			</v8:StringQualifiers>
 		</valueType>
 		<value xsi:type="xs:string">ТестовоеЗначение</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>ПустаяСтрока</name>
@@ -140,6 +146,7 @@
 			</v8:StringQualifiers>
 		</valueType>
 		<value xsi:type="xs:string"/>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<parameter>
 		<name>Валюта</name>
@@ -147,6 +154,7 @@
 			<v8:Type xmlns:d5p1="http://v8.1c.ru/8.1/data/enterprise/current-config">d5p1:CatalogRef.Валюты</v8:Type>
 		</valueType>
 		<value xsi:type="dcscor:DesignTimeValue">Справочник.Валюты.EmptyRef</value>
+		<useRestriction>false</useRestriction>
 	</parameter>
 	<settingsVariant>
 		<dcsset:name>Основной</dcsset:name>
