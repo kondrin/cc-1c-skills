@@ -402,6 +402,7 @@ XML-маппинг — по `<group>` на каждый элемент:
 | `use` | `"Always"`, `"Auto"` |
 | `denyIncompleteValues` | `true` — запретить произвольные значения (только из availableValues) |
 | `availableValues` | Массив `[{value, presentation}]` — допустимые значения с представлениями |
+| `inputParameters` | Параметры ввода (например `ФорматРедактирования`) — массив `[{parameter, value}]`, value может быть строкой, числом, bool или multilang dict |
 
 ### availableValues
 
@@ -507,10 +508,13 @@ XML-маппинг — по `<group>` на каждый элемент:
     "conditionalAppearance": [...],
     "outputParameters": {...},
     "dataParameters": [...],
-    "structure": [...]
+    "structure": [...],
+    "additionalProperties": { "ВариантНаименование": "...", "Адрес": "..." }
   }
 }]
 ```
+
+`additionalProperties` — словарь служебных свойств варианта (`<dcsset:additionalProperties>` в XML), значения сохраняются как `xs:string`. Платформа использует его для типа «имя варианта», URL временного хранилища и т.п. — для bit-perfect round-trip сохраняется как есть, обычно модели заполнять не нужно.
 
 ### selection
 
@@ -561,6 +565,7 @@ XML-маппинг — по `<group>` на каждый элемент:
 - `@quickAccess` → `viewMode=QuickAccess`
 - `@normal` → `viewMode=Normal` (явный — для bit-perfect, см. [viewMode](#viewmode-режим-доступности))
 - `@inaccessible` → `viewMode=Inaccessible`
+- Типы значений автоопределяются: `true`/`false` → `xs:boolean`, дата `2024-01-01T00:00:00` → `xs:dateTime`, числа → `xs:decimal`, `Перечисление.X.Y`/`Справочник.X.Y`/`ПланСчетов.X.Y` и др. → `dcscor:DesignTimeValue`, остальное → `xs:string`
 - Типы значений автоопределяются: `true`/`false` → boolean, `2024-01-01T00:00:00` → dateTime, числа → decimal, `Перечисление.*`/`Справочник.*`/`ПланСчетов.*`/`Документ.*` → DesignTimeValue, прочее → string
 - OrGroup: `{"group": "Or", "items": ["условие1", "условие2"]}` — объединяет условия через ИЛИ
 
@@ -645,14 +650,16 @@ XML-маппинг — по `<group>` на каждый элемент:
     "selection": ["Сумма"],
     "filter": ["Сумма > 1000"],
     "appearance": { "ЦветТекста": "style:ПросроченныеДанныеЦвет" },
-    "presentation": "Выделять крупные суммы",
+    "presentation": { "ru": "Выделять крупные суммы", "en": "Highlight large amounts" },
     "viewMode": "Normal",
     "userSettingID": "auto"
   },
   {
     "filter": ["Статус notFilled"],
     "appearance": { "Текст": "Не указано", "ЦветТекста": "web:Gray" },
-    "presentation": "Скрывать пустые статусы"
+    "presentation": "Скрывать пустые статусы",
+    "use": false,
+    "useInDontUse": ["group", "fieldsHeader"]
   }
 ]
 ```
@@ -662,15 +669,23 @@ XML-маппинг — по `<group>` на каждый элемент:
 | `selection` | Массив полей, к которым применяется. Пусто/опущено = все поля |
 | `filter` | Условия (shorthand-строки или объекты, как в settings filter) |
 | `appearance` | Объект `{ "Параметр": "Значение" }` |
-| `presentation` | Описание правила |
-| `use` | Включено (`true` по умолчанию) |
+| `presentation` | Описание правила (строка или multilang dict `{ru, en}`) |
+| `use` | Включено (`true` по умолчанию). `false` = правило отключено |
 | `viewMode` | `"Normal"`, `"QuickAccess"`, `"Inaccessible"` |
 | `userSettingID` | `"auto"` → генерировать GUID |
+| `userSettingPresentation` | Имя в пользовательских настройках (string или multilang) |
+| `useInDontUse` | Массив контекстов где правило **НЕ** применяется. Возможные имена: `group`, `hierarchicalGroup`, `overall`, `fieldsHeader`, `header`, `parameters`, `filter`, `resourceFieldsHeader`, `overallHeader`, `overallResourceFieldsHeader` |
 
 **Типы значений appearance** определяются автоматически:
 - `style:XXX`, `web:XXX`, `win:XXX` → `v8ui:Color`
+- Ключи `ЦветТекста`/`ЦветФона`/`ЦветГраницы` со значениями типа `auto` или `#XXXXXX` → `v8ui:Color`
+- Ключ `Размещение` → `dcscor:DataCompositionTextPlacementType`
+- Ключи `ГоризонтальноеПоложение`/`ВертикальноеПоложение` → `v8ui:HorizontalAlign`/`VerticalAlign`
+- Ключ `ТипМакета` → `dcsset:DataCompositionGroupTemplateType`
+- Ключи `Текст`/`Заголовок`/`Формат` → `v8:LocalStringType` (если значение строка)
+- Числовые строки (`"40"`, `"15"`) → `xs:decimal`
 - `true`/`false` → `xs:boolean`
-- Параметр `Формат`, `Текст` или `Заголовок` → `v8:LocalStringType`
+- Multilang dict `{ru, en}` для любого ключа → `v8:LocalStringType`
 - Прочее → `xs:string`
 
 Поддержка `use=false` на уровне параметра:
@@ -693,11 +708,15 @@ XML-маппинг — по `<group>` на каждый элемент:
 Ключ → `dcscor:parameter`, значение → `dcscor:value`.
 
 Типы значений определяются автоматически:
-- `"Заголовок"` → `v8:LocalStringType`
+- `"Заголовок"` → `v8:LocalStringType` (примет строку или multilang dict)
 - `"ВыводитьЗаголовок"`, `"ВыводитьПараметрыДанных"`, `"ВыводитьОтбор"` → `dcsset:DataCompositionTextOutputType`
 - `"РасположениеПолейГруппировки"` → `dcsset:DataCompositionGroupFieldsPlacement`
 - `"РасположениеРеквизитов"` → `dcsset:DataCompositionAttributesPlacement`
-- `"ГоризонтальноеРасположениеОбщихИтогов"`, `"ВертикальноеРасположениеОбщихИтогов"` → `dcscor:DataCompositionTotalPlacement`
+- `"ГоризонтальноеРасположениеОбщихИтогов"`, `"ВертикальноеРасположениеОбщихИтогов"`, `"РасположениеОбщихИтогов"`, `"РасположениеИтогов"` → `dcscor:DataCompositionTotalPlacement`
+- `"РасположениеГруппировки"` → `dcsset:DataCompositionFieldGroupPlacement`
+- `"РасположениеРесурсов"` → `dcsset:DataCompositionResourcesPlacement`
+- `"ТипМакета"` → `dcsset:DataCompositionGroupTemplateType`
+- Multilang dict `{ru, en}` для любого ключа → `v8:LocalStringType`
 - Прочие → `xs:string`
 
 ### dataParameters
@@ -783,8 +802,11 @@ XML-маппинг — по `<group>` на каждый элемент:
 | `order` | Сортировка (умолч. `["Auto"]`) |
 | `outputParameters` | Параметры вывода (как в settings) |
 | `conditionalAppearance` | Условное оформление группы (как в settings) |
+| `use` | `false` = ветка структуры отключена (на самой группе) |
 | `viewMode` | `"Normal"`, `"QuickAccess"`, `"Inaccessible"` — режим доступности группы в пользовательских настройках |
 | `itemsViewMode` | `"Normal"`, `"QuickAccess"`, `"Inaccessible"` — режим доступности подэлементов группы |
+| `userSettingID` | `"auto"` → генерировать GUID. Регистрирует группу как пункт пользовательских настроек |
+| `userSettingPresentation` | Имя в пользовательских настройках (string или multilang dict) |
 | `children` | Вложенные элементы структуры |
 
 Пустой `groupBy` (или `[]`) = детальные записи (без `groupItems` в XML).
@@ -813,7 +835,7 @@ XML-маппинг — по `<group>` на каждый элемент:
 }
 ```
 
-Каждая `column`/`row` принимает те же поля что и `group`: `name`, `groupBy`/`groupFields`, `filter`, `order`, `selection`, `outputParameters`, плюс user-settings — `viewMode`, `userSettingID`, `userSettingPresentation` (регистрация column/row как пункта «Изменить вариант»).
+Каждая `column`/`row` принимает те же поля что и `group`: `name`, `groupBy`/`groupFields`, `filter`, `order`, `selection`, `outputParameters`, `conditionalAppearance`, `children` (вложенные `StructureItemGroup`), плюс user-settings — `viewMode`, `userSettingID`, `userSettingPresentation` (регистрация column/row как пункта «Изменить вариант»).
 
 #### Диаграмма (chart)
 
