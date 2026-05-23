@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.61 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.62 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -1733,7 +1733,10 @@ function Build-OutputParameters {
 		$vmN = $it.SelectSingleNode("dcsset:viewMode", $ns)
 		$usidV = Get-Text $it "dcsset:userSettingID"
 		$uspN = $it.SelectSingleNode("dcsset:userSettingPresentation", $ns)
-		$hasExtras = ($useV -eq 'false') -or $vmN -or $usidV -or $uspN -or ($nestedItems.Count -gt 0)
+		# Если xsi:type — кастомный (dcsset:XXX, v8ui:XXX, и т.п., не xs:* и не LocalStringType/Font),
+		# нужен wrap чтобы compile сохранил тип через valueType (default — xs:string).
+		$typeIsCustom = $fullType -and ($fullType -notmatch '^xs:') -and ($vType -ne 'LocalStringType') -and ($vType -ne 'Font')
+		$hasExtras = ($useV -eq 'false') -or $vmN -or $usidV -or $uspN -or ($nestedItems.Count -gt 0) -or $typeIsCustom
 		if ($hasExtras) {
 			$wrap = [ordered]@{ value = $rawVal }
 			if ($fullType -and -not (($vType -eq 'LocalStringType') -or ($vType -eq 'Font'))) {
