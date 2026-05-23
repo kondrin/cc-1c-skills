@@ -1,4 +1,4 @@
-﻿# skd-compile v1.63 — Compile 1C DCS from JSON
+﻿# skd-compile v1.64 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -948,17 +948,26 @@ function Emit-Field {
 		X "$indent`t</role>"
 	}
 
-	# OrderExpression — после role, до valueType
+	# OrderExpression — после role, до valueType. Допустим массив (multi-sort).
 	if ($f["orderExpression"]) {
-		$oe = $f["orderExpression"]
-		$expr = if ($oe.expression) { "$($oe.expression)" } else { '' }
-		$oType = if ($oe.orderType) { "$($oe.orderType)" } else { 'Asc' }
-		$autoOrder = if ($null -ne $oe.autoOrder) { $(if ($oe.autoOrder) { 'true' } else { 'false' }) } else { 'false' }
-		X "$indent`t<orderExpression>"
-		X "$indent`t`t<dcscom:expression>$(Esc-Xml $expr)</dcscom:expression>"
-		X "$indent`t`t<dcscom:orderType>$oType</dcscom:orderType>"
-		X "$indent`t`t<dcscom:autoOrder>$autoOrder</dcscom:autoOrder>"
-		X "$indent`t</orderExpression>"
+		$oeRaw = $f["orderExpression"]
+		if ($oeRaw -is [System.Collections.IDictionary]) {
+			$oeList = @($oeRaw)
+		} elseif ($oeRaw -is [System.Collections.IList]) {
+			$oeList = $oeRaw
+		} else {
+			$oeList = @($oeRaw)
+		}
+		foreach ($oe in $oeList) {
+			$expr = if ($oe.expression) { "$($oe.expression)" } else { '' }
+			$oType = if ($oe.orderType) { "$($oe.orderType)" } else { 'Asc' }
+			$autoOrder = if ($null -ne $oe.autoOrder) { $(if ($oe.autoOrder) { 'true' } else { 'false' }) } else { 'false' }
+			X "$indent`t<orderExpression>"
+			X "$indent`t`t<dcscom:expression>$(Esc-Xml $expr)</dcscom:expression>"
+			X "$indent`t`t<dcscom:orderType>$oType</dcscom:orderType>"
+			X "$indent`t`t<dcscom:autoOrder>$autoOrder</dcscom:autoOrder>"
+			X "$indent`t</orderExpression>"
+		}
 	}
 
 	# ValueType

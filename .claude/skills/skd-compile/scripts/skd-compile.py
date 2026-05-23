@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.63 — Compile 1C DCS from JSON
+# skd-compile v1.64 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -726,16 +726,18 @@ def emit_field(lines, field_def, indent):
 
     # OrderExpression — после role, до valueType
     if f.get('orderExpression'):
-        oe = f['orderExpression']
-        expr = str(oe.get('expression', ''))
-        o_type = str(oe.get('orderType', 'Asc'))
-        auto = oe.get('autoOrder', False)
-        auto_str = 'true' if auto else 'false'
-        lines.append(f'{indent}\t<orderExpression>')
-        lines.append(f'{indent}\t\t<dcscom:expression>{esc_xml(expr)}</dcscom:expression>')
-        lines.append(f'{indent}\t\t<dcscom:orderType>{o_type}</dcscom:orderType>')
-        lines.append(f'{indent}\t\t<dcscom:autoOrder>{auto_str}</dcscom:autoOrder>')
-        lines.append(f'{indent}\t</orderExpression>')
+        oe_raw = f['orderExpression']
+        oe_list = oe_raw if isinstance(oe_raw, list) else [oe_raw]
+        for oe in oe_list:
+            expr = str(oe.get('expression', ''))
+            o_type = str(oe.get('orderType', 'Asc'))
+            auto = oe.get('autoOrder', False)
+            auto_str = 'true' if auto else 'false'
+            lines.append(f'{indent}\t<orderExpression>')
+            lines.append(f'{indent}\t\t<dcscom:expression>{esc_xml(expr)}</dcscom:expression>')
+            lines.append(f'{indent}\t\t<dcscom:orderType>{o_type}</dcscom:orderType>')
+            lines.append(f'{indent}\t\t<dcscom:autoOrder>{auto_str}</dcscom:autoOrder>')
+            lines.append(f'{indent}\t</orderExpression>')
 
     # ValueType
     if f.get('type'):

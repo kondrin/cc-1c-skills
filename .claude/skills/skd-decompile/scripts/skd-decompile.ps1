@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.47 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.48 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -523,19 +523,27 @@ function Build-Field {
 	param($fieldNode, [string]$loc)
 	# inputParameters теперь поддерживается в DSL — читается ниже в needsObject
 	$inputParameters = Read-InputParameters -parentNode $fieldNode
-	# orderExpression теперь поддерживается в DSL — читается ниже в needsObject
-	$orderExprNode = $fieldNode.SelectSingleNode("r:orderExpression", $ns)
+	# orderExpression теперь поддерживается в DSL — читается ниже в needsObject.
+	# На одном поле может быть несколько <orderExpression> (multi-sort fallback),
+	# в этом случае сохраняем массив; единичный — как объект (back-compat).
+	$orderExprNodes = $fieldNode.SelectNodes("r:orderExpression", $ns)
 	$orderExpression = $null
-	if ($orderExprNode) {
-		$oeExpr = Get-Text $orderExprNode "dcscom:expression"
-		$oeType = Get-Text $orderExprNode "dcscom:orderType"
-		$oeAuto = Get-Text $orderExprNode "dcscom:autoOrder"
-		$orderExpression = [ordered]@{}
-		if ($oeExpr) { $orderExpression['expression'] = $oeExpr }
-		if ($oeType) { $orderExpression['orderType'] = $oeType }
-		# autoOrder=false — это дефолт; emit'им только если true (или явно записан false)
-		if ($oeAuto -eq 'true') { $orderExpression['autoOrder'] = $true }
-		elseif ($oeAuto -eq 'false') { $orderExpression['autoOrder'] = $false }
+	$orderExpressionList = @()
+	foreach ($oeN in $orderExprNodes) {
+		$oeExpr = Get-Text $oeN "dcscom:expression"
+		$oeType = Get-Text $oeN "dcscom:orderType"
+		$oeAuto = Get-Text $oeN "dcscom:autoOrder"
+		$oe = [ordered]@{}
+		if ($oeExpr) { $oe['expression'] = $oeExpr }
+		if ($oeType) { $oe['orderType'] = $oeType }
+		if ($oeAuto -eq 'true') { $oe['autoOrder'] = $true }
+		elseif ($oeAuto -eq 'false') { $oe['autoOrder'] = $false }
+		$orderExpressionList += ,$oe
+	}
+	if ($orderExpressionList.Count -eq 1) {
+		$orderExpression = $orderExpressionList[0]
+	} elseif ($orderExpressionList.Count -gt 1) {
+		$orderExpression = $orderExpressionList
 	}
 	$dataPath = Get-Text $fieldNode "r:dataPath"
 	$fieldName = Get-Text $fieldNode "r:field"
