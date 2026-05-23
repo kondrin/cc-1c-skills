@@ -1,4 +1,4 @@
-﻿# skd-compile v1.69 — Compile 1C DCS from JSON
+﻿# skd-compile v1.70 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -2520,19 +2520,22 @@ function Emit-DataParameters {
 			Emit-EmptyValue -type "$($dp.valueType)" -indent "$indent`t`t" -tagPrefix "dcscor:" -valueListAllowed $false
 		} elseif ($null -ne $dp.value) {
 			$vtype = "$($dp.valueType)"
-			if ($dp.value -is [PSCustomObject] -and $dp.value.variant) {
-				# StandardPeriod (object form from JSON)
+			if (($dp.value -is [PSCustomObject] -or $dp.value -is [hashtable]) -and ($dp.value.variant)) {
+				# StandardPeriod (PSCustomObject from JSON / hashtable from shorthand parser)
+				$_sd = $null; $_ed = $null
+				if ($dp.value -is [PSCustomObject]) {
+					if ($dp.value.PSObject.Properties['startDate']) { $_sd = "$($dp.value.startDate)" }
+					if ($dp.value.PSObject.Properties['endDate'])   { $_ed = "$($dp.value.endDate)" }
+				} else {
+					if ($dp.value.Contains('startDate')) { $_sd = "$($dp.value['startDate'])" }
+					if ($dp.value.Contains('endDate'))   { $_ed = "$($dp.value['endDate'])" }
+				}
+				if (-not $_sd) { $_sd = '0001-01-01T00:00:00' }
+				if (-not $_ed) { $_ed = '0001-01-01T00:00:00' }
 				X "$indent`t`t<dcscor:value xsi:type=`"v8:StandardPeriod`">"
 				X "$indent`t`t`t<v8:variant xsi:type=`"v8:StandardPeriodVariant`">$(Esc-Xml "$($dp.value.variant)")</v8:variant>"
-				X "$indent`t`t`t<v8:startDate>0001-01-01T00:00:00</v8:startDate>"
-				X "$indent`t`t`t<v8:endDate>0001-01-01T00:00:00</v8:endDate>"
-				X "$indent`t`t</dcscor:value>"
-			} elseif ($dp.value -is [hashtable] -and $dp.value.variant) {
-				# StandardPeriod (hashtable from shorthand parser)
-				X "$indent`t`t<dcscor:value xsi:type=`"v8:StandardPeriod`">"
-				X "$indent`t`t`t<v8:variant xsi:type=`"v8:StandardPeriodVariant`">$(Esc-Xml "$($dp.value.variant)")</v8:variant>"
-				X "$indent`t`t`t<v8:startDate>0001-01-01T00:00:00</v8:startDate>"
-				X "$indent`t`t`t<v8:endDate>0001-01-01T00:00:00</v8:endDate>"
+				X "$indent`t`t`t<v8:startDate>$(Esc-Xml $_sd)</v8:startDate>"
+				X "$indent`t`t`t<v8:endDate>$(Esc-Xml $_ed)</v8:endDate>"
 				X "$indent`t`t</dcscor:value>"
 			} elseif ($vtype -eq 'boolean' -or $dp.value -is [bool]) {
 				$bv = "$($dp.value)".ToLower()

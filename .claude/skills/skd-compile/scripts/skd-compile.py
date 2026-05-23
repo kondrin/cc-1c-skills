@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.69 — Compile 1C DCS from JSON
+# skd-compile v1.70 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -2054,11 +2054,13 @@ def emit_data_parameters(lines, items, indent):
             val = dp['value']
             vtype = str(dp.get('valueType') or '')
             if isinstance(val, dict) and val.get('variant'):
-                # StandardPeriod
+                # StandardPeriod (с явными датами или boilerplate)
+                sd = str(val.get('startDate') or '0001-01-01T00:00:00')
+                ed = str(val.get('endDate') or '0001-01-01T00:00:00')
                 lines.append(f'{indent}\t\t<dcscor:value xsi:type="v8:StandardPeriod">')
                 lines.append(f'{indent}\t\t\t<v8:variant xsi:type="v8:StandardPeriodVariant">{esc_xml(str(val["variant"]))}</v8:variant>')
-                lines.append(f'{indent}\t\t\t<v8:startDate>0001-01-01T00:00:00</v8:startDate>')
-                lines.append(f'{indent}\t\t\t<v8:endDate>0001-01-01T00:00:00</v8:endDate>')
+                lines.append(f'{indent}\t\t\t<v8:startDate>{esc_xml(sd)}</v8:startDate>')
+                lines.append(f'{indent}\t\t\t<v8:endDate>{esc_xml(ed)}</v8:endDate>')
                 lines.append(f'{indent}\t\t</dcscor:value>')
             elif vtype == 'boolean' or isinstance(val, bool):
                 bv = str(val).lower()

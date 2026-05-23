@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.53 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.54 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -1751,9 +1751,20 @@ function Build-DataParameters {
 		if ($use -eq 'false') { $flags += '@off' }
 		$vt = Get-LocalXsiType $valNode
 		$vDisplay = $null
+		$stdPeriodObj = $null
 		if ($vt -eq 'StandardPeriod') {
 			$variant = Get-Text $valNode "v8:variant"
-			if ($variant) { $vDisplay = $variant }
+			$sd = Get-Text $valNode "v8:startDate"
+			$ed = Get-Text $valNode "v8:endDate"
+			$hasExplicitDates = ($sd -and $sd -ne '0001-01-01T00:00:00') -or ($ed -and $ed -ne '0001-01-01T00:00:00')
+			if ($hasExplicitDates) {
+				$stdPeriodObj = [ordered]@{ variant = $variant }
+				if ($sd) { $stdPeriodObj['startDate'] = $sd }
+				if ($ed) { $stdPeriodObj['endDate'] = $ed }
+				$canAuto = $false
+			} elseif ($variant) {
+				$vDisplay = $variant
+			}
 		} elseif ($vt -eq 'DesignTimeValue') {
 			$vDisplay = $valNode.InnerText
 		} elseif ($vt -eq 'LocalStringType') {
@@ -1764,11 +1775,19 @@ function Build-DataParameters {
 		# Compare to top-level default
 		if ($tp -and $tp.valueDisplay -ne $vDisplay) { $canAuto = $false }
 		if (-not $tp) { $canAuto = $false }   # extra param not in top-level
-		# Build shorthand entry
-		$s = $pn
-		if ($null -ne $vDisplay -and $vDisplay -ne '') { $s += " = $vDisplay" }
-		if ($flags) { $s += ' ' + ($flags -join ' ') }
-		$entries += $s
+		if ($stdPeriodObj) {
+			# Object form для StandardPeriod с явными датами
+			$obj = [ordered]@{ parameter = $pn; value = $stdPeriodObj }
+			if ($use -eq 'false') { $obj['use'] = $false }
+			if ($usid) { $obj['userSettingID'] = 'auto' }
+			$entries += $obj
+		} else {
+			# Build shorthand entry
+			$s = $pn
+			if ($null -ne $vDisplay -and $vDisplay -ne '') { $s += " = $vDisplay" }
+			if ($flags) { $s += ' ' + ($flags -join ' ') }
+			$entries += $s
+		}
 	}
 	# Check that all visible top-level params are present
 	foreach ($vn in $visibleTop.Keys) { if (-not $presentNames.ContainsKey($vn)) { $canAuto = $false } }
