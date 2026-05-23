@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.52 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.53 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -1742,7 +1742,9 @@ function Build-DataParameters {
 		if (-not $usid) { $canAuto = $false }
 		# Compare value to top-level param value
 		$valNode = $it.SelectSingleNode("dcscor:value", $ns)
-		$use = Get-Text $it "dcsset:use"
+		# use на dataParameter item — это <dcscor:use> (не dcsset)
+		$use = Get-Text $it "dcscor:use"
+		if ($use -eq 'false') { $canAuto = $false }
 		$tp = $visibleTop[$pn]
 		$flags = @()
 		if ($usid) { $flags += '@user' }
@@ -1751,7 +1753,7 @@ function Build-DataParameters {
 		$vDisplay = $null
 		if ($vt -eq 'StandardPeriod') {
 			$variant = Get-Text $valNode "v8:variant"
-			if ($variant -and $variant -ne 'Custom') { $vDisplay = $variant }
+			if ($variant) { $vDisplay = $variant }
 		} elseif ($vt -eq 'DesignTimeValue') {
 			$vDisplay = $valNode.InnerText
 		} elseif ($vt -eq 'LocalStringType') {
