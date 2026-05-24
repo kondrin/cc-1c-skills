@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.102 — Compile 1C DCS from JSON
+# skd-compile v1.103 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -2802,14 +2802,16 @@ def main():
     lines = []
 
     lines.append('<?xml version="1.0" encoding="UTF-8"?>')
-    lines.append('<DataCompositionSchema xmlns="http://v8.1c.ru/8.1/data-composition-system/schema"')
-    lines.append('\t\txmlns:dcscom="http://v8.1c.ru/8.1/data-composition-system/common"')
-    lines.append('\t\txmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core"')
-    lines.append('\t\txmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings"')
-    lines.append('\t\txmlns:v8="http://v8.1c.ru/8.1/data/core"')
-    lines.append('\t\txmlns:v8ui="http://v8.1c.ru/8.1/data/ui"')
-    lines.append('\t\txmlns:xs="http://www.w3.org/2001/XMLSchema"')
-    lines.append('\t\txmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">')
+    lines.append(
+        '<DataCompositionSchema xmlns="http://v8.1c.ru/8.1/data-composition-system/schema"'
+        ' xmlns:dcscom="http://v8.1c.ru/8.1/data-composition-system/common"'
+        ' xmlns:dcscor="http://v8.1c.ru/8.1/data-composition-system/core"'
+        ' xmlns:dcsset="http://v8.1c.ru/8.1/data-composition-system/settings"'
+        ' xmlns:v8="http://v8.1c.ru/8.1/data/core"'
+        ' xmlns:v8ui="http://v8.1c.ru/8.1/data/ui"'
+        ' xmlns:xs="http://www.w3.org/2001/XMLSchema"'
+        ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+    )
 
     emit_data_sources(lines, data_sources)
     emit_data_sets(lines, defn, default_source)

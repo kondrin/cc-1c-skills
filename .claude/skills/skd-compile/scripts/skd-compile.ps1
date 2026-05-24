@@ -1,4 +1,4 @@
-﻿# skd-compile v1.102 — Compile 1C DCS from JSON
+﻿# skd-compile v1.103 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -3475,14 +3475,14 @@ function Emit-SettingsVariants {
 # --- 12. Assemble XML ---
 
 X "<?xml version=`"1.0`" encoding=`"UTF-8`"?>"
-X "<DataCompositionSchema xmlns=`"http://v8.1c.ru/8.1/data-composition-system/schema`""
-X "`t`txmlns:dcscom=`"http://v8.1c.ru/8.1/data-composition-system/common`""
-X "`t`txmlns:dcscor=`"http://v8.1c.ru/8.1/data-composition-system/core`""
-X "`t`txmlns:dcsset=`"http://v8.1c.ru/8.1/data-composition-system/settings`""
-X "`t`txmlns:v8=`"http://v8.1c.ru/8.1/data/core`""
-X "`t`txmlns:v8ui=`"http://v8.1c.ru/8.1/data/ui`""
-X "`t`txmlns:xs=`"http://www.w3.org/2001/XMLSchema`""
-X "`t`txmlns:xsi=`"http://www.w3.org/2001/XMLSchema-instance`">"
+X ("<DataCompositionSchema xmlns=`"http://v8.1c.ru/8.1/data-composition-system/schema`"" +
+	" xmlns:dcscom=`"http://v8.1c.ru/8.1/data-composition-system/common`"" +
+	" xmlns:dcscor=`"http://v8.1c.ru/8.1/data-composition-system/core`"" +
+	" xmlns:dcsset=`"http://v8.1c.ru/8.1/data-composition-system/settings`"" +
+	" xmlns:v8=`"http://v8.1c.ru/8.1/data/core`"" +
+	" xmlns:v8ui=`"http://v8.1c.ru/8.1/data/ui`"" +
+	" xmlns:xs=`"http://www.w3.org/2001/XMLSchema`"" +
+	" xmlns:xsi=`"http://www.w3.org/2001/XMLSchema-instance`">")
 
 Emit-DataSources
 Emit-DataSets
