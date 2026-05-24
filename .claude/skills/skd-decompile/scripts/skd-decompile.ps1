@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.81 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.82 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -89,6 +89,13 @@ foreach ($t in $xmlDoc.SelectNodes("//*[local-name()='templateCondition']")) {
 # nestedSchema — DCS внутри DCS со своими dataSet/parameters/templates
 foreach ($ns_el in $xmlDoc.SelectNodes("//*[local-name()='nestedSchema']")) {
 	Fail-Ring3 -kind "nestedSchema (вложенные подсхемы)" -loc "nestedSchema"
+}
+
+# Пустые dataSets — отчёт без источника данных (только settingsVariant с outputParameters).
+# Такие отчёты валидны (динамическое заполнение из кода), но compile требует ≥1 dataSet,
+# и весь DSL заточен под data-driven отчёты — fail-fast.
+if ($xmlDoc.SelectNodes("//*[local-name()='dataSet']").Count -eq 0) {
+	Fail-Ring3 -kind "отчёт без dataSet (служебный шаблон-обёртка)" -loc "DataCompositionSchema/dataSet"
 }
 
 # --- 2. Warnings accumulator ---
