@@ -763,6 +763,31 @@ Wrapper эмитится только при наличии extra-полей; п
 ```
 Все атрибуты исходного XML сохраняются — для bit-perfect.
 
+#### Граница (v8ui:Line) в appearance
+
+Граница — объект с маркером `@type: "Line"` (атрибуты `width`/`gap` и inner `<v8ui:style>` сериализуются inline):
+```json
+"СтильГраницы": { "@type": "Line", "width": 0, "gap": false, "style": "None" }
+```
+
+Стороны (`СтильГраницы.Сверху/.Снизу/.Слева/.Справа`) — nested SettingsParameterValue, кладутся в `items` (как у outputParameters wrapper):
+```json
+"СтильГраницы": {
+  "@type": "Line", "width": 0, "gap": false, "style": "None",
+  "items": {
+    "СтильГраницы.Сверху": {
+      "value": { "@type": "Line", "width": 1, "gap": false, "style": "Solid" },
+      "use": false
+    },
+    "СтильГраницы.Снизу": {
+      "value": { "@type": "Line", "width": 1, "gap": false, "style": "Double" }
+    }
+  }
+}
+```
+
+Top-level Line хранится **плоско** (`@type`/`width`/`gap`/`style` + `use?`/`items?` на одном уровне). Nested items используют универсальный wrapper `{ value, use? }` — у `value` тип любой (Line/Font/color/text). Значения `style`: `None`, `Solid`, `Double`, `LargeDashed`, `SmallDashed`, `Dotted` и т.п. (значения `v8ui:SpreadsheetDocumentCellLineType`).
+
 ### dataParameters
 
 #### Автогенерация

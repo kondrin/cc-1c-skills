@@ -1,4 +1,4 @@
-﻿# skd-compile v1.94 — Compile 1C DCS from JSON
+﻿# skd-compile v1.95 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$DefinitionFile,
@@ -2321,12 +2321,34 @@ function Emit-AppearanceValue {
 
 	X "$indent<dcscor:item xsi:type=`"dcsset:SettingsParameterValue`">"
 
-	# Распознаём wrapper {use: false, value: ...} (необходимо отличать от multilang dict).
+	# Helper для проверки property/key на PSCustomObject/IDictionary
+	function _HasKey { param($o, [string]$k)
+		if ($o -is [PSCustomObject]) { return [bool]$o.PSObject.Properties[$k] }
+		if ($o -is [System.Collections.IDictionary]) { return $o.Contains($k) }
+		return $false
+	}
+	function _Get { param($o, [string]$k)
+		if ($o -is [PSCustomObject]) { return $o.$k }
+		if ($o -is [System.Collections.IDictionary]) { return $o[$k] }
+		return $null
+	}
+
+	# Распознаём wrapper {value:..., use?:false, items?:{}}.
+	# Top-level Line-value хранится плоско ({@type:Line, width, gap, style, use?, items?}) —
+	# отличаем от wrapper по наличию @type на самом val.
+	$isTopLevelLine = (_HasKey $val '@type') -and ("$(_Get $val '@type')" -eq 'Line')
 	$useWrapper = $false
 	$innerVal = $val
-	if ($val -is [PSCustomObject] -and $val.PSObject.Properties['use'] -and $val.use -eq $false -and $val.PSObject.Properties['value']) {
-		$useWrapper = $true
-		$innerVal = $val.value
+	$nestedItems = $null
+	if ($isTopLevelLine) {
+		# items/use лежат рядом с @type
+		if ((_HasKey $val 'use') -and ((_Get $val 'use') -eq $false)) { $useWrapper = $true }
+		if (_HasKey $val 'items') { $nestedItems = (_Get $val 'items') }
+	} elseif ((_HasKey $val 'value') -and (($val -is [PSCustomObject]) -or ($val -is [System.Collections.IDictionary]))) {
+		# Обычный wrapper {value, use?, items?}
+		$innerVal = (_Get $val 'value')
+		if ((_HasKey $val 'use') -and ((_Get $val 'use') -eq $false)) { $useWrapper = $true }
+		if (_HasKey $val 'items') { $nestedItems = (_Get $val 'items') }
 	}
 
 	if ($useWrapper) { X "$indent`t<dcscor:use>false</dcscor:use>" }
@@ -2340,8 +2362,18 @@ function Emit-AppearanceValue {
 	} elseif ($innerVal -is [System.Collections.IDictionary]) {
 		if ($innerVal.Contains('@type') -and "$($innerVal['@type'])" -eq 'Font') { $isFontDict = $true }
 	}
+	# Line dict ({@type: "Line", width, gap, style}) → <dcscor:value xsi:type="v8ui:Line" ...><v8ui:style>...
+	$isLineDict = $false
+	if (_HasKey $innerVal '@type') { $isLineDict = ("$(_Get $innerVal '@type')" -eq 'Line') }
 	$isDict = ($innerVal -is [hashtable]) -or ($innerVal -is [System.Collections.IDictionary]) -or ($innerVal -is [PSCustomObject])
-	if ($isFontDict) {
+	if ($isLineDict) {
+		$lw = if (_HasKey $innerVal 'width') { _Get $innerVal 'width' } else { 0 }
+		$lg = if (_HasKey $innerVal 'gap') { if ((_Get $innerVal 'gap')) { 'true' } else { 'false' } } else { 'false' }
+		$ls = if (_HasKey $innerVal 'style') { "$(_Get $innerVal 'style')" } else { 'None' }
+		X "$indent`t<dcscor:value xsi:type=`"v8ui:Line`" width=`"$lw`" gap=`"$lg`">"
+		X "$indent`t`t<v8ui:style xsi:type=`"v8ui:SpreadsheetDocumentCellLineType`">$(Esc-Xml $ls)</v8ui:style>"
+		X "$indent`t</dcscor:value>"
+	} elseif ($isFontDict) {
 		$attrParts = @()
 		foreach ($attrName in @('ref','faceName','height','bold','italic','underline','strikeout','kind','scale')) {
 			$av = $null
@@ -2386,6 +2418,20 @@ function Emit-AppearanceValue {
 			X "$indent`t<dcscor:value xsi:type=`"v8ui:Color`">$(Esc-Xml $actualVal)</dcscor:value>"
 		} else {
 			X "$indent`t<dcscor:value xsi:type=`"xs:string`">$(Esc-Xml $actualVal)</dcscor:value>"
+		}
+	}
+	# Nested SettingsParameterValue items (например СтильГраницы.Сверху/.Снизу/.Слева/.Справа).
+	# Эмитим как siblings <dcscor:item> внутри родительского <dcscor:item>.
+	if ($nestedItems) {
+		$niProps = if ($nestedItems -is [PSCustomObject]) { $nestedItems.PSObject.Properties } else { $null }
+		if ($niProps) {
+			foreach ($np in $niProps) {
+				Emit-AppearanceValue -key $np.Name -val $np.Value -indent "$indent`t"
+			}
+		} elseif ($nestedItems -is [System.Collections.IDictionary]) {
+			foreach ($nk in $nestedItems.Keys) {
+				Emit-AppearanceValue -key $nk -val $nestedItems[$nk] -indent "$indent`t"
+			}
 		}
 	}
 	X "$indent</dcscor:item>"

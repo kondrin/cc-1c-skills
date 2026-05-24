@@ -1,4 +1,4 @@
-﻿# skd-decompile v0.77 — Decompile 1C DCS Template.xml to JSON DSL (draft)
+﻿# skd-decompile v0.78 — Decompile 1C DCS Template.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[Parameter(Mandatory)]
@@ -1723,7 +1723,36 @@ function Build-Order {
 	return ,$out
 }
 
-# Build appearance dict from <dcsset:appearance> or <dcscor:item> list
+# Прочитать <dcscor:value xsi:type="v8ui:Line"> в объект {@type:Line, width, gap, style}.
+function Get-LineValue {
+	param($valNode)
+	$obj = [ordered]@{ '@type' = 'Line' }
+	$w = $valNode.GetAttribute("width")
+	$g = $valNode.GetAttribute("gap")
+	if ($w -ne '') { $obj['width'] = if ($w -match '^-?\d+$') { [int]$w } else { $w } }
+	if ($g -ne '') { $obj['gap']  = ($g -eq 'true') }
+	$styleNode = $valNode.SelectSingleNode("v8ui:style", $ns)
+	if ($styleNode) { $obj['style'] = $styleNode.InnerText }
+	return $obj
+}
+
+# Прочитать <dcscor:value> в JSON-значение: Font/Line/multilang/raw text.
+# Возвращает то значение которое идёт в "value" slot.
+function Read-AppearanceValueNode {
+	param($valNode)
+	if (-not $valNode) { return $null }
+	$vt = Get-LocalXsiType $valNode
+	if ($vt -eq 'LocalStringType') { return (Get-MLText $valNode) }
+	if ($vt -eq 'Font') { return (Get-FontValue $valNode) }
+	if ($vt -eq 'Line') { return (Get-LineValue $valNode) }
+	return $valNode.InnerText
+}
+
+# Build appearance dict from <dcsset:appearance> or <dcscor:item> list.
+# Поддерживает Line-значения (граница) и nested SettingsParameterValue items
+# (например СтильГраницы.Сверху). DSL form B (см. docs/skd-dsl-spec.md):
+#   - top-level Line: { "@type": "Line", "width", "gap", "style", "use"?, "items"? }
+#   - nested item: { "value": <значение>, "use"?: false }
 function Get-SettingsAppearance {
 	param($appNode)
 	if (-not $appNode) { return $null }
@@ -1732,18 +1761,32 @@ function Get-SettingsAppearance {
 		$pName = Get-Text $it "dcscor:parameter"
 		$val = $it.SelectSingleNode("dcscor:value", $ns)
 		if (-not $pName -or -not $val) { continue }
-		$valType = Get-LocalXsiType $val
-		if ($valType -eq 'LocalStringType') {
-			$rawVal = Get-MLText $val
-		} elseif ($valType -eq 'Font') {
-			$rawVal = Get-FontValue $val
-		} else {
-			$rawVal = $val.InnerText
-		}
-		# wrapper {use:false, value} как в Get-AppearanceDict
+		$rawVal = Read-AppearanceValueNode $val
 		$useV = Get-Text $it "dcscor:use"
-		if ($useV -eq 'false') {
-			$dict[$pName] = [ordered]@{ value = $rawVal; use = $false }
+		# Nested dcscor:item внутри этого item — wrap form {value, use?}.
+		$nestedItems = [ordered]@{}
+		foreach ($sub in $it.SelectNodes("dcscor:item", $ns)) {
+			$subName = Get-Text $sub "dcscor:parameter"
+			$subVal = $sub.SelectSingleNode("dcscor:value", $ns)
+			if (-not $subName) { continue }
+			$subRaw = Read-AppearanceValueNode $subVal
+			$subUse = Get-Text $sub "dcscor:use"
+			$subEntry = [ordered]@{ value = $subRaw }
+			if ($subUse -eq 'false') { $subEntry['use'] = $false }
+			$nestedItems[$subName] = $subEntry
+		}
+		# Определяем форму вывода
+		$valIsLine = ($rawVal -is [System.Collections.IDictionary]) -and $rawVal.Contains('@type') -and ($rawVal['@type'] -eq 'Line')
+		if ($valIsLine) {
+			# top-level Line — атрибуты inline + опц. use/items
+			if ($useV -eq 'false') { $rawVal['use'] = $false }
+			if ($nestedItems.Count -gt 0) { $rawVal['items'] = $nestedItems }
+			$dict[$pName] = $rawVal
+		} elseif (($useV -eq 'false') -or ($nestedItems.Count -gt 0)) {
+			$wrap = [ordered]@{ value = $rawVal }
+			if ($useV -eq 'false') { $wrap['use'] = $false }
+			if ($nestedItems.Count -gt 0) { $wrap['items'] = $nestedItems }
+			$dict[$pName] = $wrap
 		} else {
 			$dict[$pName] = $rawVal
 		}

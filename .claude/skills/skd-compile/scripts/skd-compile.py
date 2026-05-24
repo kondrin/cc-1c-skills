@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.94 — Compile 1C DCS from JSON
+# skd-compile v1.95 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -1921,19 +1921,36 @@ def emit_order(lines, items, indent, skip_auto=False, block_view_mode=None, bloc
 def emit_appearance_value(lines, key, val, indent):
     lines.append(f'{indent}<dcscor:item xsi:type="dcsset:SettingsParameterValue">')
 
-    # \u0420\u0430\u0441\u043f\u043e\u0437\u043d\u0430\u0451\u043c wrapper {use: false, value: ...} \u2014 \u043d\u043e \u0442\u043e\u043b\u044c\u043a\u043e \u0435\u0441\u043b\u0438 \u0435\u0441\u0442\u044c \u043e\u0431\u0430 \u043a\u043b\u044e\u0447\u0430.
+    # Top-level Line \u0445\u0440\u0430\u043d\u0438\u0442\u0441\u044f \u043f\u043b\u043e\u0441\u043a\u043e ({@type: "Line", width, gap, style, use?, items?}).
+    # \u041e\u0431\u044b\u0447\u043d\u044b\u0439 wrapper: {value, use?, items?}.
+    is_top_level_line = isinstance(val, dict) and val.get('@type') == 'Line'
     use_wrapper = False
     inner_val = val
-    if isinstance(val, dict) and 'use' in val and val['use'] is False and 'value' in val:
-        use_wrapper = True
+    nested_items = None
+    if is_top_level_line:
+        if val.get('use') is False:
+            use_wrapper = True
+        nested_items = val.get('items')
+    elif isinstance(val, dict) and 'value' in val:
         inner_val = val['value']
+        if val.get('use') is False:
+            use_wrapper = True
+        nested_items = val.get('items')
 
     if use_wrapper:
         lines.append(f'{indent}\t<dcscor:use>false</dcscor:use>')
     lines.append(f'{indent}\t<dcscor:parameter>{esc_xml(key)}</dcscor:parameter>')
 
+    # Line dict ({@type: "Line", width, gap, style}) \u2192 <dcscor:value xsi:type="v8ui:Line" ...>
+    if isinstance(inner_val, dict) and inner_val.get('@type') == 'Line':
+        lw = inner_val.get('width', 0)
+        lg = 'true' if inner_val.get('gap') else 'false'
+        ls = str(inner_val.get('style', 'None'))
+        lines.append(f'{indent}\t<dcscor:value xsi:type="v8ui:Line" width="{lw}" gap="{lg}">')
+        lines.append(f'{indent}\t\t<v8ui:style xsi:type="v8ui:SpreadsheetDocumentCellLineType">{esc_xml(ls)}</v8ui:style>')
+        lines.append(f'{indent}\t</dcscor:value>')
     # Font dict ({@type: "Font", ref, faceName, height, bold, ...}) \u2192 <dcscor:value xsi:type="v8ui:Font" .../>
-    if isinstance(inner_val, dict) and inner_val.get('@type') == 'Font':
+    elif isinstance(inner_val, dict) and inner_val.get('@type') == 'Font':
         attr_parts = []
         for attr_name in ('ref', 'faceName', 'height', 'bold', 'italic', 'underline', 'strikeout', 'kind', 'scale'):
             if attr_name in inner_val:
@@ -1967,6 +1984,10 @@ def emit_appearance_value(lines, key, val, indent):
             lines.append(f'{indent}\t<dcscor:value xsi:type="v8ui:Color">{esc_xml(actual_val)}</dcscor:value>')
         else:
             lines.append(f'{indent}\t<dcscor:value xsi:type="xs:string">{esc_xml(actual_val)}</dcscor:value>')
+    # Nested SettingsParameterValue items (СтильГраницы.Сверху/.Снизу/.Слева/.Справа).
+    if nested_items and isinstance(nested_items, dict):
+        for nk, nv in nested_items.items():
+            emit_appearance_value(lines, nk, nv, f'{indent}\t')
     lines.append(f'{indent}</dcscor:item>')
 
 
