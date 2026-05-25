@@ -3,7 +3,8 @@
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import { page } from './state.mjs';
-import { dismissPendingErrors } from './errors.mjs';
+import { dismissPendingErrors, checkForErrors } from './errors.mjs';
+import { getFormState } from '../browser.mjs';
 
 /**
  * page.click with the standard "intercepts pointer events" retry ladder:
@@ -104,4 +105,24 @@ export async function readEdd() {
       })
     };
   })()`);
+}
+
+/**
+ * Standard "tail" of action functions: fetch current form state, attach
+ * caller-specified extras (e.g. `{ clicked: {...} }`) and the result of
+ * `checkForErrors()` if any. Returns the flat state object.
+ *
+ * Unifies ~15 hand-written copies in clickElement, selectValue, closeForm,
+ * navigation functions, etc. Also closes R1/R2/R3 from the refactor plan —
+ * any caller using this helper gets `state.errors` for free.
+ *
+ * @param {object} [extras] — merged into the state object via Object.assign.
+ * @returns {Promise<object>} form state (flat) with optional `errors`.
+ */
+export async function returnFormState(extras = {}) {
+  const state = await getFormState();
+  Object.assign(state, extras);
+  const err = await checkForErrors();
+  if (err) state.errors = err;
+  return state;
 }

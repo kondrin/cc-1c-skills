@@ -143,7 +143,7 @@ import {
   _detectPlatformDialogs, _closePlatformDialogs,
 } from './core/errors.mjs';
 import {
-  safeClick, findFieldInputId, readEdd,
+  safeClick, findFieldInputId, readEdd, returnFormState,
   detectNewForm as helperDetectNewForm,
 } from './core/helpers.mjs';
 // Re-export only what was publicly exported before the refactor.
@@ -215,10 +215,7 @@ export async function openCommand(name) {
   if (result?.error) throw new Error(`openCommand: "${name}" not found. Available: ${result.available?.join(', ') || 'none'}`);
 
   await waitForStable(formBefore);
-  const state = await getFormState();
-  const err = await checkForErrors();
-  if (err) state.errors = err;
-  return state;
+  return await returnFormState();
 }
 
 /** Switch to an open tab by name (fuzzy match). Returns updated form state. */
@@ -390,10 +387,7 @@ export async function navigateLink(url) {
   }
 
   await waitForStable(formBefore);
-  const state = await getFormState();
-  const err = await checkForErrors();
-  if (err) state.errors = err;
-  return state;
+  return await returnFormState();
 }
 
 /** Read current form state. Single evaluate call via combined script. */
