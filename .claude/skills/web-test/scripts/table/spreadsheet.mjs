@@ -4,6 +4,8 @@
 import { page, ensureConnected, normYo } from '../core/state.mjs';
 import { detectFormScript, readTableScript, resolveGridScript } from '../dom.mjs';
 import { waitForStable } from '../core/wait.mjs';
+// getFormState still in browser.mjs (cycle resolves at call time).
+import { getFormState } from '../browser.mjs';
 
 /** Read structured table data with pagination. Returns columns, rows, total count. */
 export async function readTable({ maxRows = 20, offset = 0, table } = {}) {
