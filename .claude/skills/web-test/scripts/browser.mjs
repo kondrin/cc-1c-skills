@@ -26,7 +26,7 @@ import {
 import {
   browser, page, sessionPrefix, seanceId, recorder,
   lastCaptions, lastRecordingDuration, highlightMode,
-  persistentUserDataDir, preserveClipboard,
+  persistentUserDataDir, preserveClipboard, clipboardWarnLogged,
   contexts, activeContextName, activeMode,
   setBrowser, setPage, setSessionPrefix, setSeanceId, setRecorder,
   setLastCaptions, setLastRecordingDuration, setHighlightMode,
@@ -2113,6 +2113,11 @@ export async function selectValue(fieldName, searchText, { type } = {}) {
   const formNum = await page.evaluate(detectFormScript());
   if (formNum === null) throw new Error(`selectValue: no form found`);
 
+  // Detect any new form opened above this one (broad — includes type dialogs).
+  // Hoisted to the top so the composite-type branch can call it before its
+  // original declaration site further below.
+  const detectNewForm = () => helperDetectNewForm(formNum);
+
   // 1. Find DLB button (fallback to CB — ERP uses Choose Button instead of DLB for some fields)
   let btn = await page.evaluate(findFieldButtonScript(formNum, fieldName, 'DLB'));
   if (btn?.error === 'button_not_found') {
@@ -2219,9 +2224,7 @@ export async function selectValue(fieldName, searchText, { type } = {}) {
     })()`);
   }
 
-  // Helper: detect any new form (broad — finds type dialogs whose a.press
-  // buttons have empty IDs). Looks for any visible element with id="form{N}_*".
-  const detectNewForm = () => helperDetectNewForm(formNum);
+  // detectNewForm is hoisted at the top of selectValue (see above).
 
   // Helper: open selection form and pick value
   async function openFormAndPick() {
