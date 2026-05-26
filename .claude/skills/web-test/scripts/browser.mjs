@@ -184,7 +184,8 @@ export async function getFormState() {
 // ============================================================
 // Table reading + SpreadsheetDocument — extracted to table/spreadsheet.mjs
 // ============================================================
-export { readTable, readSpreadsheet } from './table/spreadsheet.mjs';
+export { readTable } from './table/grid.mjs';
+export { readSpreadsheet } from './table/spreadsheet.mjs';
 
 
 // ============================================================

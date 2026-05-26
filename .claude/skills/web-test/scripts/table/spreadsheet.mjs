@@ -7,19 +7,7 @@ import { waitForStable } from '../core/wait.mjs';
 // getFormState still in browser.mjs (cycle resolves at call time).
 import { getFormState } from '../browser.mjs';
 
-/** Read structured table data with pagination. Returns columns, rows, total count. */
-export async function readTable({ maxRows = 20, offset = 0, table } = {}) {
-  ensureConnected();
-  const formNum = await page.evaluate(detectFormScript());
-  if (formNum === null) throw new Error('readTable: no form found');
-  let gridSelector;
-  if (table) {
-    const resolved = await page.evaluate(resolveGridScript(formNum, table));
-    if (resolved.error) throw new Error(`readTable: ${resolved.message || resolved.error}. Available: ${resolved.available?.map(a => a.name).join(', ') || 'none'}`);
-    gridSelector = resolved.gridSelector;
-  }
-  return await page.evaluate(readTableScript(formNum, { maxRows, offset, gridSelector }));
-}
+// readTable moved to table/grid.mjs (form-grid операции отделены от SpreadsheetDocument).
 
 // --- Spreadsheet helpers (shared by readSpreadsheet and clickElement) ---
 
