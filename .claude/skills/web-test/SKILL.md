@@ -288,8 +288,7 @@ await fillFields({
 });
 ```
 
-Returns form state with `filled: [{ field, ok, value, method }]`.
-Method is one of: `'clear'` | `'toggle'` | `'radio'` | `'paste'` | `'dropdown'` | `'form'` | `'typeahead'`
+Returns form state with `filled: [{ field, ok: true, value, method }]` (method: `clear`|`toggle`|`radio`|`paste`|`dropdown`|`form`|`typeahead`). **Throws on any per-field failure** with a detailed message listing problematic fields and available options — if the call returned, all fields were filled, no per-item check needed.
 
 #### `selectValue(field, search, opts?)` → form state with `selected`
 Select a value from reference field via dropdown or selection form. More reliable than `fillFields` for reference fields that need exact selection from a catalog. Pass empty `search` (`''` or `null`) to clear the field (Shift+F4).
@@ -315,7 +314,9 @@ Also supports DCS labels — auto-enables the paired checkbox.
 #### `fillTableRow(fields, opts)` → form state with `filled` (+ optional `notFilled`)
 Fill table row cells via Tab navigation. Value is a plain string, `{ value, type }` for composite-type cells, or `''`/`null` to clear (Shift+F4).
 
-Returns form state with `filled: [{ field, ok, method, value }]`. If some requested fields weren't reached (Tab loop couldn't find them), `notFilled: [...]` lists their names.
+Returns form state with `filled: [{ field, ok, ...}]`. Items are `{ field, ok: true, method, value }` on success (method: `direct`|`paste`|`dropdown`|`form`|`type-direct`|`skip`|`clear`|`toggle`) or `{ field, ok: false, error, message }` on per-field failure. Unmatched fields → `notFilled: [...]`.
+
+**Unlike `fillFields`, `fillTableRow` does NOT throw on per-field failures** — errors appear as `ok: false` items in `filled[]` so the caller can react selectively (e.g. retry one cell while the rest of the row stays filled). Check via `r.filled.filter(f => !f.ok)`. Error codes: `composite_type`/`type_required`/`type_dialog_failed` (retry with `{value, type}`); `column_not_found` (check column name via `readTable`); `no_selection_form`/`no_selection_after_type` (retry or fall back to `selectValue`); `not_found`/`no_match`/`ambiguous` (refine search text); `still_open` (picked a group — pick a leaf row). Soft validation errors from 1C (`balloon`, `modal`) still throw via the exec-wrapper.
 
 | Option | Description |
 |--------|-------------|

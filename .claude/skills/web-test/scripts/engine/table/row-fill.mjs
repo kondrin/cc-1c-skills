@@ -1,4 +1,4 @@
-// web-test table/row-fill v1.18 — fillTableRow — заполнение строки табличной части/списка через Tab-навигацию и попутный выбор значений.
+// web-test table/row-fill v1.19 — fillTableRow — заполнение строки табличной части/списка через Tab-навигацию и попутный выбор значений.
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import {
@@ -242,17 +242,17 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
             // After type selection, detect the actual selection form
             selForm = await helperDetectNewForm(formNum);
             if (selForm === null) {
-              return { field: key, error: 'no_selection_after_type', message: `Type selected but no selection form opened for "${key}"` };
+              return { field: key, ok: false, error: 'no_selection_after_type', message: `Type selected but no selection form opened for "${key}"` };
             }
           } else {
             // No type specified — close type dialog and report error
             await page.keyboard.press('Escape');
             await page.waitForTimeout(300);
-            return { field: key, error: 'composite_type', message: `Composite type field "${key}" requires {value, type}` };
+            return { field: key, ok: false, error: 'composite_type', message: `Composite type field "${key}" requires {value, type}` };
           }
         }
         const pr = await pickFromSelectionForm(selForm, key, info.value, formNum);
-        return pr.ok ? { field: key, ok: true, method: 'form' } : { field: key, error: pr.error, message: pr.message };
+        return pr.ok ? { field: key, ok: true, method: 'form' } : { field: key, ok: false, error: pr.error, message: pr.message };
       }
 
       // First field: selection form is already open from the dblclick above
@@ -277,7 +277,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         const nextCoords = await page.evaluate(findNextCellCoordsByKeyScript(gridSelector, row, key));
         if (!nextCoords) {
           info.filled = true;
-          results.push({ field: key, error: 'column_not_found', message: `Column for "${key}" not found` });
+          results.push({ field: key, ok: false, error: 'column_not_found', message: `Column for "${key}" not found` });
           continue;
         }
         // Skip if cell already contains the desired value
@@ -319,7 +319,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         }
         if (selForm === null) {
           info.filled = true;
-          results.push({ field: key, error: 'no_selection_form', message: `Dblclick on "${key}" did not open selection form` });
+          results.push({ field: key, ok: false, error: 'no_selection_form', message: `Dblclick on "${key}" did not open selection form` });
           continue;
         }
         const pr = await directEditPick(selForm, key, info);
@@ -511,7 +511,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         info.filled = true;
         results.push(pickResult.ok
           ? { field: matchedKey, cell: cell.fullName, ok: true, method: 'form', type: info.type }
-          : { field: matchedKey, cell: cell.fullName,
+          : { field: matchedKey, cell: cell.fullName, ok: false,
               error: pickResult.error, message: pickResult.message });
         continue;
       }
@@ -521,7 +521,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         await page.waitForTimeout(300);
       }
       info.filled = true;
-      results.push({ field: matchedKey, cell: cell.fullName,
+      results.push({ field: matchedKey, cell: cell.fullName, ok: false,
         error: 'type_dialog_failed',
         message: `Cell "${matchedKey}": F4 did not open type dialog for type "${info.type}"` });
       await page.keyboard.press('Tab');
@@ -539,7 +539,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
     if (!inputAfterPaste && text) {
       // No type specified — can't fill this composite-type cell
       info.filled = true;
-      results.push({ field: matchedKey, cell: cell.fullName,
+      results.push({ field: matchedKey, cell: cell.fullName, ok: false,
         error: 'type_required',
         message: `Cell "${matchedKey}" rejected text input (composite-type). Use { value: '...', type: 'Тип' } syntax` });
       await page.keyboard.press('Tab');
@@ -575,7 +575,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         await page.keyboard.press('Escape');
         await page.waitForTimeout(300);
         info.filled = true;
-        results.push({ field: matchedKey, cell: cell.fullName,
+        results.push({ field: matchedKey, cell: cell.fullName, ok: false,
           error: 'not_found', message: `No match for "${text}"` });
       }
 
@@ -611,16 +611,16 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
             continue;
           }
           // Not found in selection form — fall through to clear + skip
-          results.push({ field: matchedKey, cell: cell.fullName,
+          results.push({ field: matchedKey, cell: cell.fullName, ok: false,
             error: pickResult.error, message: pickResult.message });
         } else {
           info.filled = true;
-          results.push({ field: matchedKey, cell: cell.fullName,
+          results.push({ field: matchedKey, cell: cell.fullName, ok: false,
             error: 'not_found', message: `Value "${text}" not in list` });
         }
       } else {
         info.filled = true;
-        results.push({ field: matchedKey, cell: cell.fullName,
+        results.push({ field: matchedKey, cell: cell.fullName, ok: false,
           error: 'not_found', message: `Value "${text}" not in list` });
       }
 
@@ -686,7 +686,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
           info.filled = true;
           results.push(pickResult.ok
             ? { field: matchedKey, cell: cell.fullName, ok: true, method: 'form', type: info.type }
-            : { field: matchedKey, cell: cell.fullName,
+            : { field: matchedKey, cell: cell.fullName, ok: false,
                 error: pickResult.error, message: pickResult.message });
           continue;
         } else {
@@ -699,7 +699,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
           await page.keyboard.press('Tab');
           await page.waitForTimeout(500);
           info.filled = true;
-          results.push({ field: matchedKey, cell: cell.fullName,
+          results.push({ field: matchedKey, cell: cell.fullName, ok: false,
             error: 'type_required',
             message: `Cell "${matchedKey}" opened a type selection dialog. Use { value: '...', type: 'Тип' } syntax` });
           continue;
@@ -710,7 +710,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
       info.filled = true;
       results.push(pickResult.ok
         ? { field: matchedKey, cell: cell.fullName, ok: true, method: 'form' }
-        : { field: matchedKey, cell: cell.fullName,
+        : { field: matchedKey, cell: cell.fullName, ok: false,
             error: pickResult.error, message: pickResult.message });
       continue;
     }
