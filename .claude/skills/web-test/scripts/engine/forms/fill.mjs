@@ -1,11 +1,11 @@
-// web-test forms/fill v1.17 — Fill form fields by name (text/checkbox/date/dropdown/reference). Delegates references to selectValue / fillReferenceField.
+// web-test forms/fill v1.18 — Fill form fields by name (text/checkbox/date/dropdown/reference). Delegates references to selectValue / fillReferenceField.
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import {
   page, ensureConnected, ACTION_WAIT, highlightMode, normYo,
 } from '../core/state.mjs';
 import {
-  detectFormScript, resolveFieldsScript, readFormScript,
+  detectFormScript, resolveFieldsScript,
 } from '../../dom.mjs';
 import { dismissPendingErrors, checkForErrors } from '../core/errors.mjs';
 import { waitForStable, startNetworkMonitor } from '../core/wait.mjs';
@@ -13,9 +13,9 @@ import { highlight, unhighlight } from '../recording/highlight.mjs';
 import {
   fillReferenceField, selectValue, pickFromSelectionForm,
   isTypeDialog, pickFromTypeDialog,
-} from './select-value.mjs';
+} from './select-value.mjs';
 import { pasteText } from '../core/clipboard.mjs';
-import { getFormState } from './state.mjs';
+import { returnFormState } from '../core/helpers.mjs';
 
 /** Fill fields on the current form via Playwright page.fill(). Returns fill results + updated form. */
 export async function fillFields(fields) {
@@ -132,13 +132,12 @@ export async function fillFields(fields) {
     if (highlightMode) try { await unhighlight(); } catch {}
   }
 
-  const formData = await page.evaluate(readFormScript(formNum));
   const failed = results.filter(r => r.error);
   if (failed.length > 0) {
     const details = failed.map(f => `  ${f.field}: ${f.message || f.error}${f.available ? ' (available: ' + f.available.join(', ') + ')' : ''}`).join('\n');
     throw new Error(`fillFields: ${failed.length} of ${results.length} field(s) failed:\n${details}`);
   }
-  return { filled: results, form: formData };
+  return returnFormState({ filled: results });
 }
 
 /** Convenience alias: fill a single field. Same as fillFields({ name: value }). */

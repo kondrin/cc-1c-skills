@@ -217,6 +217,8 @@ Sections + all open tabs.
 
 ### Actions
 
+**Return shape convention.** All action functions return a **flat form state** (same shape as `getFormState()`) with action-specific extras: `clicked`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`. Errors always sit at the top level under `.errors` (when present) — the exec-wrapper automatically throws on `.errors.modal` / `.errors.balloon`.
+
 #### `clickElement(text, { dblclick?, table?, expand?, modifier? })` → form state
 Click button, hyperlink, tab, navigation panel link, or grid row (fuzzy match).
 
@@ -267,7 +269,7 @@ Click button, hyperlink, tab, navigation panel link, or grid row (fuzzy match).
   await clickElement('150 000', { dblclick: true }); // finds cell by text in report
   ```
 
-#### `fillFields({ name: value })` → `{ filled, form }`
+#### `fillFields({ name: value })` → form state with `filled`
 Fill form fields by label (fuzzy match). Auto-detects field type.
 
 | Value | Field type | Method |
@@ -286,7 +288,7 @@ await fillFields({
 });
 ```
 
-Returns `{ filled: [{ field, ok, value, method }], form: {...} }`.
+Returns form state with `filled: [{ field, ok, value, method }]`.
 Method is one of: `'clear'` | `'toggle'` | `'radio'` | `'paste'` | `'dropdown'` | `'form'` | `'typeahead'`
 
 #### `selectValue(field, search, opts?)` → form state with `selected`
@@ -310,8 +312,10 @@ await selectValue('Документ', '0000-000601', { type: 'Реализаци
 
 Also supports DCS labels — auto-enables the paired checkbox.
 
-#### `fillTableRow(fields, opts)` → form state
+#### `fillTableRow(fields, opts)` → form state with `filled` (+ optional `notFilled`)
 Fill table row cells via Tab navigation. Value is a plain string, `{ value, type }` for composite-type cells, or `''`/`null` to clear (Shift+F4).
+
+Returns form state with `filled: [{ field, ok, method, value }]`. If some requested fields weren't reached (Tab loop couldn't find them), `notFilled: [...]` lists their names.
 
 | Option | Description |
 |--------|-------------|

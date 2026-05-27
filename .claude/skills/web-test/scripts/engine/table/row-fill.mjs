@@ -1,4 +1,4 @@
-// web-test table/row-fill v1.17 — fillTableRow — заполнение строки табличной части/списка через Tab-навигацию и попутный выбор значений.
+// web-test table/row-fill v1.18 — fillTableRow — заполнение строки табличной части/списка через Tab-навигацию и попутный выбор значений.
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import {
@@ -18,7 +18,7 @@ import { dismissPendingErrors, checkForErrors } from '../core/errors.mjs';
 import { waitForStable, waitForCondition, startNetworkMonitor } from '../core/wait.mjs';
 import { highlight, unhighlight } from '../recording/highlight.mjs';
 import {
-  safeClick, findFieldInputId,
+  safeClick, findFieldInputId, returnFormState,
   detectNewForm as helperDetectNewForm,
   isInputFocused, isInputFocusedInGrid, findOpenPopup,
   readEdd, isEddVisible, clickEddItemViaDispatch,
@@ -29,7 +29,6 @@ import {
   fillReferenceField, selectValue,
 } from '../forms/select-value.mjs';
 import { pasteText } from '../core/clipboard.mjs';
-import { getFormState } from '../forms/state.mjs';
 
 /**
  * Fill cells in the current table row via Tab navigation.
@@ -112,7 +111,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         cellCoords.currentText.toLowerCase().includes(firstVal0.toLowerCase())) {
       firstFieldSkipped = true;
       if (Object.keys(fields).length === 1) {
-        return [{ field: firstKey0, ok: true, method: 'skip', value: cellCoords.currentText }];
+        return returnFormState({ filled: [{ field: firstKey0, ok: true, method: 'skip', value: cellCoords.currentText }] });
       }
     }
 
@@ -146,11 +145,9 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
       delete remaining[firstKey0];
       if (Object.keys(remaining).length > 0) {
         const more = await fillTableRow(remaining, { row, table });
-        if (Array.isArray(more)) results.push(...more);
-        else if (more?.filled) results.push(...more.filled);
+        results.push(...more.filled);
       }
-      const formData = await getFormState();
-      return { filled: results, form: formData };
+      return returnFormState({ filled: results });
     }
 
     // Check if clicked cell is a checkbox (toggle-on-click, no edit mode)
@@ -169,9 +166,9 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
       delete remaining[firstKey0];
       if (Object.keys(remaining).length > 0) {
         const more = await fillTableRow(remaining, { row, table });
-        results.push(...more);
+        results.push(...more.filled);
       }
-      return results;
+      return returnFormState({ filled: results });
     }
 
     let inEdit = false;
@@ -338,7 +335,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
         await page.keyboard.press('Escape');
       }
       await waitForStable(formNum);
-      return results;
+      return returnFormState({ filled: results });
     }
 
     if (!inEdit) throw new Error(`fillTableRow: click on row ${row} did not enter edit mode`);
@@ -767,11 +764,7 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
       );
       if (currentRow >= 0) {
         const more = await fillTableRow(checkboxFields, { row: currentRow, table });
-        if (Array.isArray(more)) {
-          results.push(...more);
-        } else if (more?.filled) {
-          results.push(...more.filled);
-        }
+        results.push(...more.filled);
         for (const key of Object.keys(checkboxFields)) {
           const idx = notFilled.indexOf(key);
           if (idx >= 0) notFilled.splice(idx, 1);
@@ -780,11 +773,9 @@ export async function fillTableRow(fields, { tab, add, row, table } = {}) {
     }
   }
 
-  const formData = await getFormState();
-  const result = { filled: results };
-  if (notFilled.length > 0) result.notFilled = notFilled;
-  result.form = formData;
-  return result;
+  const extras = { filled: results };
+  if (notFilled.length > 0) extras.notFilled = notFilled;
+  return returnFormState(extras);
 
   } catch (e) {
     if (e.message.startsWith('fillTableRow:')) throw e;

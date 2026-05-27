@@ -53,7 +53,7 @@ export default async function({ navigateSection, openCommand, clickElement, fill
       { 'Согласовано': true },
       { table: 'Товары', row: 1 }
     );
-    log(`checkbox result: ${JSON.stringify(r.filled || r)}`);
+    log(`checkbox result: ${JSON.stringify(r.filled)}`);
     const t = await readTable({ table: 'Товары' });
     log(`row 1 Согласовано='${t.rows[1]['Согласовано']}'`);
     assert.equal(t.rows[1]['Согласовано'], 'true', 'Согласовано должно стать true');
@@ -65,7 +65,7 @@ export default async function({ navigateSection, openCommand, clickElement, fill
       { 'Номенклатура': '' },
       { table: 'Товары', row: 0 }
     );
-    log(`clear result: ${JSON.stringify(r.filled || r)}`);
+    log(`clear result: ${JSON.stringify(r.filled)}`);
     const t = await readTable({ table: 'Товары' });
     log(`row 0 Номенклатура after clear='${t.rows[0]['Номенклатура']}'`);
     assert.equal(t.rows[0]['Номенклатура'], '', 'Номенклатура должна быть очищена (Shift+F4)');

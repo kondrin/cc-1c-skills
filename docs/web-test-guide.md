@@ -218,7 +218,7 @@ console.log('Расшифровка:', JSON.stringify(drilldown.rows));
 
 | Функция | Описание | Возвращает |
 |---------|----------|------------|
-| `navigateSection(name)` | Перейти в раздел (fuzzy match) | `{ sections, commands }` |
+| `navigateSection(name)` | Перейти в раздел (fuzzy match) | form state с `navigated`, `sections`, `commands` |
 | `openCommand(name)` | Открыть команду из панели функций | form state |
 | `navigateLink(path)` | Открыть по пути метаданных (`Документ.ЗаказКлиента`) | form state |
 | `openFile(path)` | Открыть внешнюю обработку/отчёт (EPF/ERF) через «Файл → Открыть» | form state |
@@ -286,12 +286,14 @@ await clickElement('150 000', { dblclick: true }); // найдёт ячейку 
 
 ### Действия
 
+Все action-функции возвращают **плоский form state** (как `getFormState()`) с action-specific extras (`clicked`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`). Errors всегда на верхнем уровне `.errors` — exec-wrapper автоматически throw'ает на soft validation errors (`modal`/`balloon`).
+
 | Функция | Описание | Возвращает |
 |---------|----------|------------|
 | `clickElement(text, {dblclick?, modifier?})` | Клик по кнопке/ссылке/строке. `{dblclick: true}` для открытия, `{modifier: 'ctrl'\|'shift'}` для мультиселекции. Первый аргумент может быть `{row, column}` для клика по ячейке SpreadsheetDocument (см. выше) | form state или `{ submenu }` |
-| `fillFields({name: value})` | Заполнить поля (текст, чекбокс, радио, ссылки, DCS-фильтры). Пустое значение (`''`/`null`) = очистка | `{ filled: [{field, ok, method}], form }` |
+| `fillFields({name: value})` | Заполнить поля (текст, чекбокс, радио, ссылки, DCS-фильтры). Пустое значение (`''`/`null`) = очистка | form state с `filled` |
 | `selectValue(field, search, opts?)` | Выбрать из справочника. search: текст, `{поле: значение}` или `''`/`null` для очистки. `{ type }` для составного типа | form state с `selected` |
-| `fillTableRow(fields, {tab?, add?, row?})` | Заполнить строку. Значение: строка, `{ value, type }` для составного типа, `''`/`null` для очистки | form state |
+| `fillTableRow(fields, {tab?, add?, row?})` | Заполнить строку. Значение: строка, `{ value, type }` для составного типа, `''`/`null` для очистки | form state с `filled` (+ `notFilled?`) |
 | `deleteTableRow(row, {tab?})` | Удалить строку по индексу | form state |
 | `closeForm({save?})` | Закрыть форму. `save: false` = "Нет", `save: true` = "Да". Возвращает `closed: true/false` | form state с `closed` |
 | `filterList(text, {field?, exact?})` | Фильтр списка. Без field = все колонки, с field = расширенный поиск | form state |
