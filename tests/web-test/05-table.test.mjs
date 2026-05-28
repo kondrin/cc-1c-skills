@@ -20,10 +20,17 @@ export default async function({ navigateSection, openCommand, clickElement, fill
     );
 
     const t = await readTable({ table: 'Товары' });
-    log(`rows after add: ${t.rows?.length}`);
+    log(`rows after add: ${t.rows?.length}, hasMore: ${JSON.stringify(t.hasMore)}`);
     assert.equal(t.rows?.length, 2, 'Должно быть 2 строки');
     assert.equal(t.rows[0]['Номенклатура'], 'Товар 01', 'Строка 0 = Товар 01');
     assert.equal(t.rows[1]['Номенклатура'], 'Товар 02', 'Строка 1 = Товар 02');
+    // hasMore: две строки точно помещаются в табчасть — both false
+    assert.ok(t.hasMore, 'hasMore должен быть в результате readTable');
+    assert.equal(t.hasMore.below, false, 'hasMore.below должно быть false (всё видно)');
+    // above либо false (видимый scrollbar), либо undefined (дин-список) — но для табчасти ждём false
+    if (t.hasMore.above !== undefined) {
+      assert.equal(t.hasMore.above, false, 'hasMore.above должно быть false (мы на первой странице)');
+    }
   });
 
   await step('edit: изменить количество в строке 0 через fillTableRow row:0', async () => {

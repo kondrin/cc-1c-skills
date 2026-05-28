@@ -1,4 +1,4 @@
-// web-test dom/grid v1.3 — grid resolution + table reading + edit-time helpers
+// web-test dom/grid v1.5 — grid resolution + table reading + edit-time helpers
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 /**
@@ -241,7 +241,21 @@ export function readTableScript(formNum, { maxRows = 20, offset = 0, gridSelecto
     }
     const isTree = !!body.querySelector('.gridBoxTree');
     const hasGroups = rows.some(r => r._kind === 'group');
-    const result = { name, columns: columns.map(c => c.text), rows, total, offset: ${offset}, shown: rows.length };
+    // Virtualization-aware "has more" signal:
+    //  - Tabular sections render a visible scrollbar widget (#vertScroll_* with class "scrollV" and non-zero size).
+    //    Its child tracks expose exact above/below pixel offsets relative to the slider.
+    //  - Dynamic lists hide the widget (empty class, 0×0). We can only infer below via scrollHeight>clientHeight.
+    let hasMore;
+    const vsId = 'vertScroll_' + (grid.id || '').replace(p, '');
+    const vs = grid.querySelector('#' + CSS.escape(vsId));
+    if (vs && vs.classList.contains('scrollV') && vs.offsetWidth > 0) {
+      const back = vs.querySelector('[data-track-back]')?.offsetHeight ?? 0;
+      const next = vs.querySelector('[data-track-next]')?.offsetHeight ?? 0;
+      hasMore = { above: back > 0, below: next > 0 };
+    } else {
+      hasMore = { below: body.scrollHeight > body.clientHeight };
+    }
+    const result = { name, columns: columns.map(c => c.text), rows, total, offset: ${offset}, shown: rows.length, hasMore };
     if (isTree) result.viewMode = 'tree';
     if (hasGroups) result.hierarchical = true;
     return result;
@@ -379,5 +393,300 @@ export function scanGridRowsScript(formNum, searchLower) {
     const isGroup = imgBox ? !!imgBox.querySelector('.gridListH') : false;
     const r = sel.getBoundingClientRect();
     return { rowCount: lines.length, x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2), isGroup };
+  })()`;
+}
+
+// ─── Cell-click DOM scripts (for clickElement({row, column}) on grids) ───────
+
+/**
+ * Resolve a target cell in a grid by (row, column).
+ *  - `column` matched: exact (case+ё-insensitive) → endsWith ' / X' → includes.
+ *  - `row`: number = index in current DOM window; object = {col: value, ...} filter
+ *    (matches first non-group/parent row where every column condition passes).
+ *
+ * Returns `{ x, y, cellX, cellRight, gridX, gridRight, columnText, rowIdx, cellText, visible } | { error, ... }`.
+ *
+ * Visibility (`visible`) is true when the cell is fully within the grid's horizontal viewport.
+ * Callers should horizontally scroll first if `visible === false`.
+ */
+export function findGridCellScript(formNum, gridSelector, { row, column }) {
+  const p = `form${formNum}_`;
+  return `(() => {
+    const norm = s => (s || '').replace(/\\u00a0/g, ' ').replace(/ё/gi, 'е').trim();
+    const lo = s => norm(s).toLowerCase();
+
+    const p = ${JSON.stringify(p)};
+    const grid = ${gridSelector
+      ? `document.querySelector(${JSON.stringify(gridSelector)})`
+      : `[...document.querySelectorAll('[id^="' + p + '"].grid, [id^="' + p + '"] .grid')]
+           .find(g => g.offsetWidth > 0 && g.offsetHeight > 0)`};
+    if (!grid) return { error: 'no_grid' };
+    const head = grid.querySelector('.gridHead');
+    const body = grid.querySelector('.gridBody');
+    if (!head || !body) return { error: 'no_grid_structure' };
+
+    // Header X-ranges (mirror of readTableScript logic, simplified). We also
+    // remember whether each header is frozen (gridBoxFix) — frozen and scrollable
+    // columns can share X coordinates after horizontal scroll, so cell matching
+    // must respect the frozen/scrollable partition.
+    const headLine = head.querySelector('.gridLine') || head;
+    const headers = [...headLine.children]
+      .filter(c => c.offsetWidth > 0)
+      .map(c => {
+        const textEl = c.querySelector('.gridBoxText');
+        const text = (textEl || c).innerText?.trim().replace(/\\n/g, ' ') || '';
+        const r = c.getBoundingClientRect();
+        return { text, x: r.x, right: r.x + r.width, fixed: c.classList.contains('gridBoxFix') };
+      })
+      .filter(h => h.text);
+
+    const resolveCol = (name) => {
+      const suffix = ' / ' + name;
+      return headers.find(h => lo(h.text) === lo(name))
+          || headers.find(h => h.text.endsWith(suffix))
+          || headers.find(h => lo(h.text).includes(lo(name)));
+    };
+
+    const targetCol = ${JSON.stringify(column)};
+    const col = resolveCol(targetCol);
+    if (!col) return { error: 'column_not_found', column: targetCol, available: headers.map(h => h.text) };
+
+    const lines = [...body.querySelectorAll('.gridLine')];
+    if (lines.length === 0) return { error: 'empty_grid' };
+
+    // Match cell to column by X overlap, but only among cells with the same
+    // fixed/scrollable kind as the header. After horizontal scroll a scrollable
+    // cell may have the same x as a frozen one — without this guard cellAtColX
+    // would silently return the frozen cell for a scrollable header.
+    const cellAtColX = (line, c) => [...line.children]
+      .filter(b => b.offsetWidth > 0 && b.classList.contains('gridBoxFix') === c.fixed)
+      .find(b => {
+        const r = b.getBoundingClientRect();
+        const cx = r.x + r.width / 2;
+        return cx >= c.x && cx < c.right;
+      });
+    const cellText = (b) => norm(b?.querySelector('.gridBoxText')?.innerText || b?.innerText || '');
+
+    const target = ${JSON.stringify(row)};
+    let line, rowIdx;
+    if (typeof target === 'number') {
+      if (target < 0 || target >= lines.length) {
+        return { error: 'row_out_of_range', row: target, loaded: lines.length };
+      }
+      line = lines[target];
+      rowIdx = target;
+    } else if (target && typeof target === 'object') {
+      const entries = Object.entries(target);
+      const colsByKey = {};
+      for (const [k] of entries) {
+        const c = resolveCol(k);
+        if (!c) return { error: 'filter_column_not_found', column: k, available: headers.map(h => h.text) };
+        colsByKey[k] = c;
+      }
+      const matches = (ln) => {
+        for (const [k, v] of entries) {
+          const c = colsByKey[k];
+          const cell = cellAtColX(ln, c);
+          const txt = cellText(cell);
+          const wanted = lo(v);
+          if (!txt) return false;
+          const t = txt.toLowerCase();
+          if (!(t === wanted || t.includes(wanted))) return false;
+        }
+        return true;
+      };
+      rowIdx = lines.findIndex(matches);
+      if (rowIdx < 0) return { error: 'row_not_found', filter: target };
+      line = lines[rowIdx];
+    } else {
+      return { error: 'invalid_row_type' };
+    }
+
+    const cell = cellAtColX(line, col);
+    if (!cell) return { error: 'cell_not_in_dom', column: col.text, rowIdx };
+    const r = cell.getBoundingClientRect();
+    const gridBox = grid.getBoundingClientRect();
+    // Frozen columns (.gridBoxFix) stay pinned at the left edge of the grid even
+    // when the rest scrolls horizontally. For non-frozen cells, "visible" means
+    // inside the SCROLLABLE viewport (right of any frozen columns). Frozen cells
+    // are always visible by definition.
+    const isFixed = cell.classList.contains('gridBoxFix');
+    let scrollableLeft = gridBox.x;
+    if (!isFixed) {
+      [...line.children].forEach(b => {
+        if (b.offsetWidth > 0 && b.classList.contains('gridBoxFix')) {
+          const br = b.getBoundingClientRect();
+          if (br.x + br.width > scrollableLeft) scrollableLeft = br.x + br.width;
+        }
+      });
+    }
+    // "Visible enough to click" — the cell's CENTER is inside the scrollable area
+    // and the cell's right edge is inside the grid. Strict left-edge check would
+    // reject cells that 1С rendered touching the frozen-column boundary (off by 1px).
+    const center = r.x + r.width / 2;
+    const visible = center >= scrollableLeft && center <= (gridBox.x + gridBox.width) && (r.x + r.width) <= (gridBox.x + gridBox.width);
+    return {
+      x: Math.round(r.x + r.width / 2),
+      y: Math.round(r.y + r.height / 2),
+      cellX: Math.round(r.x), cellRight: Math.round(r.x + r.width),
+      gridX: Math.round(gridBox.x), gridRight: Math.round(gridBox.x + gridBox.width),
+      scrollableLeft: Math.round(scrollableLeft),
+      columnText: col.text, rowIdx, isFixed,
+      cellText: cellText(cell),
+      visible
+    };
+  })()`;
+}
+
+/**
+ * Pick coordinates for a focus-click on a safe cell within the grid.
+ *
+ * Used both for vertical reveal-loop focus and for horizontal-scroll edge focus.
+ * The caller passes a profile that selects which row, which cells to exclude,
+ * and (for horizontal scroll) which edge of the row to take.
+ *
+ * @param {string} gridSelector
+ * @param {object} opts
+ * @param {number} [opts.rowIdx]   - Pick from this row; falls back to first non-group/parent data row.
+ * @param {'ArrowRight'|'ArrowLeft'} [opts.direction]
+ *   - When set, restricts to non-frozen FULLY visible cells and picks the edge
+ *     cell in that direction (rightmost for ArrowRight, leftmost for ArrowLeft).
+ *   - When omitted, picks a generic safe cell (skips first column to avoid tree-toggles).
+ *
+ * Always prefers non-checkbox cells (center-click on a checkbox would toggle it).
+ *
+ * Returns `{ x, y } | null`.
+ */
+export function findFocusCellScript(gridSelector, { rowIdx, direction } = {}) {
+  return `(() => {
+    const grid = ${gridResolver(gridSelector)};
+    if (!grid) return null;
+    const body = grid.querySelector('.gridBody');
+    if (!body) return null;
+    const lines = [...body.querySelectorAll('.gridLine')];
+    if (!lines.length) return null;
+
+    const rowIdx = ${rowIdx == null ? 'null' : JSON.stringify(rowIdx)};
+    const direction = ${direction ? JSON.stringify(direction) : 'null'};
+
+    const line = (rowIdx != null && lines[rowIdx])
+      || lines.find(ln => {
+        const imgBox = ln.querySelector('.gridBoxImg');
+        return !imgBox?.querySelector('.gridListH, .gridListV');
+      })
+      || lines[0];
+    if (!line) return null;
+
+    let candidates;
+    if (direction) {
+      // Horizontal-scroll mode: edge cell in the scrollable area, exclude frozen.
+      const gridBox = grid.getBoundingClientRect();
+      let scrollableLeft = gridBox.x;
+      [...line.children].forEach(b => {
+        if (b.offsetWidth > 0 && b.classList.contains('gridBoxFix')) {
+          const br = b.getBoundingClientRect();
+          if (br.x + br.width > scrollableLeft) scrollableLeft = br.x + br.width;
+        }
+      });
+      const visible = [...line.children]
+        .filter(b => b.offsetWidth > 0 && !b.classList.contains('gridBoxFix'))
+        .map(b => ({ b, r: b.getBoundingClientRect(), checkbox: !!b.querySelector('.checkbox') }))
+        .filter(({ r }) => r.x >= scrollableLeft && (r.x + r.width) <= (gridBox.x + gridBox.width));
+      if (!visible.length) return null;
+      visible.sort((a, b) => a.r.x - b.r.x);
+      candidates = direction === 'ArrowRight' ? [...visible].reverse() : visible;
+    } else {
+      // Generic focus mode: any visible cell past the first column (tree toggles).
+      const cells = [...line.children]
+        .filter(b => b.offsetWidth > 0)
+        .map(b => ({ b, r: b.getBoundingClientRect(), checkbox: !!b.querySelector('.checkbox') }));
+      if (!cells.length) return null;
+      candidates = cells.length > 1 ? cells.slice(1) : cells;
+    }
+    const pick = candidates.find(v => !v.checkbox) || candidates[0];
+    if (!pick) return null;
+    return { x: Math.round(pick.r.x + pick.r.width / 2), y: Math.round(pick.r.y + pick.r.height / 2) };
+  })()`;
+}
+
+/**
+ * Snapshot grid state for reveal-loop end detection.
+ * Returns `{ firstText, lastText, lineCount, selIdx, hasBelow }`.
+ *
+ * `firstText`/`lastText` use the first cell's `.gridBoxText` content.
+ * `hasBelow` is derived from scrollbar widget tracks when visible, else from scrollHeight>clientHeight.
+ */
+export function snapshotGridScript(gridSelector) {
+  return `(() => {
+    const grid = ${gridResolver(gridSelector)};
+    if (!grid) return null;
+    const body = grid.querySelector('.gridBody');
+    if (!body) return null;
+    const lines = body.querySelectorAll('.gridLine');
+    const txt = ln => ln?.querySelector('.gridBoxText')?.innerText?.trim() || '';
+    const selIdx = [...lines].findIndex(l => l.classList.contains('selRow') || l.classList.contains('select'));
+    const vsId = 'vertScroll_' + (grid.id || '').replace(/^form\\d+_/, '');
+    const vs = grid.querySelector('#' + CSS.escape(vsId));
+    let hasBelow;
+    if (vs && vs.classList.contains('scrollV') && vs.offsetWidth > 0) {
+      hasBelow = (vs.querySelector('[data-track-next]')?.offsetHeight ?? 0) > 0;
+    } else {
+      hasBelow = body.scrollHeight > body.clientHeight;
+    }
+    return {
+      firstText: txt(lines[0]),
+      lastText: txt(lines[lines.length - 1]),
+      lineCount: lines.length,
+      selIdx,
+      hasBelow
+    };
+  })()`;
+}
+
+/**
+ * Resolve the click target kind for `clickElement({row, column})`.
+ *
+ * Routing:
+ *  - `tableName` specified: try to match a visible grid by name (exact → contains).
+ *    If matched → grid. Else if form has a spreadsheet iframe → spreadsheet. Else error.
+ *  - `tableName` omitted: spreadsheet iframe present → spreadsheet (backward-compat).
+ *    Else first visible grid. Else error.
+ *
+ * Returns `{ kind: 'spreadsheet' } | { kind: 'grid', gridSelector, gridName } | { error, ... }`.
+ */
+export function resolveCellTargetScript(formNum, tableName) {
+  const p = `form${formNum}_`;
+  return `(() => {
+    const p = ${JSON.stringify(p)};
+    const tableName = ${JSON.stringify(tableName || '')};
+    // Spreadsheet = iframe under form prefix with non-trivial width.
+    const hasSpreadsheet = [...document.querySelectorAll('iframe')].some(f => {
+      if (f.offsetWidth < 100) return false;
+      let el = f.parentElement;
+      for (let d = 0; el && d < 30; d++, el = el.parentElement) {
+        if (el.id && el.id.startsWith(p)) return true;
+      }
+      return false;
+    });
+    const grids = [...document.querySelectorAll('[id^="' + p + '"].grid, [id^="' + p + '"] .grid')]
+      .filter(g => g.offsetWidth > 0 && g.offsetHeight > 0);
+    const norm = s => (s || '').replace(/ё/gi, 'е').toLowerCase();
+
+    if (tableName) {
+      const target = norm(tableName);
+      const matched = grids.find(g => norm(g.id.replace(p, '')) === target)
+                   || grids.find(g => norm(g.id.replace(p, '')).includes(target));
+      if (matched) {
+        return { kind: 'grid', gridSelector: '#' + CSS.escape(matched.id), gridName: matched.id.replace(p, '') };
+      }
+      if (hasSpreadsheet) return { kind: 'spreadsheet' };
+      return { error: 'table_not_found', table: tableName, availableGrids: grids.map(g => g.id.replace(p, '')) };
+    }
+    if (hasSpreadsheet) return { kind: 'spreadsheet' };
+    if (grids.length > 0) {
+      const g = grids[0];
+      return { kind: 'grid', gridSelector: '#' + CSS.escape(g.id), gridName: g.id.replace(p, '') };
+    }
+    return { error: 'no_spreadsheet_or_grid' };
   })()`;
 }

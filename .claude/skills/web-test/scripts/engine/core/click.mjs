@@ -1,10 +1,10 @@
-// web-test core/click v1.20 — clickElement dispatcher: routes to spreadsheet / popup / grid-row / form-element handlers by target kind.
+// web-test core/click v1.21 — clickElement dispatcher: routes to spreadsheet / popup / grid-row / form-element handlers by target kind.
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import { page, ensureConnected, highlightMode } from './state.mjs';
 import {
   detectFormScript, findClickTargetScript, resolveGridScript,
-  readSubmenuScript,
+  readSubmenuScript, resolveCellTargetScript,
 } from '../../dom.mjs';
 import { dismissPendingErrors, checkForErrors } from './errors.mjs';
 import { waitForStable } from './wait.mjs';
@@ -13,6 +13,7 @@ import { modifierClick, returnFormState } from './helpers.mjs';
 import {
   clickGridGroupTarget, clickGridTreeNodeTarget, clickGridRowTarget,
 } from '../table/click-row.mjs';
+import { clickGridCell } from '../table/click-cell.mjs';
 import {
   clickConfirmationButton, tryClickPopupItem,
 } from '../forms/click-popup.mjs';
@@ -22,14 +23,36 @@ import {
 } from '../spreadsheet/spreadsheet.mjs';
 
 /** Click a button/hyperlink/tab on the current form. Use {dblclick: true} to double-click (open items from lists).
- *  First argument can also be an object { row, column } to click a SpreadsheetDocument cell. */
-export async function clickElement(text, { dblclick, table, toggle, expand, modifier, timeout } = {}) {
+ *  First argument can also be an object { row, column } to click a cell in a SpreadsheetDocument (отчёт) or a form grid (таблица/табчасть). */
+export async function clickElement(text, { dblclick, table, toggle, expand, modifier, scroll, timeout } = {}) {
   ensureConnected();
 
-  // Dispatch to spreadsheet cell handler when first arg is { row, column }
+  // Dispatch to cell handler when first arg is { row, column }.
+  // Routing (see resolveCellTargetScript):
+  //   - `table` named: matches grid → grid cell; falls back to spreadsheet if it's the spreadsheet's name.
+  //   - no `table`: form has spreadsheet → spreadsheet cell (backward-compat);
+  //                 else first visible grid → grid cell.
   if (typeof text === 'object' && text !== null && text.column != null) {
     await dismissPendingErrors();
-    return clickSpreadsheetCell(text, { dblclick, modifier });
+    const formNum = await page.evaluate(detectFormScript());
+    if (formNum === null) throw new Error('clickElement: no form found');
+    const route = await page.evaluate(resolveCellTargetScript(formNum, table));
+    if (route.error === 'table_not_found') {
+      throw new Error(`clickElement: table "${table}" not found. Available grids: ${(route.availableGrids || []).join(', ') || 'none'}`);
+    }
+    if (route.error) {
+      throw new Error(`clickElement: no spreadsheet or grid on form to click cell in.`);
+    }
+    if (route.kind === 'spreadsheet') {
+      return clickSpreadsheetCell(text, { dblclick, modifier });
+    }
+    // route.kind === 'grid'
+    return clickGridCell(text, {
+      formNum,
+      gridSelector: route.gridSelector,
+      gridName: route.gridName,
+      modifier, dblclick, scroll,
+    });
   }
 
   await dismissPendingErrors();

@@ -165,7 +165,7 @@ const form = await getFormState();
 
 ### Reading data
 
-#### `readTable({ maxRows?, offset?, table? })` → `{ columns, rows, total, shown, offset }`
+#### `readTable({ maxRows?, offset?, table? })` → `{ columns, rows, total, shown, offset, hasMore }`
 Read actual grid data with pagination. Each row is `{ columnName: value }`.
 
 | Option | Default | Description |
@@ -183,10 +183,22 @@ Special row fields:
 - `hierarchical: true` — list has groups (on result object)
 - `viewMode: 'tree'` — tree view active (on result object)
 
+**`total` is misleading for long lists.** 1С virtualizes both dynamic lists and form tabular sections — the DOM holds only a window of visible rows. `total` / `shown` count what's *loaded right now*, not the size of the underlying collection. Use **`hasMore`** to know if there's more data outside the window:
+
+```js
+const t = await readTable();
+// t.hasMore = { above: false, below: true }   ← form tabular section, scrollbar visible
+// t.hasMore = { below: true }                 ← dynamic list (catalog/journal/register)
+// t.hasMore = { below: false }                ← everything visible / end of list reached
+```
+
+- `hasMore.below` — always present. `true` ⇒ scrolling down (PageDown / `clickElement` with `scroll:true`) will reveal more rows.
+- `hasMore.above` — only present for tabular sections with a visible scrollbar widget. Dynamic lists hide their scrollbar so we cannot detect "above" reliably; treat absence as unknown.
+
 ```js
 const t = await readTable({ maxRows: 50 });
 console.log('Columns:', t.columns);
-console.log('Rows:', t.rows.length, 'of', t.total);
+console.log('Loaded:', t.shown, 'rows; more below:', t.hasMore.below);
 // Pagination:
 const page2 = await readTable({ maxRows: 50, offset: 50 });
 ```
@@ -219,7 +231,7 @@ Sections + all open tabs.
 
 **Return shape convention.** All action functions return a **flat form state** (same shape as `getFormState()`) with action-specific extras: `clicked`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`. Errors always sit at the top level under `.errors` (when present) — the exec-wrapper automatically throws on `.errors.modal` / `.errors.balloon`.
 
-#### `clickElement(text, { dblclick?, table?, expand?, modifier? })` → form state
+#### `clickElement(text, { dblclick?, table?, expand?, modifier?, scroll? })` → form state
 Click button, hyperlink, tab, navigation panel link, or grid row (fuzzy match).
 
 - `table` — scope button search to a specific grid's command panel (by name from `tables[]`):
@@ -250,24 +262,30 @@ Click button, hyperlink, tab, navigation panel link, or grid row (fuzzy match).
   const t = await readTable();
   t.rows.filter(r => r._selected);  // rows with _selected: true
   ```
-- **SpreadsheetDocument cells** (report drill-down): first argument can be `{ row, column }` object to click a cell in a rendered report. Coordinates match `readSpreadsheet()` output:
+- **Cell click by (row, column)** — first argument as `{ row, column }`. Routes: spreadsheet on form → spreadsheet drill-down; otherwise → grid cell. Pass `table: 'GridName'` to force a specific grid when both are present.
+
+  Spreadsheet report drill-down:
   ```js
   const report = await readSpreadsheet();
   // report.data[0] = { 'К1': 'Материалы строительные', 'К6': '150 000', ... }
-
-  // By data row index + column header name
-  await clickElement({ row: 0, column: 'К6' }, { dblclick: true });
-
-  // By cell value filter (fuzzy match)
-  await clickElement({ row: { 'К1': 'Материалы' }, column: 'К6' }, { dblclick: true });
-
-  // Totals row
-  await clickElement({ row: 'totals', column: 'К6' }, { dblclick: true });
+  await clickElement({ row: 0, column: 'К6' }, { dblclick: true });                      // by index
+  await clickElement({ row: { 'К1': 'Материалы' }, column: 'К6' }, { dblclick: true });  // by filter
+  await clickElement({ row: 'totals', column: 'К6' }, { dblclick: true });               // totals row
+  await clickElement('150 000', { dblclick: true });                                     // fallback: by text
   ```
-  Text search also works as fallback — searches inside spreadsheet iframes:
+
+  Form grid cell (catalog list, journal, table part). Off-viewport columns auto-scroll horizontally (works around frozen columns). Use `scroll: true | number` for filter-based rows outside the current DOM window:
   ```js
-  await clickElement('150 000', { dblclick: true }); // finds cell by text in report
+  await clickElement({ row: 0, column: 'Количество' }, { table: 'Товары', dblclick: true });
+  await clickElement({ row: { 'Номенклатура': 'Бумага' }, column: 'Цена' }, { table: 'Товары' });
+  await clickElement({ row: { 'Номер': '0000-000601' }, column: 'Сумма' },
+                     { table: 'Реализации', scroll: true });  // PageDown loop, max 50
   ```
+
+  Gotchas:
+  - `row: <number>` is the index in the **current DOM window**, not absolute — 1С virtualizes long lists. `row: 0` is the topmost loaded row after any prior scroll. For arbitrary rows in a long list use `row: { col: val }` + `scroll: true`.
+  - `scroll: true` walks **down only** (PageDown). For going up first press `Home` via `getPage().keyboard` or narrow with `filterList`.
+  - First matching row wins on duplicate filter matches — refine the filter to disambiguate.
 
 #### `fillFields({ name: value })` → form state with `filled`
 Fill form fields by label (fuzzy match). Auto-detects field type.

@@ -1,4 +1,4 @@
-// web-test spreadsheet v1.18 — readSpreadsheet + helpers for SpreadsheetDocument (отчёты, печатные формы).
+// web-test spreadsheet v1.19 — readSpreadsheet + helpers for SpreadsheetDocument (отчёты, печатные формы).
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import { page, ensureConnected } from '../core/state.mjs';
@@ -6,6 +6,7 @@ import { detectFormScript } from '../../dom.mjs';
 import { waitForStable } from '../core/wait.mjs';
 import { getFormState } from '../forms/state.mjs';
 import { returnFormState } from '../core/helpers.mjs';
+import { scrollHorizontallyByKey } from '../core/scroll-horiz.mjs';
 
 // --- Spreadsheet helpers (shared by readSpreadsheet and clickElement) ---
 
@@ -332,26 +333,17 @@ async function scrollSpreadsheetToCell(frame, physRow, physCol, cellLoc) {
   }
   if (!focusClicked) return; // no visible cells — can't scroll
 
-  // Arrow keys until cell is fully visible or we detect no progress.
-  const MAX_STALE = 5; // bail out if arrows aren't scrolling (lost focus?)
-  let prevCx = box.x + box.width / 2;
-  let staleCount = 0;
-  for (let i = 0; i < 100; i++) {
-    await page.keyboard.press(direction);
-    await page.waitForTimeout(50);
-    box = await getBox();
-    if (!box) break;
-    if (isFullyVisible(box)) break;
-    const cx = box.x + box.width / 2;
-    if (Math.abs(cx - prevCx) >= 1) {
-      staleCount = 0;
-    } else {
-      staleCount++;
-      if (staleCount >= MAX_STALE) break;
-    }
-    prevCx = cx;
-  }
-  await page.waitForTimeout(200);
+  await scrollHorizontallyByKey({
+    page, direction,
+    isFullyVisible: async () => {
+      const b = await getBox();
+      return !!b && isFullyVisible(b);
+    },
+    getCenterX: async () => {
+      const b = await getBox();
+      return b ? b.x + b.width / 2 : null;
+    },
+  });
 }
 
 /**
