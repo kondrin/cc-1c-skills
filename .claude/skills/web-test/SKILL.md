@@ -235,7 +235,7 @@ Sections + all open tabs.
 
 ### Actions
 
-**Return shape convention.** All action functions return a **flat form state** (same shape as `getFormState()`) with action-specific extras: `clicked`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`. Errors always sit at the top level under `.errors` (when present) — the exec-wrapper automatically throws on `.errors.modal` / `.errors.balloon`.
+**Return shape convention.** All action functions return a **flat form state** (same shape as `getFormState()`) with action-specific extras: `clicked`, `focused`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`. Errors always sit at the top level under `.errors` (when present) — the exec-wrapper automatically throws on `.errors.modal` / `.errors.balloon`.
 
 #### `clickElement(text, { dblclick?, table?, expand?, modifier?, scroll? })` → form state
 Click button, hyperlink, tab, navigation panel link, or grid row (fuzzy match).
@@ -258,6 +258,11 @@ Click button, hyperlink, tab, navigation panel link, or grid row (fuzzy match).
   ```js
   await clickElement('ИСУ ФХД');                      // select row
   await clickElement('ИСУ ФХД', { expand: true });    // expand/collapse
+  ```
+- **Focus a field** (last resort, when no `table` given): if `text` matches no clickable control but matches a form field's name/label, clicks the input to focus it **without changing its value**. Returns `focused: { field, id, ok }` (`ok: false` if the field couldn't take focus). Use it to drive focus-dependent keys:
+  ```js
+  await clickElement('Контрагент');          // focus the reference field
+  await getPage().keyboard.press('F4');      // open its selection form
   ```
 - **Multi-select rows** with `modifier: 'ctrl'` (add to selection) or `modifier: 'shift'` (select range):
   ```js

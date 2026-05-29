@@ -315,11 +315,11 @@ await clickElement(
 
 ### Действия
 
-Все action-функции возвращают **плоский form state** (как `getFormState()`) с action-specific extras (`clicked`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`). Errors всегда на верхнем уровне `.errors` — exec-wrapper автоматически throw'ает на soft validation errors (`modal`/`balloon`).
+Все action-функции возвращают **плоский form state** (как `getFormState()`) с action-specific extras (`clicked`, `focused`, `selected`, `filled`, `notFilled`, `closed`, `opened`, `navigated`, `deleted`, `filtered`, `unfiltered`). Errors всегда на верхнем уровне `.errors` — exec-wrapper автоматически throw'ает на soft validation errors (`modal`/`balloon`).
 
 | Функция | Описание | Возвращает |
 |---------|----------|------------|
-| `clickElement(text, {dblclick?, modifier?, table?, scroll?})` | Клик по кнопке/ссылке/строке. `{dblclick: true}` для открытия, `{modifier: 'ctrl'\|'shift'}` для мультиселекции. Первый аргумент может быть `{row, column}` для клика по ячейке spreadsheet или грида формы (`table` форсит грид; `scroll: true \| number` включает reveal-loop через PageDown — см. выше) | form state или `{ submenu }` |
+| `clickElement(text, {dblclick?, modifier?, table?, scroll?})` | Клик по кнопке/ссылке/строке. `{dblclick: true}` для открытия, `{modifier: 'ctrl'\|'shift'}` для мультиселекции. Первый аргумент может быть `{row, column}` для клика по ячейке spreadsheet или грида формы (`table` форсит грид; `scroll: true \| number` включает reveal-loop через PageDown — см. выше). Если `text` не совпал ни с одним контролом и `table` не задан — как последний fallback фокусирует одноимённое поле ввода (без изменения значения), см. раздел про клавиши | form state (`clicked` / `focused` / `submenu`) |
 | `fillFields({name: value})` | Заполнить поля (текст, чекбокс, радио, ссылки, DCS-фильтры). Пустое значение (`''`/`null`) = очистка | form state с `filled` |
 | `selectValue(field, search, opts?)` | Выбрать из справочника. search: текст, `{поле: значение}` или `''`/`null` для очистки. `{ type }` для составного типа | form state с `selected` |
 | `fillTableRow(fields, {tab?, add?, row?})` | Заполнить строку. Значение: строка, `{ value, type }` для составного типа, `''`/`null` для очистки | form state с `filled` (per-field ошибки как items `ok: false`, см. ниже) + `notFilled?` |
@@ -364,14 +364,17 @@ await clickElement(
 
 ## Клавиатурные сочетания
 
+Чтобы клавиша применилась к нужному полю, его сперва надо сфокусировать. `clickElement('ИмяПоля')` (без `table`) ставит фокус, ничего не меняя, и возвращает `focused: { field, id, ok }` — после этого жмём клавишу через `getPage()`:
+
 ```js
+await clickElement('Контрагент');          // фокус на ссылочное поле (focused.ok)
 const page = await getPage();
-await page.keyboard.press('F8');  // пример: создать новый элемент в сфокусированном ссылочном поле
+await page.keyboard.press('F4');           // открыть форму выбора
 ```
 
 | Клавиша | Контекст | Действие |
 |---------|----------|----------|
-| `F8` | Ссылочное поле | Создать новый элемент |
+| `F8` | Ссылочное поле | Создать новый элемент (может требовать прав/настройки в 1С) |
 | `Shift+F4` | Любое поле | Очистить значение (автоматизировано: `fillFields({ поле: '' })`) |
 | `F4` | Ссылочное поле | Форма выбора |
 | `Alt+F` | Список/таблица | Расширенный поиск |

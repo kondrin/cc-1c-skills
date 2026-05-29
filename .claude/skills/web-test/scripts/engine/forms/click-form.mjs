@@ -1,4 +1,4 @@
-// web-test forms/click-form v1.0 — click handler for form-element targets: button, tab, submenu, link.
+// web-test forms/click-form v1.1 — click handler for form-element targets: button, tab, submenu, link, field-focus.
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 //
 // Called by core/click.mjs dispatcher after target is found.
@@ -12,7 +12,7 @@ import {
 } from '../../dom.mjs';
 import { checkForErrors } from '../core/errors.mjs';
 import { waitForStable, startNetworkMonitor } from '../core/wait.mjs';
-import { safeClick, returnFormState } from '../core/helpers.mjs';
+import { safeClick, returnFormState, isInputFocused } from '../core/helpers.mjs';
 
 /**
  * Click a form target (button, tab, submenu, link) using its resolved {kind, id, x, y, name}.
@@ -104,4 +104,19 @@ export async function clickFormTarget(target, ctx) {
   } finally {
     if (netMonitor) try { await netMonitor.cleanup(); } catch {}
   }
+}
+
+/**
+ * Focus a form input field (last-resort target kind: 'field') by clicking the input itself —
+ * does NOT change its value. Lets the caller then drive focus-dependent shortcuts
+ * (F4 selection form, Shift+F4 clear, etc.) via getPage().keyboard.
+ * Returns flat form state with `focused: { field, id, ok }`; `ok` reflects whether the
+ * input actually received focus (false for disabled/readonly fields). Never throws on ok=false.
+ */
+export async function focusFormField(target, ctx) {
+  const selector = `[id="${target.id}"]`;
+  await safeClick(selector, { timeout: 5000 });
+  await waitForStable(ctx.formNum);
+  const ok = await isInputFocused({ allowTextarea: true });
+  return returnFormState({ focused: { field: target.name, id: target.id, ok } });
 }

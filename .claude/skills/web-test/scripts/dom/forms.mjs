@@ -1,4 +1,4 @@
-// web-test dom/forms v1.4 — form detection, content read, click-target/field-button resolution
+// web-test dom/forms v1.5 — form detection, content read, click-target/field-button resolution
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import { DETECT_FORM_FN, READ_FORM_FN } from './_shared.mjs';
 
@@ -203,7 +203,35 @@ export function findClickTargetScript(formNum, text, { tableName, gridSelector }
       }
     }
 
-    return { error: 'not_found', available: items.map(i => i.tooltip ? i.name + ' [' + i.tooltip + ']' : i.name).filter(Boolean) };
+    // Form input fields — LAST resort: focus a field by name/label without changing its value.
+    // Only when no table scope is given ("если нет уточнения таблицы"): grid cells are handled elsewhere.
+    // Reached only after every clickable target (button/link/tab/nav/grid row) failed to match,
+    // so collisions between a field name and a real control are unlikely.
+    const fields = [];
+    if (!tableName) {
+      [...document.querySelectorAll('input.editInput[id^="' + p + '"], textarea[id^="' + p + '"]')].forEach(el => {
+        if (el.offsetWidth === 0) return;
+        // Skip inputs inside a grid — those are table cells, not form fields.
+        let n = el.parentElement; let inGrid = false;
+        while (n) { if (n.classList && n.classList.contains('grid')) { inGrid = true; break; } n = n.parentElement; }
+        if (inGrid) return;
+        const idName = el.id.replace(p, '').replace(/_i\\d+$/, '');
+        const titleEl = document.getElementById(p + idName + '#title_text') || document.getElementById(p + idName + '#title_div');
+        const label = norm(titleEl?.innerText || '').replace(/:/g, '').trim();
+        fields.push({ id: el.id, name: idName, label });
+      });
+      let ff = fields.find(f => f.label && f.label.toLowerCase() === target);
+      if (!ff) ff = fields.find(f => f.name.toLowerCase() === target);
+      if (!ff) ff = fields.find(f => f.label && f.label.toLowerCase().startsWith(target));
+      if (!ff) ff = fields.find(f => f.name.toLowerCase().startsWith(target));
+      if (!ff && target.length >= 4) ff = fields.find(f => f.label && f.label.toLowerCase().includes(target));
+      if (!ff && target.length >= 4) ff = fields.find(f => f.name.toLowerCase().includes(target));
+      if (ff) return { id: ff.id, kind: 'field', name: ff.label || ff.name };
+    }
+
+    const available = items.map(i => i.tooltip ? i.name + ' [' + i.tooltip + ']' : i.name).filter(Boolean);
+    for (const f of fields) { const nm = f.label || f.name; if (nm && !available.includes(nm)) available.push(nm); }
+    return { error: 'not_found', available };
   })()`;
 }
 

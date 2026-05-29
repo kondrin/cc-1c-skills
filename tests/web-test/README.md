@@ -5,7 +5,7 @@ E2E-тесты движка `web-test` (Playwright + изолированная 
 ## Запуск
 
 ```bash
-# Полный регресс (все 20 тестов)
+# Полный регресс (все 21 тестов)
 node .claude/skills/web-test/scripts/run.mjs test tests/web-test/
 
 # Один файл
