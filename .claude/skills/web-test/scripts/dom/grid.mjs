@@ -1,4 +1,4 @@
-// web-test dom/grid v1.7 — grid resolution + table reading + edit-time helpers
+// web-test dom/grid v1.8 — grid resolution + table reading + edit-time helpers
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 /**
@@ -79,6 +79,21 @@ export function readTableScript(formNum, { maxRows = 20, offset = 0, gridSelecto
     if (!grid) return { error: 'no_table', message: 'No table found on form ${formNum}' };
     const name = grid.id ? grid.id.replace(p, '') : '';
 
+    // Detect a "picture value" cell: a sprite from a picture collection
+    // (.gridBoxImg .dIB with background-image .../pictureCollection/picture/<id>?...&gx=<N>).
+    // Excludes decorative tree/group markers (gridListH/gridListV/[tree]/gridBoxTree).
+    // Returns { gx } — the sprite frame index that encodes the cell state, or null.
+    function picInfo(cell) {
+      if (!cell) return null;
+      if (cell.querySelector('.gridListH, .gridListV, [tree="true"], .gridBoxTree')) return null;
+      const dib = cell.querySelector('.gridBoxImg .dIB');
+      if (!dib) return null;
+      const bg = dib.style.backgroundImage || '';
+      if (!bg.includes('pictureCollection/picture/')) return null;
+      const m = bg.match(/[?&]gx=(\\d+)/);
+      return { gx: m ? m[1] : '0' };
+    }
+
     // DOM-based parsing: gridHead → columns, gridBody → gridLine rows → gridBox cells
     const head = grid.querySelector('.gridHead');
     const body = grid.querySelector('.gridBody');
@@ -98,16 +113,26 @@ export function readTableScript(formNum, { maxRows = 20, offset = 0, gridSelecto
       const textEl = box.querySelector('.gridBoxText');
       const text = (textEl || box).innerText?.trim().replace(/\\n/g, ' ') || '';
       if (!text) {
-        // Unnamed column — check if data cells contain checkboxes
+        // Unnamed column — check if data cells contain checkboxes or pictures.
+        // Picture columns have no header text (only an icon + a title tooltip); 1С
+        // doesn't expose the technical column name in the DOM, so we name them by
+        // the header's title attribute, falling back to '(picture)'.
         const firstLine = body?.querySelector('.gridLine');
-        if (firstLine) {
-          const visibleHeaders = [...headLine.children].filter(c => c.offsetWidth > 0);
-          const idx = visibleHeaders.indexOf(box);
-          const cells = [...firstLine.children].filter(c => c.offsetWidth > 0);
-          if (cells[idx]?.querySelector('.checkbox')) {
-            const r = box.getBoundingClientRect();
-            columns.push({ text: '(checkbox)', x: r.x, w: r.width, right: r.x + r.width, y: r.y, h: r.height });
+        const visibleHeaders = [...headLine.children].filter(c => c.offsetWidth > 0);
+        const idx = visibleHeaders.indexOf(box);
+        const cells = firstLine ? [...firstLine.children].filter(c => c.offsetWidth > 0) : [];
+        const r = box.getBoundingClientRect();
+        if (cells[idx]?.querySelector('.checkbox')) {
+          columns.push({ text: '(checkbox)', x: r.x, w: r.width, right: r.x + r.width, y: r.y, h: r.height });
+        } else if (picInfo(box) || picInfo(cells[idx])) {
+          let title = (box.getAttribute('title') || '').trim() || '(picture)';
+          // Disambiguate duplicate picture-column names with a numeric suffix.
+          if (columns.some(c => c.text === title)) {
+            let n = 2;
+            while (columns.some(c => c.text === title + ' ' + n)) n++;
+            title = title + ' ' + n;
           }
+          columns.push({ text: title, x: r.x, w: r.width, right: r.x + r.width, y: r.y, h: r.height });
         }
         return;
       }
@@ -210,7 +235,13 @@ export function readTableScript(formNum, { maxRows = 20, offset = 0, gridSelecto
           val = chk.classList.contains('select') ? 'true' : 'false';
         } else {
           val = (textEl || box).innerText?.trim().replace(/\\n/g, ' ') || '';
-          if (!val) return;
+          if (!val) {
+            // Empty text → maybe a picture cell. 'pic:<gx>' encodes the sprite frame
+            // (state). Absent picture stays '' (truthy check distinguishes presence).
+            const pic = picInfo(box);
+            if (pic) val = 'pic:' + pic.gx;
+            else return;
+          }
         }
         // Match cell to column by X+Y overlap (multi-row aware)
         const r = box.getBoundingClientRect();
@@ -448,21 +479,25 @@ export function findGridCellScript(formNum, gridSelector, { row, column }) {
       .map(c => {
         const textEl = c.querySelector('.gridBoxText');
         const text = (textEl || c).innerText?.trim().replace(/\\n/g, ' ') || '';
+        // Picture/icon columns have no header text — fall back to the title tooltip
+        // (mirrors readTable naming) so they can still be targeted for clicking.
+        const title = (c.getAttribute('title') || '').trim();
         const r = c.getBoundingClientRect();
-        return { text, x: r.x, right: r.x + r.width, fixed: c.classList.contains('gridBoxFix') };
+        return { text, title, name: text || title, x: r.x, right: r.x + r.width, fixed: c.classList.contains('gridBoxFix') };
       })
-      .filter(h => h.text);
+      .filter(h => h.name);
 
     const resolveCol = (name) => {
       const suffix = ' / ' + name;
-      return headers.find(h => lo(h.text) === lo(name))
-          || headers.find(h => h.text.endsWith(suffix))
-          || headers.find(h => lo(h.text).includes(lo(name)));
+      const cand = h => [h.text, h.title].filter(Boolean);
+      return headers.find(h => cand(h).some(t => lo(t) === lo(name)))
+          || headers.find(h => cand(h).some(t => t.endsWith(suffix)))
+          || headers.find(h => cand(h).some(t => lo(t).includes(lo(name))));
     };
 
     const targetCol = ${JSON.stringify(column)};
     const col = resolveCol(targetCol);
-    if (!col) return { error: 'column_not_found', column: targetCol, available: headers.map(h => h.text) };
+    if (!col) return { error: 'column_not_found', column: targetCol, available: headers.map(h => h.name) };
 
     const lines = [...body.querySelectorAll('.gridLine')];
     if (lines.length === 0) return { error: 'empty_grid' };
@@ -493,7 +528,7 @@ export function findGridCellScript(formNum, gridSelector, { row, column }) {
       const colsByKey = {};
       for (const [k] of entries) {
         const c = resolveCol(k);
-        if (!c) return { error: 'filter_column_not_found', column: k, available: headers.map(h => h.text) };
+        if (!c) return { error: 'filter_column_not_found', column: k, available: headers.map(h => h.name) };
         colsByKey[k] = c;
       }
       const matches = (ln) => {
@@ -516,7 +551,7 @@ export function findGridCellScript(formNum, gridSelector, { row, column }) {
     }
 
     const cell = cellAtColX(line, col);
-    if (!cell) return { error: 'cell_not_in_dom', column: col.text, rowIdx };
+    if (!cell) return { error: 'cell_not_in_dom', column: col.name, rowIdx };
     const r = cell.getBoundingClientRect();
     const gridBox = grid.getBoundingClientRect();
     // Frozen columns (.gridBoxFix) stay pinned at the left edge of the grid even
@@ -544,7 +579,7 @@ export function findGridCellScript(formNum, gridSelector, { row, column }) {
       cellX: Math.round(r.x), cellRight: Math.round(r.x + r.width),
       gridX: Math.round(gridBox.x), gridRight: Math.round(gridBox.x + gridBox.width),
       scrollableLeft: Math.round(scrollableLeft),
-      columnText: col.text, rowIdx, isFixed,
+      columnText: col.name, rowIdx, isFixed,
       cellText: cellText(cell),
       visible
     };

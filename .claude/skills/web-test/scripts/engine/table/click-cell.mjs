@@ -1,4 +1,4 @@
-// web-test table/click-cell v1.2 — click a cell in a form grid by (row, column).
+// web-test table/click-cell v1.3 — click a cell in a form grid by (row, column).
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 //
 // Routed from core/click.mjs when the user calls clickElement({row, column}) and
@@ -46,6 +46,17 @@ const FOCUS_WAIT_MS = 150;
  */
 export async function clickGridCell(target, ctx) {
   const { formNum, gridSelector, gridName, modifier, dblclick, scroll } = ctx;
+
+  // Guard: a 'pic:N' filter value is a readTable picture token, not real cell text.
+  // Picture cells render an icon (no text), so they can't select a row — fail fast
+  // with guidance instead of a confusing 'row_not_found'.
+  if (target?.row && typeof target.row === 'object') {
+    for (const [k, v] of Object.entries(target.row)) {
+      if (typeof v === 'string' && /^pic:\d+$/.test(v.trim())) {
+        throw new Error(`clickElement: "${v}" is a readTable picture value (column "${k}"), not selectable text — it can't be used as a row filter. Filter by a text column (e.g. name/number) instead.`);
+      }
+    }
+  }
 
   // 1. Try to find the cell in current DOM window.
   let cell = await page.evaluate(findGridCellScript(formNum, gridSelector, target));

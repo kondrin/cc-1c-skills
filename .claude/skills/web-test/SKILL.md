@@ -174,6 +174,12 @@ Read actual grid data with pagination. Each row is `{ columnName: value }`.
 | `offset` | 0 | Skip first N rows |
 | `table` | — | Grid name from `tables[]` (for multi-grid forms) |
 
+**Picture columns.** Cells that render an icon (status/stage marks, the "ЭДО" mark, the attached-files paperclip) read as `'pic:<N>'` (`N` = icon frame/state) when shown, `''` when absent — so presence is truthy and icons differ by index. Icon-only columns (no header text) still appear, named by their tooltip or `'(picture)'`. These values are read-only — filter/select rows by a text column, not by `'pic:N'`.
+```js
+if (t.rows[0]['Присоединенные файлы']) { /* has an attached file */ }
+t.rows[0]['ЭДО'] === 'pic:1';   // connected to 1С-ЭДО ('pic:0' = not)
+```
+
 Special row fields:
 - `_kind: 'group'` — hierarchical group row
 - `_kind: 'parent'` — parent row in hierarchy
