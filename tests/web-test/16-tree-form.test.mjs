@@ -17,15 +17,16 @@ export default async function({ navigateLink, clickElement, closeForm, readTable
     assert.ok(r.tables?.some(t => t.name === 'Дерево'), 'таблица Дерево присутствует');
   });
 
-  await step('read-roots: на верхнем уровне видны 2 группы (Товары, Услуги)', async () => {
+  await step('read-roots: на верхнем уровне видны группы (Товары, Услуги, БольшойСписок)', async () => {
     const t = await readTable('Дерево');
     log(`columns=${t.columns?.join(',')} rows=${t.rows?.length}`);
     assert.deepEqual(t.columns, ['Номенклатура', 'Цена'], 'колонки: Номенклатура + Цена');
-    assert.equal(t.rows.length, 2, '2 корневые строки');
+    assert.equal(t.rows.length, 3, '3 корневые строки');
     const names = t.rows.map(r => r['Номенклатура']);
     assert.includes(names, 'Товары', 'есть Товары');
     assert.includes(names, 'Услуги', 'есть Услуги');
-    assert.ok(t.rows.every(r => r._kind === 'group'), 'обе корневые — group (есть expand-стрелка)');
+    assert.includes(names, 'БольшойСписок', 'есть БольшойСписок');
+    assert.ok(t.rows.every(r => r._kind === 'group'), 'все корневые — group (есть expand-стрелка)');
   });
 
   await step('expand: clickElement({expand}) раскрывает Товары — 15 элементов', async () => {

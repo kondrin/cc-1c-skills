@@ -20,11 +20,12 @@ export default async function({ navigateSection, openCommand, clickElement, clos
   await step('read-groups: иерархический список возвращает группы верхнего уровня', async () => {
     const t = await readTable();
     log(`total=${t.total} rows=${t.rows?.length} viewMode=${t.viewMode}`);
-    assert.equal(t.total, 2, 'видны только две группы верхнего уровня');
+    assert.equal(t.total, 3, 'три группы верхнего уровня (Товары, Услуги, БольшойСписок)');
     assert.ok(t.rows.every(r => r._kind === 'group'), 'все строки — группы (_kind=group)');
     const names = t.rows.map(r => r['Наименование']);
     assert.includes(names, 'Товары', 'есть группа Товары');
     assert.includes(names, 'Услуги', 'есть группа Услуги');
+    assert.includes(names, 'БольшойСписок', 'есть группа БольшойСписок');
   });
 
   await step('group-expand: clickElement({expand}) раскрывает группу и показывает элементы', async () => {
@@ -55,8 +56,8 @@ export default async function({ navigateSection, openCommand, clickElement, clos
   await step('read-tree: readTable в режиме Дерево возвращает _tree состояния', async () => {
     const t = await readTable();
     log(`tree rows: ${t.rows?.map(r => `${r['Наименование']}:${r._tree}`).join(' | ')}`);
-    const groupRows = t.rows.filter(r => /^(Товары|Услуги)$/.test(r['Наименование'] || ''));
-    assert.equal(groupRows.length, 2, 'обе группы видны в дереве');
+    const groupRows = t.rows.filter(r => /^(Товары|Услуги|БольшойСписок)$/.test(r['Наименование'] || ''));
+    assert.equal(groupRows.length, 3, 'все три группы видны в дереве');
     assert.ok(groupRows.every(r => r._tree === 'collapsed' || r._tree === 'expanded'),
       '_tree присутствует у каждой группы (collapsed или expanded)');
   });
