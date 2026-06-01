@@ -588,8 +588,17 @@ async function runCaseAsync(testCase, opts) {
         }
       }
       if (caseData.expect?.stdoutContains) {
-        if (!stdout.includes(caseData.expect.stdoutContains)) {
-          errors.push(`stdout does not contain "${caseData.expect.stdoutContains}"`);
+        const needles = Array.isArray(caseData.expect.stdoutContains)
+          ? caseData.expect.stdoutContains : [caseData.expect.stdoutContains];
+        for (const needle of needles) {
+          if (!stdout.includes(needle)) errors.push(`stdout does not contain "${needle}"`);
+        }
+      }
+      if (caseData.expect?.stdoutNotContains) {
+        const needles = Array.isArray(caseData.expect.stdoutNotContains)
+          ? caseData.expect.stdoutNotContains : [caseData.expect.stdoutNotContains];
+        for (const needle of needles) {
+          if (stdout.includes(needle)) errors.push(`stdout unexpectedly contains "${needle}"`);
         }
       }
       if (errors.length === 0 && !caseData.expectError && !workspace.readOnly) {
@@ -754,10 +763,19 @@ function runCase(testCase, opts) {
         }
       }
 
-      // expect.stdoutContains
+      // expect.stdoutContains / stdoutNotContains (string or array)
       if (caseData.expect?.stdoutContains) {
-        if (!stdout.includes(caseData.expect.stdoutContains)) {
-          errors.push(`stdout does not contain "${caseData.expect.stdoutContains}"`);
+        const needles = Array.isArray(caseData.expect.stdoutContains)
+          ? caseData.expect.stdoutContains : [caseData.expect.stdoutContains];
+        for (const needle of needles) {
+          if (!stdout.includes(needle)) errors.push(`stdout does not contain "${needle}"`);
+        }
+      }
+      if (caseData.expect?.stdoutNotContains) {
+        const needles = Array.isArray(caseData.expect.stdoutNotContains)
+          ? caseData.expect.stdoutNotContains : [caseData.expect.stdoutNotContains];
+        for (const needle of needles) {
+          if (stdout.includes(needle)) errors.push(`stdout unexpectedly contains "${needle}"`);
         }
       }
 
