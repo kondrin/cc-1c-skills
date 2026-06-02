@@ -1,4 +1,4 @@
-// web-test forms/select-value v1.22 — Reference & composite-type value selection: selectValue, fillReferenceField, selection/type-dialog pickers.
+// web-test forms/select-value v1.24 — Reference & composite-type value selection: selectValue, fillReferenceField, selection/type-dialog pickers.
 // Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 
 import {
@@ -22,6 +22,7 @@ import {
 } from '../core/helpers.mjs';
 import { pasteText } from '../core/clipboard.mjs';
 import { getFormState } from './state.mjs';
+import { filterList } from '../table/filter.mjs';
 
 /**
  * Scan visible grid rows for a text match (exact → startsWith → includes).
@@ -165,7 +166,15 @@ export async function pickFromSelectionForm(selFormNum, fieldName, search, origF
   if (typeof search === 'object' && search) {
     // Per-field advanced search via filterList(val, {field})
     for (const [fld, val] of Object.entries(search)) {
-      try { await filterList(String(val), { field: fld }); } catch { /* proceed */ }
+      try {
+        await filterList(String(val), { field: fld });
+      } catch (e) {
+        // Re-throw programming errors (e.g. a missing import surfacing as
+        // ReferenceError) — only field-filter failures (not found / unsupported
+        // column) should be swallowed so we fall through to the re-scan.
+        if (e instanceof ReferenceError || e instanceof TypeError) throw e;
+        /* proceed */
+      }
     }
   } else if (searchLower) {
     // Inline advanced search (Alt+F, "по части строки")
@@ -735,6 +744,21 @@ export async function selectValue(fieldName, searchText, { type } = {}) {
   if (Array.isArray(popupItems) && popupItems.length > 0) {
     const regularItems = popupItems.filter(i => i.kind !== 'showAll');
     const showAllItem = popupItems.find(i => i.kind === 'showAll');
+
+    if (searchText && typeof searchText !== 'string') {
+      // Object search ({field: value}) can't be matched against dropdown item
+      // text — close the typeahead popup and open the full selection form, which
+      // handles per-field advanced search (pickFromSelectionForm → filterList).
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      const inputId = await findFieldInputId(formNum, btn.fieldName);
+      if (inputId) { await page.click(`[id="${inputId}"]`); await page.waitForTimeout(300); }
+      await page.keyboard.press('F4');
+      await page.waitForTimeout(ACTION_WAIT);
+      const formResult = await openFormAndPick();
+      if (formResult) return formResult;
+      throw new Error(`selectValue: object search ${JSON.stringify(searchText)} for "${btn.fieldName}" did not open a selection form`);
+    }
 
     if (searchText) {
       const target = normYo(searchText.toLowerCase());
