@@ -17,68 +17,89 @@
 			<AutoCommandBar name="СписокКоманднаяПанель" id="3">
 				<Autofill>false</Autofill>
 			</AutoCommandBar>
-			<SearchStringAddition name="СписокСтрокаПоиска" id="4"/>
-			<ViewStatusAddition name="СписокСостояниеПросмотра" id="5"/>
-			<SearchControlAddition name="СписокУправлениеПоиском" id="6"/>
+			<SearchStringAddition name="СписокСтрокаПоиска" id="4">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСтрокаПоискаКонтекстноеМеню" id="5"/>
+				<ExtendedTooltip name="СписокСтрокаПоискаРасширеннаяПодсказка" id="6"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="СписокСостояниеПросмотра" id="7">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСостояниеПросмотраКонтекстноеМеню" id="8"/>
+				<ExtendedTooltip name="СписокСостояниеПросмотраРасширеннаяПодсказка" id="9"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="СписокУправлениеПоиском" id="10">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокУправлениеПоискомКонтекстноеМеню" id="11"/>
+				<ExtendedTooltip name="СписокУправлениеПоискомРасширеннаяПодсказка" id="12"/>
+			</SearchControlAddition>
 			<ChildItems>
-				<LabelField name="Наименование" id="7">
+				<LabelField name="Наименование" id="13">
 					<DataPath>Список.Description</DataPath>
-					<ContextMenu name="НаименованиеКонтекстноеМеню" id="8"/>
-					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="9"/>
+					<ContextMenu name="НаименованиеКонтекстноеМеню" id="14"/>
+					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="15"/>
 				</LabelField>
-				<LabelField name="Код" id="10">
+				<LabelField name="Код" id="16">
 					<DataPath>Список.Code</DataPath>
-					<ContextMenu name="КодКонтекстноеМеню" id="11"/>
-					<ExtendedTooltip name="КодРасширеннаяПодсказка" id="12"/>
+					<ContextMenu name="КодКонтекстноеМеню" id="17"/>
+					<ExtendedTooltip name="КодРасширеннаяПодсказка" id="18"/>
 				</LabelField>
-				<LabelField name="ЗагружаетсяИзИнтернета" id="13">
+				<LabelField name="ЗагружаетсяИзИнтернета" id="19">
 					<DataPath>Список.ЗагружаетсяИзИнтернета</DataPath>
-					<ContextMenu name="ЗагружаетсяИзИнтернетаКонтекстноеМеню" id="14"/>
-					<ExtendedTooltip name="ЗагружаетсяИзИнтернетаРасширеннаяПодсказка" id="15"/>
+					<ContextMenu name="ЗагружаетсяИзИнтернетаКонтекстноеМеню" id="20"/>
+					<ExtendedTooltip name="ЗагружаетсяИзИнтернетаРасширеннаяПодсказка" id="21"/>
 				</LabelField>
-				<LabelField name="НаименованиеПолное" id="16">
+				<LabelField name="НаименованиеПолное" id="22">
 					<DataPath>Список.НаименованиеПолное</DataPath>
-					<ContextMenu name="НаименованиеПолноеКонтекстноеМеню" id="17"/>
-					<ExtendedTooltip name="НаименованиеПолноеРасширеннаяПодсказка" id="18"/>
+					<ContextMenu name="НаименованиеПолноеКонтекстноеМеню" id="23"/>
+					<ExtendedTooltip name="НаименованиеПолноеРасширеннаяПодсказка" id="24"/>
 				</LabelField>
-				<LabelField name="Наценка" id="19">
+				<LabelField name="Наценка" id="25">
 					<DataPath>Список.Наценка</DataPath>
-					<ContextMenu name="НаценкаКонтекстноеМеню" id="20"/>
-					<ExtendedTooltip name="НаценкаРасширеннаяПодсказка" id="21"/>
+					<ContextMenu name="НаценкаКонтекстноеМеню" id="26"/>
+					<ExtendedTooltip name="НаценкаРасширеннаяПодсказка" id="27"/>
 				</LabelField>
-				<LabelField name="ОсновнаяВалюта" id="22">
+				<LabelField name="ОсновнаяВалюта" id="28">
 					<DataPath>Список.ОсновнаяВалюта</DataPath>
-					<ContextMenu name="ОсновнаяВалютаКонтекстноеМеню" id="23"/>
-					<ExtendedTooltip name="ОсновнаяВалютаРасширеннаяПодсказка" id="24"/>
+					<ContextMenu name="ОсновнаяВалютаКонтекстноеМеню" id="29"/>
+					<ExtendedTooltip name="ОсновнаяВалютаРасширеннаяПодсказка" id="30"/>
 				</LabelField>
-				<LabelField name="ПараметрыПрописи" id="25">
+				<LabelField name="ПараметрыПрописи" id="31">
 					<DataPath>Список.ПараметрыПрописи</DataPath>
-					<ContextMenu name="ПараметрыПрописиКонтекстноеМеню" id="26"/>
-					<ExtendedTooltip name="ПараметрыПрописиРасширеннаяПодсказка" id="27"/>
+					<ContextMenu name="ПараметрыПрописиКонтекстноеМеню" id="32"/>
+					<ExtendedTooltip name="ПараметрыПрописиРасширеннаяПодсказка" id="33"/>
 				</LabelField>
-				<LabelField name="ФормулаРасчетаКурса" id="28">
+				<LabelField name="ФормулаРасчетаКурса" id="34">
 					<DataPath>Список.ФормулаРасчетаКурса</DataPath>
-					<ContextMenu name="ФормулаРасчетаКурсаКонтекстноеМеню" id="29"/>
-					<ExtendedTooltip name="ФормулаРасчетаКурсаРасширеннаяПодсказка" id="30"/>
+					<ContextMenu name="ФормулаРасчетаКурсаКонтекстноеМеню" id="35"/>
+					<ExtendedTooltip name="ФормулаРасчетаКурсаРасширеннаяПодсказка" id="36"/>
 				</LabelField>
-				<LabelField name="СпособУстановкиКурса" id="31">
+				<LabelField name="СпособУстановкиКурса" id="37">
 					<DataPath>Список.СпособУстановкиКурса</DataPath>
-					<ContextMenu name="СпособУстановкиКурсаКонтекстноеМеню" id="32"/>
-					<ExtendedTooltip name="СпособУстановкиКурсаРасширеннаяПодсказка" id="33"/>
+					<ContextMenu name="СпособУстановкиКурсаКонтекстноеМеню" id="38"/>
+					<ExtendedTooltip name="СпособУстановкиКурсаРасширеннаяПодсказка" id="39"/>
 				</LabelField>
-				<LabelField name="Ссылка" id="34">
+				<LabelField name="Ссылка" id="40">
 					<DataPath>Список.Ref</DataPath>
 					<UserVisible>
 						<xr:Common>false</xr:Common>
 					</UserVisible>
-					<ContextMenu name="СсылкаКонтекстноеМеню" id="35"/>
-					<ExtendedTooltip name="СсылкаРасширеннаяПодсказка" id="36"/>
+					<ContextMenu name="СсылкаКонтекстноеМеню" id="41"/>
+					<ExtendedTooltip name="СсылкаРасширеннаяПодсказка" id="42"/>
 				</LabelField>
 			</ChildItems>
 		</Table>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Список" id="37">
+		<Attribute name="Список" id="43">
 			<Type>
 				<v8:Type>cfg:DynamicList</v8:Type>
 			</Type>

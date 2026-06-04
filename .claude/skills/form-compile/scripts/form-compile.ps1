@@ -1,4 +1,4 @@
-﻿# form-compile v1.28 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.29 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1824,6 +1824,22 @@ function Emit-Companion {
 	X "$indent<$tag name=`"$name`" id=`"$id`"/>"
 }
 
+# Табличный addition (СтрокаПоиска/СостояниеПросмотра/УправлениеПоиском) с AdditionSource.
+# Item = имя таблицы, Type фиксирован по виду; внутри — companion ContextMenu/ExtendedTooltip.
+function Emit-TableAddition {
+	param([string]$tag, [string]$tableName, [string]$nameSuffix, [string]$srcType, [string]$indent)
+	$addName = "$tableName$nameSuffix"
+	$id = New-Id
+	X "$indent<$tag name=`"$addName`" id=`"$id`">"
+	X "$indent`t<AdditionSource>"
+	X "$indent`t`t<Item>$tableName</Item>"
+	X "$indent`t`t<Type>$srcType</Type>"
+	X "$indent`t</AdditionSource>"
+	Emit-Companion -tag "ContextMenu" -name "${addName}КонтекстноеМеню" -indent "$indent`t"
+	Emit-Companion -tag "ExtendedTooltip" -name "${addName}РасширеннаяПодсказка" -indent "$indent`t"
+	X "$indent</$tag>"
+}
+
 function Emit-Element {
 	param($el, [string]$indent, [bool]$inCmdBar = $false)
 
@@ -2551,9 +2567,9 @@ function Emit-Table {
 	} else {
 		Emit-Companion -tag "AutoCommandBar" -name "${name}КоманднаяПанель" -indent $inner
 	}
-	Emit-Companion -tag "SearchStringAddition" -name "${name}СтрокаПоиска" -indent $inner
-	Emit-Companion -tag "ViewStatusAddition" -name "${name}СостояниеПросмотра" -indent $inner
-	Emit-Companion -tag "SearchControlAddition" -name "${name}УправлениеПоиском" -indent $inner
+	Emit-TableAddition -tag "SearchStringAddition" -tableName $name -nameSuffix "СтрокаПоиска" -srcType "SearchStringRepresentation" -indent $inner
+	Emit-TableAddition -tag "ViewStatusAddition" -tableName $name -nameSuffix "СостояниеПросмотра" -srcType "ViewStatusRepresentation" -indent $inner
+	Emit-TableAddition -tag "SearchControlAddition" -tableName $name -nameSuffix "УправлениеПоиском" -srcType "SearchControl" -indent $inner
 
 	# Columns
 	if ($el.columns -and $el.columns.Count -gt 0) {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.28 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.29 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1549,6 +1549,20 @@ def emit_companion(lines, tag, name, indent):
     lines.append(f'{indent}<{tag} name="{name}" id="{cid}"/>')
 
 
+def emit_table_addition(lines, tag, table_name, name_suffix, src_type, indent):
+    # Табличный addition с AdditionSource (Item = имя таблицы, Type фиксирован).
+    add_name = f'{table_name}{name_suffix}'
+    aid = new_id()
+    lines.append(f'{indent}<{tag} name="{add_name}" id="{aid}">')
+    lines.append(f'{indent}\t<AdditionSource>')
+    lines.append(f'{indent}\t\t<Item>{table_name}</Item>')
+    lines.append(f'{indent}\t\t<Type>{src_type}</Type>')
+    lines.append(f'{indent}\t</AdditionSource>')
+    emit_companion(lines, 'ContextMenu', f'{add_name}КонтекстноеМеню', f'{indent}\t')
+    emit_companion(lines, 'ExtendedTooltip', f'{add_name}РасширеннаяПодсказка', f'{indent}\t')
+    lines.append(f'{indent}</{tag}>')
+
+
 def emit_common_flags(lines, el, indent):
     if el.get('visible') is False or el.get('hidden') is True:
         lines.append(f"{indent}<Visible>false</Visible>")
@@ -2211,9 +2225,9 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}</AutoCommandBar>')
     else:
         emit_companion(lines, 'AutoCommandBar', f'{name}\u041a\u043e\u043c\u0430\u043d\u0434\u043d\u0430\u044f\u041f\u0430\u043d\u0435\u043b\u044c', inner)
-    emit_companion(lines, 'SearchStringAddition', f'{name}\u0421\u0442\u0440\u043e\u043a\u0430\u041f\u043e\u0438\u0441\u043a\u0430', inner)
-    emit_companion(lines, 'ViewStatusAddition', f'{name}\u0421\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435\u041f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430', inner)
-    emit_companion(lines, 'SearchControlAddition', f'{name}\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435\u041f\u043e\u0438\u0441\u043a\u043e\u043c', inner)
+    emit_table_addition(lines, 'SearchStringAddition', name, '\u0421\u0442\u0440\u043e\u043a\u0430\u041f\u043e\u0438\u0441\u043a\u0430', 'SearchStringRepresentation', inner)
+    emit_table_addition(lines, 'ViewStatusAddition', name, '\u0421\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435\u041f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430', 'ViewStatusRepresentation', inner)
+    emit_table_addition(lines, 'SearchControlAddition', name, '\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435\u041f\u043e\u0438\u0441\u043a\u043e\u043c', 'SearchControl', inner)
 
     # Columns
     if el.get('columns') and len(el['columns']) > 0:

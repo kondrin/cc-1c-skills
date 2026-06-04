@@ -26,20 +26,41 @@
 			<AutoCommandBar name="СписокКоманднаяПанель" id="5">
 				<Autofill>false</Autofill>
 			</AutoCommandBar>
-			<SearchStringAddition name="СписокСтрокаПоиска" id="6"/>
-			<ViewStatusAddition name="СписокСостояниеПросмотра" id="7"/>
-			<SearchControlAddition name="СписокУправлениеПоиском" id="8"/>
+			<SearchStringAddition name="СписокСтрокаПоиска" id="6">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСтрокаПоискаКонтекстноеМеню" id="7"/>
+				<ExtendedTooltip name="СписокСтрокаПоискаРасширеннаяПодсказка" id="8"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="СписокСостояниеПросмотра" id="9">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСостояниеПросмотраКонтекстноеМеню" id="10"/>
+				<ExtendedTooltip name="СписокСостояниеПросмотраРасширеннаяПодсказка" id="11"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="СписокУправлениеПоиском" id="12">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокУправлениеПоискомКонтекстноеМеню" id="13"/>
+				<ExtendedTooltip name="СписокУправлениеПоискомРасширеннаяПодсказка" id="14"/>
+			</SearchControlAddition>
 			<ChildItems>
-				<InputField name="Наименование" id="9">
+				<InputField name="Наименование" id="15">
 					<DataPath>Список.Description</DataPath>
-					<ContextMenu name="НаименованиеКонтекстноеМеню" id="10"/>
-					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="11"/>
+					<ContextMenu name="НаименованиеКонтекстноеМеню" id="16"/>
+					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="17"/>
 				</InputField>
 			</ChildItems>
 		</Table>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Список" id="12">
+		<Attribute name="Список" id="18">
 			<Type>
 				<v8:Type>cfg:DynamicList</v8:Type>
 			</Type>
@@ -52,7 +73,7 @@
 		</Attribute>
 	</Attributes>
 	<Commands>
-		<Command name="ИзменитьВыделенные" id="13">
+		<Command name="ИзменитьВыделенные" id="19">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>

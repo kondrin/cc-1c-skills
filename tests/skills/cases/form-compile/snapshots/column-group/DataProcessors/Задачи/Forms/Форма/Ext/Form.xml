@@ -13,16 +13,37 @@
 			<DataPath>Список</DataPath>
 			<ContextMenu name="СписокКонтекстноеМеню" id="2"/>
 			<AutoCommandBar name="СписокКоманднаяПанель" id="3"/>
-			<SearchStringAddition name="СписокСтрокаПоиска" id="4"/>
-			<ViewStatusAddition name="СписокСостояниеПросмотра" id="5"/>
-			<SearchControlAddition name="СписокУправлениеПоиском" id="6"/>
+			<SearchStringAddition name="СписокСтрокаПоиска" id="4">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchStringRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСтрокаПоискаКонтекстноеМеню" id="5"/>
+				<ExtendedTooltip name="СписокСтрокаПоискаРасширеннаяПодсказка" id="6"/>
+			</SearchStringAddition>
+			<ViewStatusAddition name="СписокСостояниеПросмотра" id="7">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>ViewStatusRepresentation</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокСостояниеПросмотраКонтекстноеМеню" id="8"/>
+				<ExtendedTooltip name="СписокСостояниеПросмотраРасширеннаяПодсказка" id="9"/>
+			</ViewStatusAddition>
+			<SearchControlAddition name="СписокУправлениеПоиском" id="10">
+				<AdditionSource>
+					<Item>Список</Item>
+					<Type>SearchControl</Type>
+				</AdditionSource>
+				<ContextMenu name="СписокУправлениеПоискомКонтекстноеМеню" id="11"/>
+				<ExtendedTooltip name="СписокУправлениеПоискомРасширеннаяПодсказка" id="12"/>
+			</SearchControlAddition>
 			<ChildItems>
-				<InputField name="Наименование" id="7">
+				<InputField name="Наименование" id="13">
 					<DataPath>Список.Наименование</DataPath>
-					<ContextMenu name="НаименованиеКонтекстноеМеню" id="8"/>
-					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="9"/>
+					<ContextMenu name="НаименованиеКонтекстноеМеню" id="14"/>
+					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="15"/>
 				</InputField>
-				<ColumnGroup name="ГруппаСрок" id="10">
+				<ColumnGroup name="ГруппаСрок" id="16">
 					<Title>
 						<v8:item>
 							<v8:lang>ru</v8:lang>
@@ -30,29 +51,29 @@
 						</v8:item>
 					</Title>
 					<Group>Horizontal</Group>
-					<ExtendedTooltip name="ГруппаСрокРасширеннаяПодсказка" id="11"/>
+					<ExtendedTooltip name="ГруппаСрокРасширеннаяПодсказка" id="17"/>
 					<ChildItems>
-						<InputField name="ДатаНачала" id="12">
+						<InputField name="ДатаНачала" id="18">
 							<DataPath>Список.ДатаНачала</DataPath>
-							<ContextMenu name="ДатаНачалаКонтекстноеМеню" id="13"/>
-							<ExtendedTooltip name="ДатаНачалаРасширеннаяПодсказка" id="14"/>
+							<ContextMenu name="ДатаНачалаКонтекстноеМеню" id="19"/>
+							<ExtendedTooltip name="ДатаНачалаРасширеннаяПодсказка" id="20"/>
 						</InputField>
-						<InputField name="ДатаОкончания" id="15">
+						<InputField name="ДатаОкончания" id="21">
 							<DataPath>Список.ДатаОкончания</DataPath>
-							<ContextMenu name="ДатаОкончанияКонтекстноеМеню" id="16"/>
-							<ExtendedTooltip name="ДатаОкончанияРасширеннаяПодсказка" id="17"/>
+							<ContextMenu name="ДатаОкончанияКонтекстноеМеню" id="22"/>
+							<ExtendedTooltip name="ДатаОкончанияРасширеннаяПодсказка" id="23"/>
 						</InputField>
 					</ChildItems>
 				</ColumnGroup>
-				<ColumnGroup name="ГруппаИсполнитель" id="18">
+				<ColumnGroup name="ГруппаИсполнитель" id="24">
 					<Group>InCell</Group>
 					<ShowInHeader>true</ShowInHeader>
-					<ExtendedTooltip name="ГруппаИсполнительРасширеннаяПодсказка" id="19"/>
+					<ExtendedTooltip name="ГруппаИсполнительРасширеннаяПодсказка" id="25"/>
 					<ChildItems>
-						<InputField name="Исполнитель" id="20">
+						<InputField name="Исполнитель" id="26">
 							<DataPath>Список.Исполнитель</DataPath>
-							<ContextMenu name="ИсполнительКонтекстноеМеню" id="21"/>
-							<ExtendedTooltip name="ИсполнительРасширеннаяПодсказка" id="22"/>
+							<ContextMenu name="ИсполнительКонтекстноеМеню" id="27"/>
+							<ExtendedTooltip name="ИсполнительРасширеннаяПодсказка" id="28"/>
 						</InputField>
 					</ChildItems>
 				</ColumnGroup>
@@ -60,13 +81,13 @@
 		</Table>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Объект" id="23">
+		<Attribute name="Объект" id="29">
 			<Type>
 				<v8:Type>cfg:DataProcessorObject.Задачи</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
-		<Attribute name="Список" id="24">
+		<Attribute name="Список" id="30">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
@@ -77,7 +98,7 @@
 				<v8:Type>v8:ValueTable</v8:Type>
 			</Type>
 			<Columns>
-				<Column name="Наименование" id="25">
+				<Column name="Наименование" id="31">
 					<Type>
 						<v8:Type>xs:string</v8:Type>
 						<v8:StringQualifiers>
@@ -86,7 +107,7 @@
 						</v8:StringQualifiers>
 					</Type>
 				</Column>
-				<Column name="ДатаНачала" id="26">
+				<Column name="ДатаНачала" id="32">
 					<Type>
 						<v8:Type>xs:dateTime</v8:Type>
 						<v8:DateQualifiers>
@@ -94,7 +115,7 @@
 						</v8:DateQualifiers>
 					</Type>
 				</Column>
-				<Column name="ДатаОкончания" id="27">
+				<Column name="ДатаОкончания" id="33">
 					<Type>
 						<v8:Type>xs:dateTime</v8:Type>
 						<v8:DateQualifiers>
@@ -102,7 +123,7 @@
 						</v8:DateQualifiers>
 					</Type>
 				</Column>
-				<Column name="Исполнитель" id="28">
+				<Column name="Исполнитель" id="34">
 					<Type>
 						<v8:Type>xs:string</v8:Type>
 						<v8:StringQualifiers>
