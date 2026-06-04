@@ -1,4 +1,4 @@
-﻿# form-decompile v0.6 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.7 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -450,6 +450,15 @@ function Decompile-Element {
 			if ((Get-Child $node 'Footer') -eq 'true') { $obj['footer'] = $true }
 			$htr = Get-Child $node 'HeightInTableRows'; if ($htr) { $obj['height'] = [int]$htr }
 			$cbl = Get-Child $node 'CommandBarLocation'; if ($cbl) { $obj['commandBarLocation'] = $cbl }
+			$ssl = Get-Child $node 'SearchStringLocation'; if ($ssl) { $obj['searchStringLocation'] = $ssl }
+			$vsl = Get-Child $node 'ViewStatusLocation'; if ($vsl) { $obj['viewStatusLocation'] = $vsl }
+			$scl = Get-Child $node 'SearchControlLocation'; if ($scl) { $obj['searchControlLocation'] = $scl }
+			$csNode = $node.SelectSingleNode("lf:CommandSet", $ns)
+			if ($csNode) {
+				$exc = New-Object System.Collections.ArrayList
+				foreach ($ec in @($csNode.SelectNodes("lf:ExcludedCommand", $ns))) { [void]$exc.Add($ec.InnerText) }
+				if ($exc.Count -gt 0) { $obj['excludedCommands'] = @($exc) }
+			}
 			$cols = Decompile-Children $node
 			if ($cols) { $obj['columns'] = $cols }
 		}

@@ -16,7 +16,9 @@
   "input": {
     "title": "Просмотр данных",
     "elements": [
-      { "table": "Данные", "path": "Данные", "changeRowSet": true, "columns": [
+      { "table": "Данные", "path": "Данные", "changeRowSet": true,
+        "viewStatusLocation": "None", "searchControlLocation": "None",
+        "excludedCommands": ["Add", "Delete", "MoveUp", "MoveDown"], "columns": [
         { "input": "Дата", "path": "Данные.Дата" },
         { "input": "Сумма", "path": "Данные.Сумма" },
         { "input": "Комментарий", "path": "Данные.Комментарий" }

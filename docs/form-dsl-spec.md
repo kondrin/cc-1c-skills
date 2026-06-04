@@ -296,6 +296,9 @@
 | `footer` | bool | Показывать подвал |
 | `commandBarLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
 | `searchStringLocation` | string | `None`, `Top`, `Bottom`, `CommandBar`, `Auto` |
+| `viewStatusLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
+| `searchControlLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
+| `excludedCommands` | string[] | Исключённые стандартные команды таблицы (`Add`, `Delete`, `MoveUp`, `SortListAsc`, …) → `<CommandSet>` |
 
 #### columnGroup — ColumnGroup
 

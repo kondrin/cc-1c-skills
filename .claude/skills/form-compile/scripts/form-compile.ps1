@@ -1,4 +1,4 @@
-﻿# form-compile v1.27 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.28 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1922,7 +1922,8 @@ function Emit-Element {
 		"children"=1;"columns"=1
 		# table-specific
 		"changeRowSet"=1;"changeRowOrder"=1;"header"=1;"footer"=1
-		"commandBarLocation"=1;"searchStringLocation"=1
+		"commandBarLocation"=1;"searchStringLocation"=1;"viewStatusLocation"=1;"searchControlLocation"=1
+		"excludedCommands"=1
 		"choiceMode"=1;"initialTreeView"=1;"enableDrag"=1;"enableStartDrag"=1
 		"rowPictureDataPath"=1;"tableAutofill"=1
 		# pages-specific
@@ -2528,7 +2529,15 @@ function Emit-Table {
 	if ($el.enableStartDrag -eq $true) { X "$inner<EnableStartDrag>true</EnableStartDrag>" }
 	if ($el.enableDrag -eq $true) { X "$inner<EnableDrag>true</EnableDrag>" }
 	if ($el.rowPictureDataPath) { X "$inner<RowPictureDataPath>$($el.rowPictureDataPath)</RowPictureDataPath>" }
+	if ($el.viewStatusLocation) { X "$inner<ViewStatusLocation>$($el.viewStatusLocation)</ViewStatusLocation>" }
+	if ($el.searchControlLocation) { X "$inner<SearchControlLocation>$($el.searchControlLocation)</SearchControlLocation>" }
 	Emit-Layout -el $el -indent $inner -skipHeight
+
+	if ($el.excludedCommands -and $el.excludedCommands.Count -gt 0) {
+		X "$inner<CommandSet>"
+		foreach ($cmd in $el.excludedCommands) { X "$inner`t<ExcludedCommand>$cmd</ExcludedCommand>" }
+		X "$inner</CommandSet>"
+	}
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner

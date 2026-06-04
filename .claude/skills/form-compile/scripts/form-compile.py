@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.27 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.28 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1356,7 +1356,8 @@ KNOWN_KEYS = {
     "showTitle", "united", "collapsed",
     "children", "columns",
     "changeRowSet", "changeRowOrder", "header", "footer",
-    "commandBarLocation", "searchStringLocation",
+    "commandBarLocation", "searchStringLocation", "viewStatusLocation", "searchControlLocation",
+    "excludedCommands",
     "pagesRepresentation",
     "type", "command", "stdCommand", "defaultButton", "locationInCommandBar",
     "src", "valuesPicture", "loadTransparent",
@@ -2186,7 +2187,17 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<EnableDrag>true</EnableDrag>')
     if el.get('rowPictureDataPath'):
         lines.append(f'{inner}<RowPictureDataPath>{el["rowPictureDataPath"]}</RowPictureDataPath>')
+    if el.get('viewStatusLocation'):
+        lines.append(f'{inner}<ViewStatusLocation>{el["viewStatusLocation"]}</ViewStatusLocation>')
+    if el.get('searchControlLocation'):
+        lines.append(f'{inner}<SearchControlLocation>{el["searchControlLocation"]}</SearchControlLocation>')
     emit_layout(lines, el, inner, skip_height=True)
+
+    if el.get('excludedCommands'):
+        lines.append(f'{inner}<CommandSet>')
+        for cmd in el['excludedCommands']:
+            lines.append(f'{inner}\t<ExcludedCommand>{cmd}</ExcludedCommand>')
+        lines.append(f'{inner}</CommandSet>')
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)

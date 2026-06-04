@@ -12,6 +12,14 @@
 		<Table name="Данные" id="1">
 			<DataPath>Данные</DataPath>
 			<ChangeRowSet>true</ChangeRowSet>
+			<ViewStatusLocation>None</ViewStatusLocation>
+			<SearchControlLocation>None</SearchControlLocation>
+			<CommandSet>
+				<ExcludedCommand>Add</ExcludedCommand>
+				<ExcludedCommand>Delete</ExcludedCommand>
+				<ExcludedCommand>MoveUp</ExcludedCommand>
+				<ExcludedCommand>MoveDown</ExcludedCommand>
+			</CommandSet>
 			<ContextMenu name="ДанныеКонтекстноеМеню" id="2"/>
 			<AutoCommandBar name="ДанныеКоманднаяПанель" id="3"/>
 			<SearchStringAddition name="ДанныеСтрокаПоиска" id="4"/>
