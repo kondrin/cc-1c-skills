@@ -1,4 +1,4 @@
-﻿# form-compile v1.24 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.25 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1909,6 +1909,7 @@ function Emit-Element {
 		"titleLocation"=1;"representation"=1;"width"=1;"height"=1
 		"horizontalStretch"=1;"verticalStretch"=1;"autoMaxWidth"=1;"autoMaxHeight"=1
 		"maxWidth"=1;"maxHeight"=1
+		"groupHorizontalAlign"=1;"groupVerticalAlign"=1;"horizontalAlign"=1
 		# input-specific
 		"multiLine"=1;"passwordMode"=1;"choiceButton"=1;"clearButton"=1
 		"spinButton"=1;"dropListButton"=1;"markIncomplete"=1;"skipOnInput"=1;"inputHint"=1
@@ -1973,6 +1974,31 @@ function Emit-CommonFlags {
 	}
 	if ($el.enabled -eq $false -or $el.disabled -eq $true) { X "$indent<Enabled>false</Enabled>" }
 	if ($el.readOnly -eq $true) { X "$indent<ReadOnly>true</ReadOnly>" }
+}
+
+# Общие layout-свойства — применимы ко всем элементам. Порядок согласован с
+# историческим выводом input/label, чтобы не сдвигать существующие снапшоты.
+# -skipHeight: для Table (height → HeightInTableRows, эмитится в Emit-Table).
+# -multiLineDefault: input без явного autoMaxWidth при multiLine → AutoMaxWidth=false.
+function Emit-Layout {
+	param($el, [string]$indent, [switch]$skipHeight, [bool]$multiLineDefault = $false)
+	if ($el.skipOnInput -eq $true) { X "$indent<SkipOnInput>true</SkipOnInput>" }
+	$amwExplicit = ($el.PSObject.Properties.Name -contains 'autoMaxWidth')
+	if ($amwExplicit) {
+		if ($el.autoMaxWidth -eq $false) { X "$indent<AutoMaxWidth>false</AutoMaxWidth>" }
+	} elseif ($multiLineDefault) {
+		X "$indent<AutoMaxWidth>false</AutoMaxWidth>"
+	}
+	if ($null -ne $el.maxWidth) { X "$indent<MaxWidth>$($el.maxWidth)</MaxWidth>" }
+	if ($el.autoMaxHeight -eq $false) { X "$indent<AutoMaxHeight>false</AutoMaxHeight>" }
+	if ($null -ne $el.maxHeight) { X "$indent<MaxHeight>$($el.maxHeight)</MaxHeight>" }
+	if ($el.width) { X "$indent<Width>$($el.width)</Width>" }
+	if (-not $skipHeight -and $el.height) { X "$indent<Height>$($el.height)</Height>" }
+	if ($el.horizontalStretch -eq $true) { X "$indent<HorizontalStretch>true</HorizontalStretch>" }
+	if ($el.verticalStretch -eq $true) { X "$indent<VerticalStretch>true</VerticalStretch>" }
+	if ($el.groupHorizontalAlign) { X "$indent<GroupHorizontalAlign>$($el.groupHorizontalAlign)</GroupHorizontalAlign>" }
+	if ($el.groupVerticalAlign) { X "$indent<GroupVerticalAlign>$($el.groupVerticalAlign)</GroupVerticalAlign>" }
+	if ($el.horizontalAlign) { X "$indent<HorizontalAlign>$($el.horizontalAlign)</HorizontalAlign>" }
 }
 
 function Title-FromName {
@@ -2051,6 +2077,7 @@ function Emit-Group {
 	if ($el.united -eq $false) { X "$inner<United>false</United>" }
 
 	Emit-CommonFlags -el $el -indent $inner
+	Emit-Layout -el $el -indent $inner
 
 	# Companion: ExtendedTooltip
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2090,9 +2117,9 @@ function Emit-ColumnGroup {
 		$shVal = if ($el.showInHeader) { "true" } else { "false" }
 		X "$inner<ShowInHeader>$shVal</ShowInHeader>"
 	}
-	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
 
 	Emit-CommonFlags -el $el -indent $inner
+	Emit-Layout -el $el -indent $inner
 
 	# Companion: ExtendedTooltip
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2141,20 +2168,7 @@ function Emit-Input {
 	if ($el.dropListButton -eq $true) { X "$inner<DropListButton>true</DropListButton>" }
 	if ($el.markIncomplete -eq $true) { X "$inner<AutoMarkIncomplete>true</AutoMarkIncomplete>" }
 	if ($el.textEdit -eq $false) { X "$inner<TextEdit>false</TextEdit>" }
-	if ($el.skipOnInput -eq $true) { X "$inner<SkipOnInput>true</SkipOnInput>" }
-	$hasAmw = $el.PSObject.Properties.Name -contains 'autoMaxWidth'
-	if ($hasAmw) {
-		if ($el.autoMaxWidth -eq $false) { X "$inner<AutoMaxWidth>false</AutoMaxWidth>" }
-	} elseif ($el.multiLine -eq $true) {
-		X "$inner<AutoMaxWidth>false</AutoMaxWidth>"
-	}
-	if ($null -ne $el.maxWidth) { X "$inner<MaxWidth>$($el.maxWidth)</MaxWidth>" }
-	if ($el.autoMaxHeight -eq $false) { X "$inner<AutoMaxHeight>false</AutoMaxHeight>" }
-	if ($null -ne $el.maxHeight) { X "$inner<MaxHeight>$($el.maxHeight)</MaxHeight>" }
-	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
-	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }
-	if ($el.horizontalStretch -eq $true) { X "$inner<HorizontalStretch>true</HorizontalStretch>" }
-	if ($el.verticalStretch -eq $true) { X "$inner<VerticalStretch>true</VerticalStretch>" }
+	Emit-Layout -el $el -indent $inner -multiLineDefault ([bool]($el.multiLine -eq $true))
 
 	if ($el.inputHint) {
 		Emit-MLText -tag "InputHint" -text "$($el.inputHint)" -indent $inner
@@ -2182,6 +2196,8 @@ function Emit-Check {
 
 	$tl = if ($el.titleLocation) { "$($el.titleLocation)" } else { "Right" }
 	X "$inner<TitleLocation>$tl</TitleLocation>"
+
+	Emit-Layout -el $el -indent $inner
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2401,6 +2417,8 @@ function Emit-Radio {
 		X "$inner</ChoiceList>"
 	}
 
+	Emit-Layout -el $el -indent $inner
+
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2430,12 +2448,7 @@ function Emit-Label {
 	Emit-CommonFlags -el $el -indent $inner
 
 	if ($el.hyperlink -eq $true) { X "$inner<Hyperlink>true</Hyperlink>" }
-	if ($el.autoMaxWidth -eq $false) { X "$inner<AutoMaxWidth>false</AutoMaxWidth>" }
-	if ($null -ne $el.maxWidth) { X "$inner<MaxWidth>$($el.maxWidth)</MaxWidth>" }
-	if ($el.autoMaxHeight -eq $false) { X "$inner<AutoMaxHeight>false</AutoMaxHeight>" }
-	if ($null -ne $el.maxHeight) { X "$inner<MaxHeight>$($el.maxHeight)</MaxHeight>" }
-	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
-	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }
+	Emit-Layout -el $el -indent $inner
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2458,6 +2471,7 @@ function Emit-LabelField {
 	Emit-CommonFlags -el $el -indent $inner
 
 	if ($el.hyperlink -eq $true) { X "$inner<Hyperlink>true</Hyperlink>" }
+	Emit-Layout -el $el -indent $inner
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2499,6 +2513,7 @@ function Emit-Table {
 	if ($el.enableStartDrag -eq $true) { X "$inner<EnableStartDrag>true</EnableStartDrag>" }
 	if ($el.enableDrag -eq $true) { X "$inner<EnableDrag>true</EnableDrag>" }
 	if ($el.rowPictureDataPath) { X "$inner<RowPictureDataPath>$($el.rowPictureDataPath)</RowPictureDataPath>" }
+	Emit-Layout -el $el -indent $inner -skipHeight
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2541,6 +2556,7 @@ function Emit-Pages {
 	}
 
 	Emit-CommonFlags -el $el -indent $inner
+	Emit-Layout -el $el -indent $inner
 
 	# Companion
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2578,6 +2594,7 @@ function Emit-Page {
 		}
 		if ($orientation) { X "$inner<Group>$orientation</Group>" }
 	}
+	Emit-Layout -el $el -indent $inner
 
 	# Companion
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2674,6 +2691,7 @@ function Emit-Button {
 	if ($el.locationInCommandBar) {
 		X "$inner<LocationInCommandBar>$($el.locationInCommandBar)</LocationInCommandBar>"
 	}
+	Emit-Layout -el $el -indent $inner
 
 	# Companion
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2694,15 +2712,15 @@ function Emit-PictureDecoration {
 
 	if ($el.picture -or $el.src) {
 		$ref = if ($el.src) { "$($el.src)" } else { "$($el.picture)" }
+		$lt = if ($el.loadTransparent -eq $true) { "true" } else { "false" }
 		X "$inner<Picture>"
 		X "$inner`t<xr:Ref>$ref</xr:Ref>"
-		X "$inner`t<xr:LoadTransparent>true</xr:LoadTransparent>"
+		X "$inner`t<xr:LoadTransparent>$lt</xr:LoadTransparent>"
 		X "$inner</Picture>"
 	}
 
 	if ($el.hyperlink -eq $true) { X "$inner<Hyperlink>true</Hyperlink>" }
-	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
-	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }
+	Emit-Layout -el $el -indent $inner
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2734,8 +2752,7 @@ function Emit-PictureField {
 		X "$inner</ValuesPicture>"
 	}
 
-	if ($el.width) { X "$inner<Width>$($el.width)</Width>" }
-	if ($el.height) { X "$inner<Height>$($el.height)</Height>" }
+	Emit-Layout -el $el -indent $inner
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2756,6 +2773,7 @@ function Emit-Calendar {
 
 	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
 	Emit-CommonFlags -el $el -indent $inner
+	Emit-Layout -el $el -indent $inner
 
 	# Companions
 	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
@@ -2775,6 +2793,7 @@ function Emit-CommandBar {
 	if ($el.autofill -eq $true) { X "$inner<Autofill>true</Autofill>" }
 
 	Emit-CommonFlags -el $el -indent $inner
+	Emit-Layout -el $el -indent $inner
 
 	# Children
 	if ($el.children -and $el.children.Count -gt 0) {
@@ -2801,6 +2820,7 @@ function Emit-ButtonGroup {
 	}
 
 	Emit-CommonFlags -el $el -indent $inner
+	Emit-Layout -el $el -indent $inner
 
 	# Companion: ExtendedTooltip
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner
@@ -2836,6 +2856,7 @@ function Emit-Popup {
 	if ($el.representation) {
 		X "$inner<Representation>$($el.representation)</Representation>"
 	}
+	Emit-Layout -el $el -indent $inner
 
 	# Children
 	if ($el.children -and $el.children.Count -gt 0) {

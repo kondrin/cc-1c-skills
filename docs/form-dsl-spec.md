@@ -117,6 +117,25 @@
 | `on` | string[] | Массив имён событий |
 | `handlers` | object | Явные имена обработчиков: `{"OnChange": "МойОбработчик"}` |
 
+### 4.1a. Общие layout-свойства
+
+Применимы к любому элементу (размеры, растягивание, выравнивание внутри родителя). Эмитятся только при указании.
+
+| Свойство | XML | Значения |
+|----------|-----|----------|
+| `width` | `<Width>` | число |
+| `height` | `<Height>` | число (у `table` → `<HeightInTableRows>`, высота в строках) |
+| `horizontalStretch` | `<HorizontalStretch>` | `true` |
+| `verticalStretch` | `<VerticalStretch>` | `true` |
+| `autoMaxWidth` | `<AutoMaxWidth>` | `false` (у `input` при `multiLine` подставляется автоматически) |
+| `autoMaxHeight` | `<AutoMaxHeight>` | `false` |
+| `maxWidth` | `<MaxWidth>` | число |
+| `maxHeight` | `<MaxHeight>` | число |
+| `groupHorizontalAlign` | `<GroupHorizontalAlign>` | `Left`, `Center`, `Right` |
+| `groupVerticalAlign` | `<GroupVerticalAlign>` | `Top`, `Center`, `Bottom` |
+| `horizontalAlign` | `<HorizontalAlign>` | `Left`, `Center`, `Right` |
+| `skipOnInput` | `<SkipOnInput>` | `true` |
+
 ### 4.2. Автоименование обработчиков
 
 При указании `"on"` без `"handlers"` имя обработчика генерируется автоматически:
@@ -345,6 +364,7 @@ Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `Tabs
 | Свойство | Тип | Описание |
 |----------|-----|----------|
 | `src` или `picture` (как свойство) | string | Ссылка на картинку |
+| `loadTransparent` | bool | `true` → загружать прозрачной. По умолчанию `false` |
 | `hyperlink` | bool | Режим гиперссылки |
 | `width` | int | Ширина |
 | `height` | int | Высота |

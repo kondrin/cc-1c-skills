@@ -1,4 +1,4 @@
-﻿# form-decompile v0.3 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.4 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -182,6 +182,25 @@ function Convert-TypedValue {
 		'boolean$' { return ($raw -eq 'true') }
 		default { return $raw }
 	}
+}
+
+# Общие layout-свойства → в $obj (симметрично Emit-Layout компилятора).
+# Вызывается один раз для любого элемента. Height тут — пиксельная высота
+# (<Height>); Table хранит высоту в строках (<HeightInTableRows>) и ловит её сам.
+function Add-Layout {
+	param($obj, $node)
+	if ((Get-Child $node 'SkipOnInput') -eq 'true') { $obj['skipOnInput'] = $true }
+	if ((Get-Child $node 'AutoMaxWidth') -eq 'false') { $obj['autoMaxWidth'] = $false }
+	$mw = Get-Child $node 'MaxWidth'; if ($mw) { $obj['maxWidth'] = [int]$mw }
+	if ((Get-Child $node 'AutoMaxHeight') -eq 'false') { $obj['autoMaxHeight'] = $false }
+	$mh = Get-Child $node 'MaxHeight'; if ($mh) { $obj['maxHeight'] = [int]$mh }
+	$w = Get-Child $node 'Width'; if ($w) { $obj['width'] = [int]$w }
+	$h = Get-Child $node 'Height'; if ($h) { $obj['height'] = [int]$h }
+	if ((Get-Child $node 'HorizontalStretch') -eq 'true') { $obj['horizontalStretch'] = $true }
+	if ((Get-Child $node 'VerticalStretch') -eq 'true') { $obj['verticalStretch'] = $true }
+	$gha = Get-Child $node 'GroupHorizontalAlign'; if ($gha) { $obj['groupHorizontalAlign'] = $gha }
+	$gva = Get-Child $node 'GroupVerticalAlign'; if ($gva) { $obj['groupVerticalAlign'] = $gva }
+	$ha = Get-Child $node 'HorizontalAlign'; if ($ha) { $obj['horizontalAlign'] = $ha }
 }
 
 # Суффиксы авто-имён обработчиков (инверсия компилятора)
@@ -396,6 +415,7 @@ function Decompile-Element {
 			$obj[$key] = $name
 			Add-CommonProps $obj $node $name
 			$ref = $node.SelectSingleNode("lf:Picture/xr:Ref", $ns); if ($ref) { $obj['src'] = $ref.InnerText }
+			$lt = $node.SelectSingleNode("lf:Picture/xr:LoadTransparent", $ns); if ($lt -and $lt.InnerText -eq 'true') { $obj['loadTransparent'] = $true }
 			if ((Get-Child $node 'Hyperlink') -eq 'true') { $obj['hyperlink'] = $true }
 		}
 		'PictureField' {
@@ -418,6 +438,7 @@ function Decompile-Element {
 			if ((Get-Child $node 'ChangeRowOrder') -eq 'true') { $obj['changeRowOrder'] = $true }
 			if ((Get-Child $node 'Header') -eq 'false') { $obj['header'] = $false }
 			if ((Get-Child $node 'Footer') -eq 'true') { $obj['footer'] = $true }
+			$htr = Get-Child $node 'HeightInTableRows'; if ($htr) { $obj['height'] = [int]$htr }
 			$cbl = Get-Child $node 'CommandBarLocation'; if ($cbl) { $obj['commandBarLocation'] = $cbl }
 			$cols = Decompile-Children $node
 			if ($cols) { $obj['columns'] = $cols }
@@ -478,6 +499,7 @@ function Decompile-Element {
 			if ($kids) { $obj['children'] = $kids }
 		}
 	}
+	Add-Layout $obj $node
 	return $obj
 }
 

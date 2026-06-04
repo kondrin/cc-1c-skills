@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.24 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.25 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1348,6 +1348,7 @@ KNOWN_KEYS = {
     "titleLocation", "representation", "width", "height",
     "horizontalStretch", "verticalStretch", "autoMaxWidth", "autoMaxHeight",
     "maxWidth", "maxHeight",
+    "groupHorizontalAlign", "groupVerticalAlign", "horizontalAlign",
     "multiLine", "passwordMode", "choiceButton", "clearButton",
     "spinButton", "dropListButton", "markIncomplete", "skipOnInput", "inputHint",
     "textEdit",
@@ -1558,6 +1559,40 @@ def emit_common_flags(lines, el, indent):
         lines.append(f"{indent}<Enabled>false</Enabled>")
     if el.get('readOnly') is True:
         lines.append(f"{indent}<ReadOnly>true</ReadOnly>")
+
+
+def emit_layout(lines, el, indent, skip_height=False, multi_line_default=False):
+    # Общие layout-свойства — применимы ко всем элементам. Порядок согласован
+    # с историческим выводом input/label, чтобы не сдвигать существующие снапшоты.
+    # skip_height: для Table (height → HeightInTableRows, эмитится в emit_table).
+    # multi_line_default: input без явного autoMaxWidth при multiLine → AutoMaxWidth=false.
+    if el.get('skipOnInput') is True:
+        lines.append(f"{indent}<SkipOnInput>true</SkipOnInput>")
+    if 'autoMaxWidth' in el:
+        if el.get('autoMaxWidth') is False:
+            lines.append(f"{indent}<AutoMaxWidth>false</AutoMaxWidth>")
+    elif multi_line_default:
+        lines.append(f"{indent}<AutoMaxWidth>false</AutoMaxWidth>")
+    if el.get('maxWidth') is not None:
+        lines.append(f"{indent}<MaxWidth>{el['maxWidth']}</MaxWidth>")
+    if el.get('autoMaxHeight') is False:
+        lines.append(f"{indent}<AutoMaxHeight>false</AutoMaxHeight>")
+    if el.get('maxHeight') is not None:
+        lines.append(f"{indent}<MaxHeight>{el['maxHeight']}</MaxHeight>")
+    if el.get('width'):
+        lines.append(f"{indent}<Width>{el['width']}</Width>")
+    if not skip_height and el.get('height'):
+        lines.append(f"{indent}<Height>{el['height']}</Height>")
+    if el.get('horizontalStretch') is True:
+        lines.append(f"{indent}<HorizontalStretch>true</HorizontalStretch>")
+    if el.get('verticalStretch') is True:
+        lines.append(f"{indent}<VerticalStretch>true</VerticalStretch>")
+    if el.get('groupHorizontalAlign'):
+        lines.append(f"{indent}<GroupHorizontalAlign>{el['groupHorizontalAlign']}</GroupHorizontalAlign>")
+    if el.get('groupVerticalAlign'):
+        lines.append(f"{indent}<GroupVerticalAlign>{el['groupVerticalAlign']}</GroupVerticalAlign>")
+    if el.get('horizontalAlign'):
+        lines.append(f"{indent}<HorizontalAlign>{el['horizontalAlign']}</HorizontalAlign>")
 
 
 def title_from_name(name):
@@ -1862,6 +1897,7 @@ def emit_group(lines, el, name, eid, indent):
         lines.append(f'{inner}<United>false</United>')
 
     emit_common_flags(lines, el, inner)
+    emit_layout(lines, el, inner)
 
     # Companion: ExtendedTooltip
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner)
@@ -1897,10 +1933,9 @@ def emit_column_group(lines, el, name, eid, indent):
     if el.get('showInHeader') is not None:
         sh_val = 'true' if el['showInHeader'] else 'false'
         lines.append(f'{inner}<ShowInHeader>{sh_val}</ShowInHeader>')
-    if el.get('width'):
-        lines.append(f'{inner}<Width>{el["width"]}</Width>')
 
     emit_common_flags(lines, el, inner)
+    emit_layout(lines, el, inner)
 
     emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner)
 
@@ -1946,27 +1981,7 @@ def emit_input(lines, el, name, eid, indent):
         lines.append(f'{inner}<AutoMarkIncomplete>true</AutoMarkIncomplete>')
     if el.get('textEdit') is False:
         lines.append(f'{inner}<TextEdit>false</TextEdit>')
-    if el.get('skipOnInput') is True:
-        lines.append(f'{inner}<SkipOnInput>true</SkipOnInput>')
-    if 'autoMaxWidth' in el:
-        if el['autoMaxWidth'] is False:
-            lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
-    elif el.get('multiLine') is True:
-        lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
-    if el.get('maxWidth') is not None:
-        lines.append(f'{inner}<MaxWidth>{el["maxWidth"]}</MaxWidth>')
-    if el.get('autoMaxHeight') is False:
-        lines.append(f'{inner}<AutoMaxHeight>false</AutoMaxHeight>')
-    if el.get('maxHeight') is not None:
-        lines.append(f'{inner}<MaxHeight>{el["maxHeight"]}</MaxHeight>')
-    if el.get('width'):
-        lines.append(f'{inner}<Width>{el["width"]}</Width>')
-    if el.get('height'):
-        lines.append(f'{inner}<Height>{el["height"]}</Height>')
-    if el.get('horizontalStretch') is True:
-        lines.append(f'{inner}<HorizontalStretch>true</HorizontalStretch>')
-    if el.get('verticalStretch') is True:
-        lines.append(f'{inner}<VerticalStretch>true</VerticalStretch>')
+    emit_layout(lines, el, inner, multi_line_default=(el.get('multiLine') is True))
 
     if el.get('inputHint'):
         emit_mltext(lines, inner, 'InputHint', str(el['inputHint']))
@@ -1992,6 +2007,8 @@ def emit_check(lines, el, name, eid, indent):
 
     tl = el.get('titleLocation') or 'Right'
     lines.append(f'{inner}<TitleLocation>{tl}</TitleLocation>')
+
+    emit_layout(lines, el, inner)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2057,6 +2074,8 @@ def emit_radio_button_field(lines, el, name, eid, indent):
             lines.append(f'{item_indent}</xr:Item>')
         lines.append(f'{inner}</ChoiceList>')
 
+    emit_layout(lines, el, inner)
+
     emit_companion(lines, 'ContextMenu', f'{name}КонтекстноеМеню', inner)
     emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner)
 
@@ -2083,18 +2102,7 @@ def emit_label(lines, el, name, eid, indent):
 
     if el.get('hyperlink') is True:
         lines.append(f'{inner}<Hyperlink>true</Hyperlink>')
-    if el.get('autoMaxWidth') is False:
-        lines.append(f'{inner}<AutoMaxWidth>false</AutoMaxWidth>')
-    if el.get('maxWidth') is not None:
-        lines.append(f'{inner}<MaxWidth>{el["maxWidth"]}</MaxWidth>')
-    if el.get('autoMaxHeight') is False:
-        lines.append(f'{inner}<AutoMaxHeight>false</AutoMaxHeight>')
-    if el.get('maxHeight') is not None:
-        lines.append(f'{inner}<MaxHeight>{el["maxHeight"]}</MaxHeight>')
-    if el.get('width'):
-        lines.append(f'{inner}<Width>{el["width"]}</Width>')
-    if el.get('height'):
-        lines.append(f'{inner}<Height>{el["height"]}</Height>')
+    emit_layout(lines, el, inner)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2117,6 +2125,7 @@ def emit_label_field(lines, el, name, eid, indent):
 
     if el.get('hyperlink') is True:
         lines.append(f'{inner}<Hyperlink>true</Hyperlink>')
+    emit_layout(lines, el, inner)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2165,6 +2174,7 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<EnableDrag>true</EnableDrag>')
     if el.get('rowPictureDataPath'):
         lines.append(f'{inner}<RowPictureDataPath>{el["rowPictureDataPath"]}</RowPictureDataPath>')
+    emit_layout(lines, el, inner, skip_height=True)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2202,6 +2212,7 @@ def emit_pages(lines, el, name, eid, indent):
         lines.append(f'{inner}<PagesRepresentation>{el["pagesRepresentation"]}</PagesRepresentation>')
 
     emit_common_flags(lines, el, inner)
+    emit_layout(lines, el, inner)
 
     # Companion
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner)
@@ -2235,6 +2246,7 @@ def emit_page(lines, el, name, eid, indent):
         orientation = orientation_map.get(str(el['group']))
         if orientation:
             lines.append(f'{inner}<Group>{orientation}</Group>')
+    emit_layout(lines, el, inner)
 
     # Companion
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner)
@@ -2316,6 +2328,7 @@ def emit_button(lines, el, name, eid, indent, in_cmd_bar=False):
 
     if el.get('locationInCommandBar'):
         lines.append(f'{inner}<LocationInCommandBar>{el["locationInCommandBar"]}</LocationInCommandBar>')
+    emit_layout(lines, el, inner)
 
     # Companion
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner)
@@ -2334,17 +2347,15 @@ def emit_picture_decoration(lines, el, name, eid, indent):
 
     if el.get('picture') or el.get('src'):
         ref = str(el.get('src') or el.get('picture'))
+        lt = 'true' if el.get('loadTransparent') is True else 'false'
         lines.append(f'{inner}<Picture>')
         lines.append(f'{inner}\t<xr:Ref>{ref}</xr:Ref>')
-        lines.append(f'{inner}\t<xr:LoadTransparent>true</xr:LoadTransparent>')
+        lines.append(f'{inner}\t<xr:LoadTransparent>{lt}</xr:LoadTransparent>')
         lines.append(f'{inner}</Picture>')
 
     if el.get('hyperlink') is True:
         lines.append(f'{inner}<Hyperlink>true</Hyperlink>')
-    if el.get('width'):
-        lines.append(f'{inner}<Width>{el["width"]}</Width>')
-    if el.get('height'):
-        lines.append(f'{inner}<Height>{el["height"]}</Height>')
+    emit_layout(lines, el, inner)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2375,10 +2386,7 @@ def emit_picture_field(lines, el, name, eid, indent):
             lines.append(f'{inner}\t<xr:LoadTransparent>true</xr:LoadTransparent>')
         lines.append(f'{inner}</ValuesPicture>')
 
-    if el.get('width'):
-        lines.append(f'{inner}<Width>{el["width"]}</Width>')
-    if el.get('height'):
-        lines.append(f'{inner}<Height>{el["height"]}</Height>')
+    emit_layout(lines, el, inner)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2398,6 +2406,7 @@ def emit_calendar(lines, el, name, eid, indent):
 
     emit_title(lines, el, name, inner, auto=not el.get('path'))
     emit_common_flags(lines, el, inner)
+    emit_layout(lines, el, inner)
 
     # Companions
     emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
@@ -2416,6 +2425,7 @@ def emit_command_bar(lines, el, name, eid, indent):
         lines.append(f'{inner}<Autofill>true</Autofill>')
 
     emit_common_flags(lines, el, inner)
+    emit_layout(lines, el, inner)
 
     # Children
     if el.get('children') and len(el['children']) > 0:
@@ -2442,6 +2452,7 @@ def emit_popup(lines, el, name, eid, indent):
 
     if el.get('representation'):
         lines.append(f'{inner}<Representation>{el["representation"]}</Representation>')
+    emit_layout(lines, el, inner)
 
     # Children
     if el.get('children') and len(el['children']) > 0:
@@ -2463,6 +2474,7 @@ def emit_button_group(lines, el, name, eid, indent):
         lines.append(f'{inner}<Representation>{el["representation"]}</Representation>')
 
     emit_common_flags(lines, el, inner)
+    emit_layout(lines, el, inner)
 
     # Companion: ExtendedTooltip
     emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner)

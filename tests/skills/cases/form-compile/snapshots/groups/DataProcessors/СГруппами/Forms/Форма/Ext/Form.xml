@@ -22,6 +22,8 @@
 				</v8:item>
 			</Title>
 			<Group>Horizontal</Group>
+			<HorizontalStretch>true</HorizontalStretch>
+			<GroupHorizontalAlign>Right</GroupHorizontalAlign>
 			<ExtendedTooltip name="ГруппаШапкаРасширеннаяПодсказка" id="3"/>
 			<ChildItems>
 				<InputField name="Поле1" id="4">
@@ -32,6 +34,8 @@
 							<v8:content>Поле 1</v8:content>
 						</v8:item>
 					</Title>
+					<SkipOnInput>true</SkipOnInput>
+					<Width>20</Width>
 					<ContextMenu name="Поле1КонтекстноеМеню" id="5"/>
 					<ExtendedTooltip name="Поле1РасширеннаяПодсказка" id="6"/>
 				</InputField>
@@ -46,13 +50,19 @@
 					<ContextMenu name="Поле2КонтекстноеМеню" id="8"/>
 					<ExtendedTooltip name="Поле2РасширеннаяПодсказка" id="9"/>
 				</InputField>
+				<LabelField name="Метка" id="10">
+					<DataPath>Поле1</DataPath>
+					<GroupVerticalAlign>Center</GroupVerticalAlign>
+					<ContextMenu name="МеткаКонтекстноеМеню" id="11"/>
+					<ExtendedTooltip name="МеткаРасширеннаяПодсказка" id="12"/>
+				</LabelField>
 			</ChildItems>
 		</UsualGroup>
-		<UsualGroup name="ГруппаПодвал" id="10">
+		<UsualGroup name="ГруппаПодвал" id="13">
 			<Group>Vertical</Group>
-			<ExtendedTooltip name="ГруппаПодвалРасширеннаяПодсказка" id="11"/>
+			<ExtendedTooltip name="ГруппаПодвалРасширеннаяПодсказка" id="14"/>
 			<ChildItems>
-				<InputField name="Поле3" id="12">
+				<InputField name="Поле3" id="15">
 					<DataPath>Поле3</DataPath>
 					<Title>
 						<v8:item>
@@ -60,20 +70,20 @@
 							<v8:content>Поле 3</v8:content>
 						</v8:item>
 					</Title>
-					<ContextMenu name="Поле3КонтекстноеМеню" id="13"/>
-					<ExtendedTooltip name="Поле3РасширеннаяПодсказка" id="14"/>
+					<ContextMenu name="Поле3КонтекстноеМеню" id="16"/>
+					<ExtendedTooltip name="Поле3РасширеннаяПодсказка" id="17"/>
 				</InputField>
 			</ChildItems>
 		</UsualGroup>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Объект" id="15">
+		<Attribute name="Объект" id="18">
 			<Type>
 				<v8:Type>cfg:DataProcessorObject.СГруппами</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
-		<Attribute name="Поле1" id="16">
+		<Attribute name="Поле1" id="19">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
@@ -88,7 +98,7 @@
 				</v8:StringQualifiers>
 			</Type>
 		</Attribute>
-		<Attribute name="Поле2" id="17">
+		<Attribute name="Поле2" id="20">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
@@ -104,7 +114,7 @@
 				</v8:NumberQualifiers>
 			</Type>
 		</Attribute>
-		<Attribute name="Поле3" id="18">
+		<Attribute name="Поле3" id="21">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
