@@ -1,4 +1,4 @@
-# skd-edit v1.24 — Atomic 1C DCS editor (Python port)
+# skd-edit v1.25 — Atomic 1C DCS editor (Python port)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import os
@@ -371,7 +371,18 @@ def parse_param_shorthand(s):
         result["name"] = m.group(1).strip()
         result["type"] = resolve_type_str(m.group(2).strip())
         if m.group(3) is not None:
-            result["value"] = m.group(4).strip() if m.group(4) else ""
+            rhs = m.group(4)
+            if rhs and rhs.strip():
+                items = parse_value_list(rhs.strip())
+                if len(items) >= 2:
+                    # Multi-value default → list; valueListAllowed implied
+                    result["value"] = items
+                    result["valueListAllowed"] = True
+                else:
+                    # Scalar (single item, quotes stripped) or empty sentinel
+                    result["value"] = items[0] if len(items) == 1 else ""
+            else:
+                result["value"] = ""
     else:
         result["name"] = s.strip()
 
@@ -631,14 +642,12 @@ def parse_output_param_shorthand(s):
     return {"key": s.strip(), "value": ""}
 
 
-def parse_available_value_list(s):
-    """Returns list of {value, presentation} from comma-separated list.
-    Items can use single/double quotes (stripped). Quoted spans preserve commas/colons."""
-    if not s:
-        return []
-
-    # Tokenize by ',' respecting quoted spans
+def split_quoted_csv(s):
+    """Split on top-level commas, respecting single/double quoted spans.
+    Returns raw (un-stripped) item spans. Shared by availableValue and value-list parsing."""
     items = []
+    if s is None:
+        return items
     buf = []
     in_quote = None
     for ch in s:
@@ -656,12 +665,37 @@ def parse_available_value_list(s):
             buf.append(ch)
     if buf:
         items.append("".join(buf))
+    return items
 
-    def strip_quotes(t):
-        t = t.strip()
-        if len(t) >= 2 and ((t[0] == "'" and t[-1] == "'") or (t[0] == '"' and t[-1] == '"')):
-            return t[1:-1]
-        return t
+
+def strip_quotes(t):
+    """Strip a single surrounding pair of matching quotes; trims first."""
+    t = t.strip()
+    if len(t) >= 2 and ((t[0] == "'" and t[-1] == "'") or (t[0] == '"' and t[-1] == '"')):
+        return t[1:-1]
+    return t
+
+
+def parse_value_list(s):
+    """Return list of value strings (quotes stripped) split by top-level commas.
+    No ':' handling — values may contain colons (e.g. dateTime 2024-01-01T12:30:00)."""
+    if s is None:
+        return []
+    result = []
+    for raw in split_quoted_csv(s):
+        v = strip_quotes(raw)
+        if v != "":
+            result.append(v)
+    return result
+
+
+def parse_available_value_list(s):
+    """Returns list of {value, presentation} from comma-separated list.
+    Items can use single/double quotes (stripped). Quoted spans preserve commas/colons."""
+    if not s:
+        return []
+
+    items = split_quoted_csv(s)
 
     result = []
     for raw in items:
@@ -1012,7 +1046,12 @@ def build_param_fragment(parsed, indent):
         lines.append(f"{i}\t</valueType>")
 
     vla = bool(parsed.get("valueListAllowed"))
-    if parsed["value"] is not None:
+    if isinstance(parsed["value"], list):
+        # Multi-value default (value-list): one <value> per item
+        for v in parsed["value"]:
+            for vl in build_param_value_xml(parsed.get("type", ""), v, f"{i}\t"):
+                lines.append(vl)
+    elif parsed["value"] is not None:
         if is_empty_value(parsed["value"]):
             empty_xml = build_empty_value_xml(parsed.get("type", ""), f"{i}\t", "", "value", vla)
             if empty_xml:
@@ -1987,6 +2026,17 @@ elif operation == "modify-parameter":
             simple_rest = rest[:av_idx].strip()
             av_part = rest[av_idx:]
 
+        # Separate a multi-value value=... (list) — kv-regex below grabs only a single
+        # \S+ token, so a comma-separated list (with spaces) wouldn't be captured.
+        value_list_items = None
+        vl_idx = simple_rest.find("value=")
+        if vl_idx >= 0:
+            vl_rhs = simple_rest[vl_idx + len("value="):]
+            cand = parse_value_list(vl_rhs)
+            if len(cand) >= 2:
+                value_list_items = cand
+                simple_rest = simple_rest[:vl_idx].strip()
+
         # Process simple key=value pairs (use, denyIncompleteValues, etc.)
         if simple_rest:
             for m in re.finditer(r'(\w+)=(\S+)', simple_rest):
@@ -2012,12 +2062,15 @@ elif operation == "modify-parameter":
                     else:
                         value_lines = build_param_value_xml(declared_type, value, child_indent)
                         frag_xml = "\n".join(value_lines)
-                    was_existing = existing is not None
-                    if existing is not None:
-                        # Find next-element sibling as ref before removing
-                        idx = list(param_el).index(existing)
-                        ref_node = param_el[idx + 1] if idx + 1 < len(param_el) else None
-                        remove_node_with_whitespace(existing)
+                    # Collect ALL existing <value> (a param may carry a value-list) — scalar
+                    # value= collapses them to one, so remove every <value>, not just the first.
+                    all_value_els = [ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) == "value" and etree.QName(ch.tag).namespace == SCH_NS]
+                    was_existing = len(all_value_els) > 0
+                    if was_existing:
+                        last_idx = list(param_el).index(all_value_els[-1])
+                        ref_node = param_el[last_idx + 1] if last_idx + 1 < len(param_el) else None
+                        for ve in all_value_els:
+                            remove_node_with_whitespace(ve)
                     else:
                         ref_node = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) in ("useRestriction", "availableValue", "denyIncompleteValues", "use")), None)
                     if frag_xml:
@@ -2039,6 +2092,39 @@ elif operation == "modify-parameter":
                     for node in nodes:
                         insert_before_element(param_el, node, ref_node, child_indent)
                     dirty = True; print(f'[OK] Parameter "{param_name}": {key}={value} added')
+
+        # Process multi-value list (value=v1, v2, ...) — replace ALL <value>, ensure valueListAllowed=true
+        if value_list_items:
+            declared_type = ""
+            vt_el = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) == "valueType" and etree.QName(ch.tag).namespace == SCH_NS), None)
+            if vt_el is not None:
+                for tnode in vt_el:
+                    if isinstance(tnode.tag, str) and local_name(tnode) == "Type":
+                        declared_type = re.sub(r'^d\d+p\d+:', '', (tnode.text or "").strip())
+                        break
+            # Remove ALL existing <value>; capture insertion ref after the last one
+            value_els = [ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) == "value" and etree.QName(ch.tag).namespace == SCH_NS]
+            if value_els:
+                last_idx = list(param_el).index(value_els[-1])
+                ref_node = param_el[last_idx + 1] if last_idx + 1 < len(param_el) else None
+                for ve in value_els:
+                    remove_node_with_whitespace(ve)
+            else:
+                ref_node = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) in ("useRestriction", "availableValue", "denyIncompleteValues", "use")), None)
+            for v in value_list_items:
+                frag_xml = "\n".join(build_param_value_xml(declared_type, v, child_indent))
+                for node in import_fragment(xml_doc, frag_xml):
+                    insert_before_element(param_el, node, ref_node, child_indent)
+            # Ensure <valueListAllowed>true</valueListAllowed> (schema order: after useRestriction, before availableValue/use)
+            vla_el = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) == "valueListAllowed" and etree.QName(ch.tag).namespace == SCH_NS), None)
+            if vla_el is not None:
+                if (vla_el.text or "").strip() != "true":
+                    vla_el.text = "true"
+            else:
+                ref_vla = next((ch for ch in param_el if isinstance(ch.tag, str) and local_name(ch) in ("availableValue", "denyIncompleteValues", "use")), None)
+                for node in import_fragment(xml_doc, f"{child_indent}<valueListAllowed>true</valueListAllowed>"):
+                    insert_before_element(param_el, node, ref_vla, child_indent)
+            dirty = True; print(f'[OK] Parameter "{param_name}": value set to list of {len(value_list_items)} item(s)')
 
         # Process availableValue
         if av_part:

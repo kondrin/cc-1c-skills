@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# skd-compile v1.104 — Compile 1C DCS from JSON
+# skd-compile v1.105 — Compile 1C DCS from JSON
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import json
@@ -325,6 +325,39 @@ def parse_total_shorthand(s):
 
 # --- Parameter shorthand parser ---
 
+def split_value_list_csv(s):
+    """Split on top-level commas (respecting single/double quotes), strip quotes,
+    drop empties. No ':' handling — values may contain colons (dateTime)."""
+    result = []
+    if s is None:
+        return result
+    items = []
+    buf = []
+    in_quote = None
+    for ch in s:
+        if in_quote:
+            buf.append(ch)
+            if ch == in_quote:
+                in_quote = None
+        elif ch in ("'", '"'):
+            in_quote = ch
+            buf.append(ch)
+        elif ch == ',':
+            items.append("".join(buf))
+            buf = []
+        else:
+            buf.append(ch)
+    if buf:
+        items.append("".join(buf))
+    for raw in items:
+        t = raw.strip()
+        if len(t) >= 2 and ((t[0] == "'" and t[-1] == "'") or (t[0] == '"' and t[-1] == '"')):
+            t = t[1:-1]
+        if t != "":
+            result.append(t)
+    return result
+
+
 def parse_param_shorthand(s):
     result = {'name': '', 'type': '', 'value': None, 'autoDates': False, 'title': None}
 
@@ -355,7 +388,16 @@ def parse_param_shorthand(s):
         result['name'] = m.group(1).strip()
         result['type'] = resolve_type_str(m.group(2).strip())
         if m.group(4):
-            result['value'] = m.group(4).strip()
+            rhs = m.group(4).strip()
+            items = split_value_list_csv(rhs)
+            if len(items) >= 2:
+                # Multi-value default → list; valueListAllowed implied
+                result['value'] = items
+                result['valueListAllowed'] = True
+            elif len(items) == 1:
+                result['value'] = items[0]
+            else:
+                result['value'] = rhs
     else:
         result['name'] = s.strip()
 
