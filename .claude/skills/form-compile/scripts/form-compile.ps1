@@ -1,4 +1,4 @@
-﻿# form-compile v1.26 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.27 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2034,6 +2034,30 @@ function Emit-Title {
 	}
 }
 
+function Map-TitleLoc {
+	param([string]$v)
+	switch ("$v".ToLower()) {
+		"none"   { "None" }
+		"left"   { "Left" }
+		"right"  { "Right" }
+		"top"    { "Top" }
+		"bottom" { "Bottom" }
+		"auto"   { "Auto" }
+		default  { "$v" }
+	}
+}
+
+# TitleLocation у check/radio: нет ключа → умный дефолт (Right/None), эмитится;
+# "" → подавить (= дефолт платформы, она его сама не пишет); значение → эмитить (маппинг регистра).
+function Emit-TitleLocation {
+	param($el, [string]$indent, [string]$smartDefault)
+	if ($null -ne $el.PSObject.Properties['titleLocation']) {
+		if ($el.titleLocation) { X "$indent<TitleLocation>$(Map-TitleLoc "$($el.titleLocation)")</TitleLocation>" }
+	} elseif ($smartDefault) {
+		X "$indent<TitleLocation>$smartDefault</TitleLocation>"
+	}
+}
+
 function Emit-Group {
 	param($el, [string]$name, [int]$id, [string]$indent)
 
@@ -2196,8 +2220,7 @@ function Emit-Check {
 	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
 	Emit-CommonFlags -el $el -indent $inner
 
-	$tl = if ($el.titleLocation) { "$($el.titleLocation)" } else { "Right" }
-	X "$inner<TitleLocation>$tl</TitleLocation>"
+	Emit-TitleLocation -el $el -indent $inner -smartDefault "Right"
 
 	Emit-Layout -el $el -indent $inner
 
@@ -2337,18 +2360,7 @@ function Emit-Radio {
 	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
 	Emit-CommonFlags -el $el -indent $inner
 
-	# TitleLocation default is None for radio (matches typical configurator behavior)
-	$tl = if ($el.titleLocation) {
-		switch ("$($el.titleLocation)") {
-			"none"   { "None" }
-			"left"   { "Left" }
-			"right"  { "Right" }
-			"top"    { "Top" }
-			"bottom" { "Bottom" }
-			default  { "$($el.titleLocation)" }
-		}
-	} else { "None" }
-	X "$inner<TitleLocation>$tl</TitleLocation>"
+	Emit-TitleLocation -el $el -indent $inner -smartDefault "None"
 
 	# RadioButtonType: Auto | RadioButtons | Tumbler. Accept synonyms.
 	$rbtRaw = if ($el.radioButtonType) { "$($el.radioButtonType)".Trim() } else { "Auto" }

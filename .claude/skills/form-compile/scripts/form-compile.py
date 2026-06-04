@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.26 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.27 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1620,6 +1620,23 @@ def emit_title(lines, el, name, indent, auto=False):
         emit_mltext(lines, indent, 'Title', title_from_name(name))
 
 
+_TITLE_LOC_MAP = {'none': 'None', 'left': 'Left', 'right': 'Right', 'top': 'Top', 'bottom': 'Bottom', 'auto': 'Auto'}
+
+
+def map_title_loc(v):
+    return _TITLE_LOC_MAP.get(str(v).lower(), str(v))
+
+
+def emit_title_location(lines, el, indent, smart_default):
+    # Нет ключа → умный дефолт (Right/None), эмитится. "" → подавить (дефолт платформы).
+    # Значение → эмитить с маппингом регистра.
+    if 'titleLocation' in el:
+        if el.get('titleLocation'):
+            lines.append(f"{indent}<TitleLocation>{map_title_loc(el['titleLocation'])}</TitleLocation>")
+    elif smart_default:
+        lines.append(f"{indent}<TitleLocation>{smart_default}</TitleLocation>")
+
+
 # --- Type emitter ---
 
 V8_TYPES = {
@@ -2007,8 +2024,7 @@ def emit_check(lines, el, name, eid, indent):
     emit_title(lines, el, name, inner, auto=not el.get('path'))
     emit_common_flags(lines, el, inner)
 
-    tl = el.get('titleLocation') or 'Right'
-    lines.append(f'{inner}<TitleLocation>{tl}</TitleLocation>')
+    emit_title_location(lines, el, inner, 'Right')
 
     emit_layout(lines, el, inner)
 
@@ -2031,13 +2047,7 @@ def emit_radio_button_field(lines, el, name, eid, indent):
     emit_title(lines, el, name, inner, auto=not el.get('path'))
     emit_common_flags(lines, el, inner)
 
-    tl_raw = el.get('titleLocation')
-    if tl_raw:
-        loc_map = {'none': 'None', 'left': 'Left', 'right': 'Right', 'top': 'Top', 'bottom': 'Bottom'}
-        tl = loc_map.get(str(tl_raw), str(tl_raw))
-    else:
-        tl = 'None'
-    lines.append(f'{inner}<TitleLocation>{tl}</TitleLocation>')
+    emit_title_location(lines, el, inner, 'None')
 
     rbt = normalize_radio_button_type(el.get('radioButtonType'))
     lines.append(f'{inner}<RadioButtonType>{rbt}</RadioButtonType>')

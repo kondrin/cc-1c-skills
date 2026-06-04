@@ -1,4 +1,4 @@
-﻿# form-decompile v0.5 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.6 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -203,6 +203,15 @@ function Add-Layout {
 	$ha = Get-Child $node 'HorizontalAlign'; if ($ha) { $obj['horizontalAlign'] = $ha }
 }
 
+# TitleLocation у check/radio (зеркало Emit-TitleLocation):
+#   тега нет → "" (дефолт платформы); значение = умный дефолт → опускаем; иначе пишем.
+function Add-TitleLocation {
+	param($obj, $node, [string]$smartDefault)
+	$tl = Get-Child $node 'TitleLocation'
+	if ($null -eq $tl) { $obj['titleLocation'] = '' }
+	elseif ($tl -ne $smartDefault) { $obj['titleLocation'] = $tl.ToLower() }
+}
+
 # Суффиксы авто-имён обработчиков (инверсия компилятора)
 $HANDLER_SUFFIX = @{
 	'OnChange'='ПриИзменении'; 'StartChoice'='НачалоВыбора'; 'ChoiceProcessing'='ОбработкаВыбора';
@@ -375,12 +384,13 @@ function Decompile-Element {
 			$obj[$key] = $name
 			$dp = Get-Child $node 'DataPath'; if ($dp) { $obj['path'] = $dp }
 			Add-CommonProps $obj $node $name
-			$tl = Get-Child $node 'TitleLocation'; if ($tl) { $obj['titleLocation'] = $tl.ToLower() }
+			Add-TitleLocation $obj $node 'Right'
 		}
 		'RadioButtonField' {
 			$obj[$key] = $name
 			$dp = Get-Child $node 'DataPath'; if ($dp) { $obj['path'] = $dp }
 			Add-CommonProps $obj $node $name
+			Add-TitleLocation $obj $node 'None'
 			$rbt = Get-Child $node 'RadioButtonType'; if ($rbt) { $obj['radioButtonType'] = $rbt }
 			$cc = Get-Child $node 'ColumnsCount'; if ($cc) { $obj['columnsCount'] = [int]$cc }
 			$cl = $node.SelectSingleNode("lf:ChoiceList", $ns)

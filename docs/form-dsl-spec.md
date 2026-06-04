@@ -216,7 +216,7 @@
 | Свойство | Тип | Описание |
 |----------|-----|----------|
 | `path` | string | DataPath |
-| `titleLocation` | string | Расположение заголовка |
+| `titleLocation` | string | Расположение заголовка. **Нет ключа** → умный дефолт `Right` (флажки почти всегда справа). **`""`** → дефолт платформы (`Left`, тег не пишется). Значение (`none`/`left`/`top`/…) → как указано |
 
 #### radio — RadioButtonField
 
@@ -237,7 +237,7 @@
 | `path` | string | DataPath |
 | `radioButtonType` | string | `Auto` (по умолчанию), `RadioButtons`, `Tumbler` |
 | `columnsCount` | int | Число колонок раскладки |
-| `titleLocation` | string | Расположение заголовка (компилятор подставляет `None`, если не задан) |
+| `titleLocation` | string | Расположение заголовка. **Нет ключа** → умный дефолт `None`. **`""`** → дефолт платформы (тег не пишется). Значение → как указано |
 | `choiceList` | array | Варианты выбора: массив `{ value, presentation }` |
 
 `choiceList[*]`:
