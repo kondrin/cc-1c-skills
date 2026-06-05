@@ -1,4 +1,4 @@
-﻿# form-decompile v0.21 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.22 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -979,6 +979,31 @@ function Decompile-Element {
 			$ssl = Get-Child $node 'SearchStringLocation'; if ($ssl) { $obj['searchStringLocation'] = $ssl }
 			$vsl = Get-Child $node 'ViewStatusLocation'; if ($vsl) { $obj['viewStatusLocation'] = $vsl }
 			$scl = Get-Child $node 'SearchControlLocation'; if ($scl) { $obj['searchControlLocation'] = $scl }
+			# --- Блок свойств дин-список-таблицы (признак: дочерний <UpdateOnDataChange>) ---
+			if (Has-Child $node 'UpdateOnDataChange') {
+				$listName = Get-Child $node 'DataPath'
+				# Group A (инверсия дефолтов)
+				if ((Get-Child $node 'AutoRefresh') -eq 'true') { $obj['autoRefresh'] = $true }
+				$arp = Get-Child $node 'AutoRefreshPeriod'; if ($arp -and $arp -ne '60') { $obj['autoRefreshPeriod'] = [int]$arp }
+				$cfi = Get-Child $node 'ChoiceFoldersAndItems'; if ($cfi -and $cfi -ne 'Items') { $obj['choiceFoldersAndItems'] = $cfi }
+				if ((Get-Child $node 'RestoreCurrentRow') -eq 'true') { $obj['restoreCurrentRow'] = $true }
+				if ((Get-Child $node 'ShowRoot') -eq 'false') { $obj['showRoot'] = $false }
+				if ((Get-Child $node 'AllowRootChoice') -eq 'true') { $obj['allowRootChoice'] = $true }
+				$uodc = Get-Child $node 'UpdateOnDataChange'; if ($uodc -and $uodc -ne 'Auto') { $obj['updateOnDataChange'] = $uodc }
+				if ((Get-Child $node 'AllowGettingCurrentRowURL') -eq 'false') { $obj['allowGettingCurrentRowURL'] = $false }
+				# Group B (захват при наличии)
+				if ((Get-Child $node 'DefaultItem') -eq 'true') { $obj['defaultItem'] = $true }
+				if ((Get-Child $node 'UseAlternationRowColor') -eq 'true') { $obj['useAlternationRowColor'] = $true }
+				$itv = Get-Child $node 'InitialTreeView'; if ($itv) { $obj['initialTreeView'] = $itv }
+				if ((Get-Child $node 'EnableStartDrag') -eq 'true') { $obj['enableStartDrag'] = $true }
+				$fdm = Get-Child $node 'FileDragMode'; if ($fdm) { $obj['fileDragMode'] = $fdm }
+				# Group C
+				$rpdp = Get-Child $node 'RowPictureDataPath'
+				if ($null -eq $rpdp) { $obj['rowPictureDataPath'] = '' }
+				elseif ($rpdp -ne "$listName.DefaultPicture") { $obj['rowPictureDataPath'] = $rpdp }
+				$rpRef = $node.SelectSingleNode("lf:RowsPicture/xr:Ref", $ns); if ($rpRef) { $obj['rowsPicture'] = $rpRef.InnerText }
+				$usg = Get-Child $node 'UserSettingsGroup'; if ($usg) { $obj['userSettingsGroup'] = $usg }
+			}
 			$csNode = $node.SelectSingleNode("lf:CommandSet", $ns)
 			if ($csNode) {
 				$exc = New-Object System.Collections.ArrayList

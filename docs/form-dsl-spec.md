@@ -321,6 +321,28 @@
 | `searchControlLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
 | `excludedCommands` | string[] | Исключённые стандартные команды таблицы (`Add`, `Delete`, `MoveUp`, `SortListAsc`, …) → `<CommandSet>` |
 
+##### Таблица динамического списка
+
+Когда таблица привязана к реквизиту `type: "DynamicList"` (её `path` = имя такого реквизита), платформа эмитит блок специфичных свойств. Компилятор генерирует его автоматически с умолчаниями; в DSL указываются **только отличия** от умолчания (декомпилятор так и поступает). Чистые константы (`Period`, `TopLevelParent`) не настраиваются.
+
+| Свойство | Тип | Умолчание | Описание |
+|----------|-----|-----------|----------|
+| `rowPictureDataPath` | string | `<Список>.DefaultPicture` (если есть осн. таблица) | Путь к картинке строки. `""` — подавить авто-вывод |
+| `defaultItem` | bool | — | `<DefaultItem>` (элемент по умолчанию) |
+| `useAlternationRowColor` | bool | — | Чередование цвета строк |
+| `initialTreeView` | string | — | `ExpandTopLevel`, `ExpandAllLevels`, `NoExpand` |
+| `enableStartDrag` / `fileDragMode` | bool / string | — | Перетаскивание; `fileDragMode` = `AsFile`/… |
+| `autoRefresh` | bool | `false` | Автообновление |
+| `autoRefreshPeriod` | int | `60` | Период автообновления, сек |
+| `choiceFoldersAndItems` | string | `Items` | `Items`, `Folders`, `FoldersAndItems` |
+| `restoreCurrentRow` | bool | `false` | Восстанавливать текущую строку |
+| `showRoot` | bool | `true` | Показывать корень |
+| `allowRootChoice` | bool | `false` | Разрешить выбор корня |
+| `updateOnDataChange` | string | `Auto` | `Auto`, `DontUpdate` |
+| `allowGettingCurrentRowURL` | bool | `true` | Получение URL текущей строки |
+| `userSettingsGroup` | string | — | Группа пользовательских настроек |
+| `rowsPicture` | string | — | Картинка строк (`CommonPicture.X`) → `<RowsPicture>` |
+
 #### columnGroup — ColumnGroup
 
 Группа колонок таблицы. Используется только внутри `columns` таблицы. Допускается вложение `columnGroup` в `columnGroup`.

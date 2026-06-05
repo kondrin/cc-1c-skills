@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.39 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.40 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1784,6 +1784,11 @@ KNOWN_KEYS = {
     "autofill",
     "choiceMode", "initialTreeView", "enableDrag", "enableStartDrag",
     "rowPictureDataPath", "tableAutofill",
+    # dynamic-list table block
+    "defaultItem", "useAlternationRowColor", "fileDragMode", "autoRefresh",
+    "autoRefreshPeriod", "choiceFoldersAndItems", "restoreCurrentRow", "showRoot",
+    "allowRootChoice", "updateOnDataChange", "allowGettingCurrentRowURL",
+    "userSettingsGroup", "rowsPicture",
 }
 
 TYPE_KEYS = ["columnGroup", "buttonGroup", "group", "input", "check", "radio", "label", "labelField", "table", "pages", "page",
@@ -2318,8 +2323,10 @@ def emit_element(lines, el, indent, in_cmd_bar=False):
         print("WARNING: Unknown element type, skipping", file=sys.stderr)
         return
 
-    # Validate known keys
+    # Validate known keys (внутренние маркеры на _ пропускаем)
     for p_name in el.keys():
+        if p_name.startswith('_'):
+            continue
         if p_name not in KNOWN_KEYS:
             print(f"WARNING: Element '{el.get(type_key, '')}': unknown key '{p_name}' -- ignored. Check SKILL.md for valid keys.", file=sys.stderr)
 
@@ -2650,6 +2657,42 @@ def emit_label_field(lines, el, name, eid, indent):
     lines.append(f'{indent}</LabelField>')
 
 
+# Блок свойств таблицы, привязанной к динамическому списку (Group A defaults + B/C).
+def emit_dynlist_table_block(lines, el, indent):
+    # Group B (условные опц.)
+    if el.get('defaultItem') is True:
+        lines.append(f'{indent}<DefaultItem>true</DefaultItem>')
+    if el.get('useAlternationRowColor') is True:
+        lines.append(f'{indent}<UseAlternationRowColor>true</UseAlternationRowColor>')
+    if el.get('fileDragMode'):
+        lines.append(f'{indent}<FileDragMode>{el["fileDragMode"]}</FileDragMode>')
+    # Group A (гарант. блок): дефолт + override
+    ar = 'true' if el.get('autoRefresh') is True else 'false'
+    lines.append(f'{indent}<AutoRefresh>{ar}</AutoRefresh>')
+    arp = el['autoRefreshPeriod'] if el.get('autoRefreshPeriod') is not None else 60
+    lines.append(f'{indent}<AutoRefreshPeriod>{arp}</AutoRefreshPeriod>')
+    lines.append(f'{indent}<Period>')
+    lines.append(f'{indent}\t<v8:variant xsi:type="v8:StandardPeriodVariant">Custom</v8:variant>')
+    lines.append(f'{indent}\t<v8:startDate>0001-01-01T00:00:00</v8:startDate>')
+    lines.append(f'{indent}\t<v8:endDate>0001-01-01T00:00:00</v8:endDate>')
+    lines.append(f'{indent}</Period>')
+    cfi = el.get('choiceFoldersAndItems') or 'Items'
+    lines.append(f'{indent}<ChoiceFoldersAndItems>{cfi}</ChoiceFoldersAndItems>')
+    rcr = 'true' if el.get('restoreCurrentRow') is True else 'false'
+    lines.append(f'{indent}<RestoreCurrentRow>{rcr}</RestoreCurrentRow>')
+    lines.append(f'{indent}<TopLevelParent xsi:nil="true"/>')
+    sr = 'false' if el.get('showRoot') is False else 'true'
+    lines.append(f'{indent}<ShowRoot>{sr}</ShowRoot>')
+    arc = 'true' if el.get('allowRootChoice') is True else 'false'
+    lines.append(f'{indent}<AllowRootChoice>{arc}</AllowRootChoice>')
+    uodc = el.get('updateOnDataChange') or 'Auto'
+    lines.append(f'{indent}<UpdateOnDataChange>{uodc}</UpdateOnDataChange>')
+    if el.get('userSettingsGroup'):
+        lines.append(f'{indent}<UserSettingsGroup>{el["userSettingsGroup"]}</UserSettingsGroup>')
+    agcru = 'false' if el.get('allowGettingCurrentRowURL') is False else 'true'
+    lines.append(f'{indent}<AllowGettingCurrentRowURL>{agcru}</AllowGettingCurrentRowURL>')
+
+
 def emit_table(lines, el, name, eid, indent):
     lines.append(f'{indent}<Table name="{name}" id="{eid}">')
     inner = f'{indent}\t'
@@ -2690,6 +2733,14 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<EnableDrag>true</EnableDrag>')
     if el.get('rowPictureDataPath'):
         lines.append(f'{inner}<RowPictureDataPath>{el["rowPictureDataPath"]}</RowPictureDataPath>')
+    if el.get('rowsPicture'):
+        lines.append(f'{inner}<RowsPicture>')
+        lines.append(f'{inner}\t<xr:Ref>{el["rowsPicture"]}</xr:Ref>')
+        lines.append(f'{inner}\t<xr:LoadTransparent>false</xr:LoadTransparent>')
+        lines.append(f'{inner}</RowsPicture>')
+    # Блок свойств дин-список-таблицы (помечена эвристикой)
+    if el.get('_dynList'):
+        emit_dynlist_table_block(lines, el, inner)
     if el.get('viewStatusLocation'):
         lines.append(f'{inner}<ViewStatusLocation>{el["viewStatusLocation"]}</ViewStatusLocation>')
     if el.get('searchControlLocation'):
@@ -3532,12 +3583,15 @@ def main():
         if not isinstance(el, dict):
             return
         if el.get('table') is not None and str(el.get('path', '')) == list_name:
+            # Маркер дин-список-таблицы → emit_table эмитит блок свойств
+            el['_dynList'] = True
             if 'tableAutofill' not in el:
                 el['tableAutofill'] = False
             if 'commandBarLocation' not in el:
                 el['commandBarLocation'] = 'None'
-            # DefaultPicture доступен только если у DynamicList есть основная таблица
-            if has_main_table and not el.get('rowPictureDataPath'):
+            # RowPictureDataPath: умный дефолт <Список>.DefaultPicture, если ключ ОТСУТСТВУЕТ
+            # и есть основная таблица. Пустая строка (suppress-маркер) НЕ перезатирается.
+            if has_main_table and 'rowPictureDataPath' not in el:
                 el['rowPictureDataPath'] = f'{list_name}.DefaultPicture'
         if isinstance(el.get('children'), list):
             for child in el['children']:
@@ -3602,14 +3656,15 @@ def main():
                 names = ', '.join(c.get('name', '') for c in candidates)
                 print(f"[WARN] Multiple main-attribute candidates: {names}; specify \"main\": true explicitly")
 
-    # 1b.4: DynamicList → table heuristic
+    # 1b.4: DynamicList → table heuristic (для ВСЕХ DynamicList-реквизитов, не только main)
     if isinstance(defn.get('attributes'), list) and isinstance(defn.get('elements'), list):
-        main_attr = next((a for a in defn['attributes'] if isinstance(a, dict) and a.get('main') is True), None)
-        if main_attr and str(main_attr.get('type', '')) == 'DynamicList':
-            settings = main_attr.get('settings') or {}
+        for attr in defn['attributes']:
+            if not isinstance(attr, dict) or str(attr.get('type', '')) != 'DynamicList':
+                continue
+            settings = attr.get('settings') or {}
             has_mt = bool(isinstance(settings, dict) and settings.get('mainTable'))
             for el in defn['elements']:
-                _apply_dlist_table_heuristic(el, main_attr.get('name', ''), has_mt)
+                _apply_dlist_table_heuristic(el, attr.get('name', ''), has_mt)
 
     # 1b.5: Compute main AutoCommandBar Autofill (B3)
     def _compute_main_acb_autofill():

@@ -1,4 +1,4 @@
-﻿# form-compile v1.39 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.40 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2342,6 +2342,11 @@ function Emit-Element {
 		"excludedCommands"=1
 		"choiceMode"=1;"initialTreeView"=1;"enableDrag"=1;"enableStartDrag"=1
 		"rowPictureDataPath"=1;"tableAutofill"=1
+		# dynamic-list table block
+		"defaultItem"=1;"useAlternationRowColor"=1;"fileDragMode"=1;"autoRefresh"=1
+		"autoRefreshPeriod"=1;"choiceFoldersAndItems"=1;"restoreCurrentRow"=1;"showRoot"=1
+		"allowRootChoice"=1;"updateOnDataChange"=1;"allowGettingCurrentRowURL"=1
+		"userSettingsGroup"=1;"rowsPicture"=1
 		# calendar-specific
 		"selectionMode"=1;"showCurrentDate"=1;"widthInMonths"=1;"heightInMonths"=1;"showMonthsPanel"=1
 		# pages-specific
@@ -2354,6 +2359,7 @@ function Emit-Element {
 		"autofill"=1
 	}
 	foreach ($p in $el.PSObject.Properties) {
+		if ($p.Name -like '_*') { continue }  # внутренние маркеры (напр. _dynList)
 		if (-not $knownKeys.ContainsKey($p.Name)) {
 			Write-Warning "Element '$($el.$typeKey)': unknown key '$($p.Name)' — ignored. Check SKILL.md for valid keys."
 		}
@@ -2949,6 +2955,41 @@ function Emit-LabelField {
 	X "$indent</LabelField>"
 }
 
+# Блок свойств таблицы, привязанной к динамическому списку (Group A defaults + B/C).
+# Платформа всегда эмитит этот блок на дин-список-таблице; компилятор зеркалит дефолты,
+# DSL-ключ переопределяет; декомпилятор инвертирует (опускает значения = дефолту).
+function Emit-DynListTableBlock {
+	param($el, [string]$indent)
+	# Group B (условные опц.): defaultItem / useAlternationRowColor / fileDragMode
+	if ($el.defaultItem -eq $true) { X "$indent<DefaultItem>true</DefaultItem>" }
+	if ($el.useAlternationRowColor -eq $true) { X "$indent<UseAlternationRowColor>true</UseAlternationRowColor>" }
+	if ($el.fileDragMode) { X "$indent<FileDragMode>$($el.fileDragMode)</FileDragMode>" }
+	# Group A (гарант. блок, n=5079): дефолт + override
+	$ar = if ($el.autoRefresh -eq $true) { "true" } else { "false" }
+	X "$indent<AutoRefresh>$ar</AutoRefresh>"
+	$arp = if ($el.PSObject.Properties["autoRefreshPeriod"] -and $null -ne $el.autoRefreshPeriod) { $el.autoRefreshPeriod } else { 60 }
+	X "$indent<AutoRefreshPeriod>$arp</AutoRefreshPeriod>"
+	X "$indent<Period>"
+	X "$indent`t<v8:variant xsi:type=`"v8:StandardPeriodVariant`">Custom</v8:variant>"
+	X "$indent`t<v8:startDate>0001-01-01T00:00:00</v8:startDate>"
+	X "$indent`t<v8:endDate>0001-01-01T00:00:00</v8:endDate>"
+	X "$indent</Period>"
+	$cfi = if ($el.choiceFoldersAndItems) { $el.choiceFoldersAndItems } else { "Items" }
+	X "$indent<ChoiceFoldersAndItems>$cfi</ChoiceFoldersAndItems>"
+	$rcr = if ($el.restoreCurrentRow -eq $true) { "true" } else { "false" }
+	X "$indent<RestoreCurrentRow>$rcr</RestoreCurrentRow>"
+	X "$indent<TopLevelParent xsi:nil=`"true`"/>"
+	$sr = if ($el.showRoot -eq $false) { "false" } else { "true" }
+	X "$indent<ShowRoot>$sr</ShowRoot>"
+	$arc = if ($el.allowRootChoice -eq $true) { "true" } else { "false" }
+	X "$indent<AllowRootChoice>$arc</AllowRootChoice>"
+	$uodc = if ($el.updateOnDataChange) { $el.updateOnDataChange } else { "Auto" }
+	X "$indent<UpdateOnDataChange>$uodc</UpdateOnDataChange>"
+	if ($el.userSettingsGroup) { X "$indent<UserSettingsGroup>$($el.userSettingsGroup)</UserSettingsGroup>" }
+	$agcru = if ($el.allowGettingCurrentRowURL -eq $false) { "false" } else { "true" }
+	X "$indent<AllowGettingCurrentRowURL>$agcru</AllowGettingCurrentRowURL>"
+}
+
 function Emit-Table {
 	param($el, [string]$name, [int]$id, [string]$indent)
 
@@ -2981,6 +3022,14 @@ function Emit-Table {
 	if ($el.enableStartDrag -eq $true) { X "$inner<EnableStartDrag>true</EnableStartDrag>" }
 	if ($el.enableDrag -eq $true) { X "$inner<EnableDrag>true</EnableDrag>" }
 	if ($el.rowPictureDataPath) { X "$inner<RowPictureDataPath>$($el.rowPictureDataPath)</RowPictureDataPath>" }
+	if ($el.rowsPicture) {
+		X "$inner<RowsPicture>"
+		X "$inner`t<xr:Ref>$($el.rowsPicture)</xr:Ref>"
+		X "$inner`t<xr:LoadTransparent>false</xr:LoadTransparent>"
+		X "$inner</RowsPicture>"
+	}
+	# Блок свойств дин-список-таблицы (помечена эвристикой 11b.4)
+	if ($el.PSObject.Properties["_dynList"] -and $el._dynList) { Emit-DynListTableBlock -el $el -indent $inner }
 	if ($el.viewStatusLocation) { X "$inner<ViewStatusLocation>$($el.viewStatusLocation)</ViewStatusLocation>" }
 	if ($el.searchControlLocation) { X "$inner<SearchControlLocation>$($el.searchControlLocation)</SearchControlLocation>" }
 	Emit-Layout -el $el -indent $inner -skipHeight
@@ -3637,14 +3686,17 @@ function ApplyDynamicListTableHeuristic {
 	param($el, [string]$listName, [bool]$hasMainTable)
 	if ($null -eq $el) { return }
 	if ($el.PSObject.Properties["table"] -and $null -ne $el.table -and "$($el.path)" -eq $listName) {
+		# Маркер дин-список-таблицы → Emit-Table эмитит блок свойств (Group A defaults)
+		$el | Add-Member -NotePropertyName "_dynList" -NotePropertyValue $true -Force
 		if ($null -eq $el.PSObject.Properties["tableAutofill"]) {
 			$el | Add-Member -NotePropertyName "tableAutofill" -NotePropertyValue $false -Force
 		}
 		if ($null -eq $el.PSObject.Properties["commandBarLocation"]) {
 			$el | Add-Member -NotePropertyName "commandBarLocation" -NotePropertyValue "None" -Force
 		}
-		# DefaultPicture доступен только если у DynamicList есть основная таблица
-		if ($hasMainTable -and ($null -eq $el.PSObject.Properties["rowPictureDataPath"] -or [string]::IsNullOrEmpty("$($el.rowPictureDataPath)"))) {
+		# RowPictureDataPath: умный дефолт <Список>.DefaultPicture, если ключ ОТСУТСТВУЕТ
+		# и есть основная таблица. Пустая строка (suppress-маркер) НЕ перезатирается.
+		if ($hasMainTable -and ($null -eq $el.PSObject.Properties["rowPictureDataPath"])) {
 			$el | Add-Member -NotePropertyName "rowPictureDataPath" -NotePropertyValue "$listName.DefaultPicture" -Force
 		}
 	}
@@ -3731,24 +3783,21 @@ if ($def.attributes) {
 	}
 }
 
-# 11b.4: DynamicList → table heuristic
+# 11b.4: DynamicList → table heuristic (для ВСЕХ DynamicList-реквизитов, не только main)
 if ($def.attributes -and $def.elements) {
-	$mainAttr = $null
 	foreach ($attr in $def.attributes) {
-		if ($attr.main -eq $true) { $mainAttr = $attr; break }
-	}
-	if ($mainAttr -and "$($mainAttr.type)" -eq "DynamicList") {
+		if ("$($attr.type)" -ne "DynamicList") { continue }
 		$mt = $null
-		if ($mainAttr.PSObject.Properties["settings"] -and $null -ne $mainAttr.settings) {
-			if ($mainAttr.settings -is [hashtable]) {
-				if ($mainAttr.settings.ContainsKey("mainTable")) { $mt = $mainAttr.settings["mainTable"] }
-			} elseif ($mainAttr.settings.PSObject.Properties["mainTable"]) {
-				$mt = $mainAttr.settings.mainTable
+		if ($attr.PSObject.Properties["settings"] -and $null -ne $attr.settings) {
+			if ($attr.settings -is [hashtable]) {
+				if ($attr.settings.ContainsKey("mainTable")) { $mt = $attr.settings["mainTable"] }
+			} elseif ($attr.settings.PSObject.Properties["mainTable"]) {
+				$mt = $attr.settings.mainTable
 			}
 		}
 		$hasMt = -not [string]::IsNullOrEmpty("$mt")
 		foreach ($el in $def.elements) {
-			ApplyDynamicListTableHeuristic $el $mainAttr.name $hasMt
+			ApplyDynamicListTableHeuristic $el $attr.name $hasMt
 		}
 	}
 }
