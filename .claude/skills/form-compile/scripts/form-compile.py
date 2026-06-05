@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.34 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.36 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1251,7 +1251,9 @@ def generate_chart_of_accounts_choice_dsl(meta, preset_data):
 
 
 def esc_xml(s):
-    return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+    # Экранирование ТЕКСТА элемента (<v8:content>, <Value>): только & < > .
+    # Кавычки/апострофы в тексте 1С не экранирует (пишет литерально) — &quot; ломал бы раундтрип.
+    return s.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
 
 
 def emit_ml_items(lines, indent, val):
@@ -1354,7 +1356,7 @@ KNOWN_KEYS = {
     "button", "picture", "picField", "calendar", "cmdBar", "popup",
     "showInHeader",
     "radioButtonType", "choiceList", "columnsCount", "checkBoxType", "editMode",
-    "name", "path", "title",
+    "name", "path", "title", "tooltip",
     "visible", "hidden", "enabled", "disabled", "readOnly", "userVisible",
     "events", "on", "handlers",
     "selectionMode", "showCurrentDate", "widthInMonths", "heightInMonths", "showMonthsPanel",
@@ -1673,6 +1675,9 @@ def emit_title(lines, el, name, indent, auto=False):
             emit_mltext(lines, indent, 'Title', el['title'])
     elif auto and name:
         emit_mltext(lines, indent, 'Title', title_from_name(name))
+    # ToolTip элемента (всплывающая подсказка) — по схеме сразу после Title.
+    if el.get('tooltip'):
+        emit_mltext(lines, indent, 'ToolTip', el['tooltip'])
 
 
 _TITLE_LOC_MAP = {'none': 'None', 'left': 'Left', 'right': 'Right', 'top': 'Top', 'bottom': 'Bottom', 'auto': 'Auto'}
@@ -2173,6 +2178,8 @@ def emit_label(lines, el, name, eid, indent):
         lines.append(f'{inner}<Title formatted="{formatted}">')
         emit_ml_items(lines, f'{inner}\t', label_title)
         lines.append(f'{inner}</Title>')
+    if el.get('tooltip'):
+        emit_mltext(lines, inner, 'ToolTip', el['tooltip'])
 
     emit_common_flags(lines, el, inner)
 
@@ -2300,6 +2307,8 @@ def emit_table(lines, el, name, eid, indent):
 def emit_pages(lines, el, name, eid, indent):
     lines.append(f'{indent}<Pages name="{name}" id="{eid}">')
     inner = f'{indent}\t'
+
+    emit_title(lines, el, name, inner)
 
     if el.get('pagesRepresentation'):
         lines.append(f'{inner}<PagesRepresentation>{el["pagesRepresentation"]}</PagesRepresentation>')
@@ -2534,6 +2543,8 @@ def emit_calendar(lines, el, name, eid, indent):
 def emit_command_bar(lines, el, name, eid, indent):
     lines.append(f'{indent}<CommandBar name="{name}" id="{eid}">')
     inner = f'{indent}\t'
+
+    emit_title(lines, el, name, inner)
 
     if el.get('autofill') is True:
         lines.append(f'{inner}<Autofill>true</Autofill>')

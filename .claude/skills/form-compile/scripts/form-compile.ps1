@@ -1,4 +1,4 @@
-﻿# form-compile v1.34 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.36 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1515,8 +1515,11 @@ function X {
 }
 
 function Esc-Xml {
+	# Экранирование ТЕКСТА элемента (<v8:content>, <Value>): только & < > .
+	# Кавычки/апострофы в тексте экранировать НЕ нужно (1С их не экранирует — пишет литерально);
+	# &quot; ломал бы раундтрип. Кавычки спецсимвольны лишь в значениях атрибутов.
 	param([string]$s)
-	return $s.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;').Replace('"','&quot;')
+	return $s.Replace('&','&amp;').Replace('<','&lt;').Replace('>','&gt;')
 }
 
 # --- 4. Multilang helper ---
@@ -1956,7 +1959,7 @@ function Emit-Element {
 		# radio-specific
 		"radioButtonType"=1;"choiceList"=1;"columnsCount"=1;"checkBoxType"=1;"editMode"=1
 		# naming & binding
-		"name"=1;"path"=1;"title"=1
+		"name"=1;"path"=1;"title"=1;"tooltip"=1
 		# visibility & state
 		"visible"=1;"hidden"=1;"enabled"=1;"disabled"=1;"readOnly"=1;"userVisible"=1
 		# events ("events" — основной формат; on/handlers — legacy, принимаются ради совместимости)
@@ -2091,6 +2094,8 @@ function Emit-Title {
 	} elseif ($auto -and $name) {
 		Emit-MLText -tag "Title" -text (Title-FromName -name $name) -indent $indent
 	}
+	# ToolTip элемента (всплывающая подсказка) — по схеме сразу после Title.
+	if ($el.tooltip) { Emit-MLText -tag "ToolTip" -text $el.tooltip -indent $indent }
 }
 
 function Map-TitleLoc {
@@ -2525,6 +2530,7 @@ function Emit-Label {
 		Emit-MLItems -val $labelTitle -indent "$inner`t"
 		X "$inner</Title>"
 	}
+	if ($el.tooltip) { Emit-MLText -tag "ToolTip" -text $el.tooltip -indent $inner }
 
 	Emit-CommonFlags -el $el -indent $inner
 
@@ -2643,6 +2649,8 @@ function Emit-Pages {
 
 	X "$indent<Pages name=`"$name`" id=`"$id`">"
 	$inner = "$indent`t"
+
+	Emit-Title -el $el -name $name -indent $inner
 
 	if ($el.pagesRepresentation) {
 		X "$inner<PagesRepresentation>$($el.pagesRepresentation)</PagesRepresentation>"
@@ -2905,6 +2913,8 @@ function Emit-CommandBar {
 
 	X "$indent<CommandBar name=`"$name`" id=`"$id`">"
 	$inner = "$indent`t"
+
+	Emit-Title -el $el -name $name -indent $inner
 
 	if ($el.autofill -eq $true) { X "$inner<Autofill>true</Autofill>" }
 

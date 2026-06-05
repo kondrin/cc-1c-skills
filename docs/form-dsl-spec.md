@@ -116,6 +116,7 @@
 | `readOnly` | bool | `true` → `<ReadOnly>true</ReadOnly>` |
 | `events` | object | Обработчики событий: `{ "ИмяСобытия": "ИмяОбработчика" }` — тот же формат, что у событий формы (§3). Значение `null` → имя по конвенции (§4.2). См. §4.2 |
 | `titleLocation` | string | Расположение заголовка: `none`/`left`/`right`/`top`/`bottom`/`auto`. Эмитится при наличии (input, labelField, picField, table, calendar). У `check`/`radio` — особая семантика с умным дефолтом (см. их разделы) |
+| `tooltip` | string/object | Всплывающая подсказка элемента (`<ToolTip>`). Строка → ru, объект `{ "ru": …, "en": … }` → мультиязычный (как `title`). Эмитится сразу после `title` |
 
 ### 4.1a. Общие layout-свойства
 

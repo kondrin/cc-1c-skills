@@ -16,7 +16,7 @@
   "input": {
     "title": "Поля ввода",
     "elements": [
-      { "input": "ОбычноеПоле", "path": "ОбычноеПоле", "title": "Обычное поле", "editMode": "EnterOnInput" },
+      { "input": "ОбычноеПоле", "path": "ОбычноеПоле", "title": "Обычное поле", "tooltip": "Введите значение поля", "editMode": "EnterOnInput" },
       { "labelField": "Ссылка", "path": "ОбычноеПоле", "titleLocation": "left", "hyperlink": true },
       { "input": "МногострочноеПоле", "path": "МногострочноеПоле", "multiLine": true, "height": 5, "title": "Комментарий" },
       { "input": "ПолеПароля", "path": "ПолеПароля", "passwordMode": true, "title": "Пароль" },

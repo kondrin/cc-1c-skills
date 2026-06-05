@@ -10,6 +10,12 @@
 	<AutoCommandBar name="ФормаКоманднаяПанель" id="-1"/>
 	<ChildItems>
 		<Pages name="СтраницыМастера" id="1">
+			<ToolTip>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Страницы мастера настройки</v8:content>
+				</v8:item>
+			</ToolTip>
 			<PagesRepresentation>None</PagesRepresentation>
 			<ExtendedTooltip name="СтраницыМастераРасширеннаяПодсказка" id="2"/>
 			<ChildItems>
@@ -30,6 +36,12 @@
 							<v8:content>Результат</v8:content>
 						</v8:item>
 					</Title>
+					<ToolTip>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Шаг "Результат"</v8:content>
+						</v8:item>
+					</ToolTip>
 					<ExtendedTooltip name="Шаг2РасширеннаяПодсказка" id="9"/>
 					<ChildItems>
 						<InputField name="Итог" id="10">
