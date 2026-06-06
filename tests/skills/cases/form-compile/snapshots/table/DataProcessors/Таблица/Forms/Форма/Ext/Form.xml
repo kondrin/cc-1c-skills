@@ -134,11 +134,21 @@
 						</v8:StringQualifiers>
 					</Type>
 				</Column>
+				<Column name="Объект" id="34">
+					<Type>
+						<v8:TypeSet>cfg:AnyRef</v8:TypeSet>
+					</Type>
+				</Column>
+				<Column name="Источник" id="35">
+					<Type>
+						<v8:TypeSet>cfg:CatalogRef</v8:TypeSet>
+					</Type>
+				</Column>
 			</Columns>
 		</Attribute>
 	</Attributes>
 	<Commands>
-		<Command name="Обновить" id="34">
+		<Command name="Обновить" id="36">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>

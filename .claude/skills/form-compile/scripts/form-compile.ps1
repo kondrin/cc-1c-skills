@@ -1,4 +1,4 @@
-﻿# form-compile v1.51 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.52 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1955,6 +1955,9 @@ $script:formTypeSynonyms["планобменассылка"]              = "Exc
 $script:formTypeSynonyms["бизнеспроцессссылка"]           = "BusinessProcessRef"
 $script:formTypeSynonyms["задачассылка"]                  = "TaskRef"
 $script:formTypeSynonyms["определяемыйтип"]             = "DefinedType"
+$script:formTypeSynonyms["характеристика"]             = "Characteristic"
+$script:formTypeSynonyms["любаяссылка"]                = "AnyRef"
+$script:formTypeSynonyms["любаяссылкаиб"]              = "AnyIBRef"
 
 # Known invalid types (runtime/UI types that don't exist in XDTO schema)
 $script:knownInvalidTypes = @{
@@ -2107,6 +2110,17 @@ function Emit-SingleType {
 	# DynamicList
 	if ($typeStr -eq "DynamicList") {
 		X "$indent<v8:Type>cfg:DynamicList</v8:Type>"
+		return
+	}
+
+	# TypeSet (набор типов) → <v8:TypeSet>: определяемый тип / характеристика (именованные)
+	# + «любая ссылка вида» (голый ref-вид без .Имя). Развязка с обычным типом — по наличию точки.
+	if ($typeStr -match '^(DefinedType|Characteristic)\.') {
+		X "$indent<v8:TypeSet>cfg:$typeStr</v8:TypeSet>"
+		return
+	}
+	if ($typeStr -match '^(AnyRef|AnyIBRef|CatalogRef|DocumentRef|EnumRef|ExchangePlanRef|TaskRef|BusinessProcessRef|ChartOfAccountsRef|ChartOfCharacteristicTypesRef|ChartOfCalculationTypesRef)$') {
+		X "$indent<v8:TypeSet>cfg:$typeStr</v8:TypeSet>"
 		return
 	}
 

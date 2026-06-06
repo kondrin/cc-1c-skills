@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.51 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.52 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -2345,6 +2345,9 @@ _FORM_TYPE_SYNONYMS = {
     "бизнеспроцессссылка": "BusinessProcessRef",
     "задачассылка": "TaskRef",
     "определяемыйтип": "DefinedType",
+    "характеристика": "Characteristic",
+    "любаяссылка": "AnyRef",
+    "любаяссылкаиб": "AnyIBRef",
 }
 
 
@@ -2430,6 +2433,15 @@ def emit_single_type(lines, type_str, indent):
     # DynamicList
     if type_str == 'DynamicList':
         lines.append(f'{indent}<v8:Type>cfg:DynamicList</v8:Type>')
+        return
+
+    # TypeSet (набор типов) → <v8:TypeSet>: определяемый тип / характеристика (именованные)
+    # + «любая ссылка вида» (голый ref-вид без .Имя). Развязка с обычным типом — по наличию точки.
+    if re.match(r'^(DefinedType|Characteristic)\.', type_str):
+        lines.append(f'{indent}<v8:TypeSet>cfg:{type_str}</v8:TypeSet>')
+        return
+    if re.match(r'^(AnyRef|AnyIBRef|CatalogRef|DocumentRef|EnumRef|ExchangePlanRef|TaskRef|BusinessProcessRef|ChartOfAccountsRef|ChartOfCharacteristicTypesRef|ChartOfCalculationTypesRef)$', type_str):
+        lines.append(f'{indent}<v8:TypeSet>cfg:{type_str}</v8:TypeSet>')
         return
 
     # cfg: references

@@ -38,7 +38,9 @@
       { "name": "Данные", "type": "ValueTable", "columns": [
         { "name": "Дата", "type": "date" },
         { "name": "Сумма", "type": "decimal(15,2)" },
-        { "name": "Комментарий", "type": "string(200)" }
+        { "name": "Комментарий", "type": "string(200)" },
+        { "name": "Объект", "type": "AnyRef" },
+        { "name": "Источник", "type": "CatalogRef" }
       ]}
     ],
     "commands": [

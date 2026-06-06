@@ -742,12 +742,27 @@ Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `Tabs
 | `"Picture"` | `v8ui:Picture` |
 | `"DynamicList"` | `cfg:DynamicList` |
 
+### Наборы типов (TypeSet → `<v8:TypeSet>`)
+
+«Набор типов» вместо конкретного типа. Развязка с обычным типом — по наличию `.Имя`:
+
+| DSL | XML | Смысл |
+|-----|-----|-------|
+| `"DefinedType.ДенежнаяСумма"` | `<v8:TypeSet>cfg:DefinedType.ДенежнаяСумма</v8:TypeSet>` | определяемый тип (синоним `ОпределяемыйТип.X`) |
+| `"Characteristic.Номенклатура"` | `<v8:TypeSet>cfg:Characteristic.Номенклатура</v8:TypeSet>` | характеристика (синоним `Характеристика.X`) |
+| `"AnyRef"` | `<v8:TypeSet>cfg:AnyRef</v8:TypeSet>` | любая ссылка (синоним `ЛюбаяСсылка`) |
+| `"AnyIBRef"` | `<v8:TypeSet>cfg:AnyIBRef</v8:TypeSet>` | любая ссылка ИБ |
+| `"CatalogRef"` (голый, без `.Имя`) | `<v8:TypeSet>cfg:CatalogRef</v8:TypeSet>` | любая ссылка справочника (аналогично `DocumentRef`, `EnumRef`, `ExchangePlanRef`, `TaskRef`, `BusinessProcessRef`, `ChartOf*Ref`) |
+
+`CatalogRef.Валюты` (с `.Имя`) → обычный `<v8:Type>`; `CatalogRef` (голый) → `<v8:TypeSet>`.
+
 ### Составные типы
 
-Разделитель `" | "`:
+Разделитель `" | "` (или `+`). Каждая часть независимо роутится в `<v8:Type>` или `<v8:TypeSet>` (можно смешивать):
 
 ```json
 "type": "CatalogRef.Организации | CatalogRef.ИндивидуальныеПредприниматели"
+"type": "CatalogRef.Контрагенты | DefinedType.ДенежнаяСумма"
 ```
 
 ---

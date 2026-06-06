@@ -1,4 +1,4 @@
-﻿# form-decompile v0.33 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.34 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -853,6 +853,13 @@ function Decompile-Type {
 			'^(v8|v8ui|cfg):(.+)$' { $short = $matches[2] }
 			default { $short = $raw }
 		}
+		[void]$parts.Add($short)
+	}
+	# TypeSet (набор типов): определяемый тип / характеристика / «любая ссылка вида».
+	# Префикс cfg:/v8: снимаем — обратный роутинг в компиляторе по форме токена.
+	foreach ($ts in @($typeNode.SelectNodes("v8:TypeSet", $ns))) {
+		$raw = $ts.InnerText.Trim()
+		$short = $raw -replace '^(v8ui|v8|cfg):', ''
 		[void]$parts.Add($short)
 	}
 	if ($parts.Count -eq 0) { return $null }
