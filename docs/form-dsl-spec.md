@@ -115,6 +115,8 @@
 | `disabled` | bool | `true` → `<Enabled>false</Enabled>` |
 | `readOnly` | bool | `true` → `<ReadOnly>true</ReadOnly>` |
 | `userVisible` | bool/object | Пользовательская видимость по ролям (`<UserVisible>`). См. §4.1c. Отсутствие = виден всем |
+| `commandBar` | object/array | Командная панель элемента (companion `<AutoCommandBar>`) с контентом. См. §4.1d |
+| `contextMenu` | object/array | Контекстное меню элемента (companion `<ContextMenu>`) с контентом. См. §4.1d |
 | `events` | object | Обработчики событий: `{ "ИмяСобытия": "ИмяОбработчика" }` — тот же формат, что у событий формы (§3). Значение `null` → имя по конвенции (§4.2). См. §4.2 |
 | `titleLocation` | string | Расположение заголовка: `none`/`left`/`right`/`top`/`bottom`/`auto`. Эмитится при наличии (input, labelField, picField, table, calendar). У `check`/`radio` — особая семантика с умным дефолтом (см. их разделы) |
 | `tooltip` | string/object | Всплывающая подсказка элемента (`<ToolTip>`). Строка → ru, объект `{ "ru": …, "en": … }` → мультиязычный (как `title`). Эмитится сразу после `title` |
@@ -159,6 +161,37 @@
 { "name": "Реквизит", "view": false,                                            // не виден…
   "edit": { "common": false, "roles": { "ПолныеПрава": true } } }               // …и редактируем только Полными правами
 { "name": "Команда", "use": { "common": false, "roles": { "Роль.Бухгалтер": true } } }
+```
+
+### 4.1d. Companion-панели элемента (`commandBar` / `contextMenu`)
+
+Командная панель (`<AutoCommandBar>`) и контекстное меню (`<ContextMenu>`) элемента — это
+companion-панели с собственным контентом. Оба несут одну грамматику.
+
+| Ключ | XML companion | Forgiving-синонимы (при объект/массив-значении) |
+|------|---------------|--------------------------------------------------|
+| `commandBar` | `<AutoCommandBar>` | `autoCommandBar`, `AutoCommandBar`, `autoCmdBar`, `cmdBar`, `КоманднаяПанель` |
+| `contextMenu` | `<ContextMenu>` | `ContextMenu`, `КонтекстноеМеню` |
+
+**Значение** (обе формы):
+- массив `[ … ]` → shorthand для `{ "children": [ … ] }`;
+- объект `{ "autofill"?: bool, "children": [ … ] }` (+ `horizontalAlign` у `commandBar`).
+
+`children` — обычная грамматика кнопок: `button` (с `command`/`commandName`/`stdCommand`), `buttonGroup`, `popup`.
+
+- `autofill`: отсутствует → дефолт платформы (тег не эмитим); `false` → подавить автозаполнение панели.
+- Отсутствие свойства целиком → пустой companion (как обычно).
+
+**Разведение тип-элемента и панель-свойства — по типу значения:** `cmdBar: "Имя"` (строка) — это
+отдельный элемент-панель в дереве (§4.3); `commandBar: { … }` (объект/массив) — companion-панель *данного*
+элемента. Поэтому модель может писать панель таблицы любым знакомым словом.
+
+```jsonc
+{ "table": "Список", "path": "Список",
+  "commandBar": { "autofill": false, "children": [
+    { "button": "Создать", "command": "СоздатьЭлемент" } ] },
+  "contextMenu": { "children": [
+    { "button": "Карта", "commandName": "CommonCommand.КартаМаршрута" } ] } }
 ```
 
 ### 4.1a. Общие layout-свойства
@@ -447,7 +480,8 @@ Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `Tabs
 | Свойство | Тип | Описание |
 |----------|-----|----------|
 | `command` | string | Имя команды формы (→ `Form.Command.<name>`) |
-| `stdCommand` | string | Стандартная команда (→ `Form.StandardCommand.<name>`) |
+| `commandName` | string | Глобальная команда «как есть» (`CommonCommand.X`, `Catalog.X.Command.Y` …) — без обёртки `Form.` |
+| `stdCommand` | string | Стандартная команда (→ `Form.StandardCommand.<name>`; `X.Y` → `Form.Item.X.StandardCommand.Y`) |
 | `type` | string | `usual`, `hyperlink`, `commandBar` |
 | `defaultButton` | bool | Кнопка по умолчанию |
 | `picture` | string | Ссылка на картинку (`StdPicture.Name`) |

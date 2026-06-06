@@ -21,60 +21,82 @@
 				<ExcludedCommand>MoveUp</ExcludedCommand>
 				<ExcludedCommand>MoveDown</ExcludedCommand>
 			</CommandSet>
-			<ContextMenu name="ДанныеКонтекстноеМеню" id="2"/>
-			<AutoCommandBar name="ДанныеКоманднаяПанель" id="3"/>
-			<ExtendedTooltip name="ДанныеРасширеннаяПодсказка" id="4"/>
-			<SearchStringAddition name="ДанныеСтрокаПоиска" id="5">
+			<ContextMenu name="ДанныеКонтекстноеМеню" id="2">
+				<ChildItems>
+					<ButtonGroup name="МенюГруппа" id="3">
+						<ExtendedTooltip name="МенюГруппаРасширеннаяПодсказка" id="4"/>
+						<ChildItems>
+							<Button name="МенюОбновить" id="5">
+								<Type>CommandBarButton</Type>
+								<CommandName>Form.Command.Обновить</CommandName>
+								<ExtendedTooltip name="МенюОбновитьРасширеннаяПодсказка" id="6"/>
+							</Button>
+						</ChildItems>
+					</ButtonGroup>
+				</ChildItems>
+			</ContextMenu>
+			<AutoCommandBar name="ДанныеКоманднаяПанель" id="7">
+				<Autofill>false</Autofill>
+				<ChildItems>
+					<Button name="ПанельОбновить" id="8">
+						<Type>CommandBarButton</Type>
+						<CommandName>Form.Command.Обновить</CommandName>
+						<ExtendedTooltip name="ПанельОбновитьРасширеннаяПодсказка" id="9"/>
+					</Button>
+				</ChildItems>
+			</AutoCommandBar>
+			<ExtendedTooltip name="ДанныеРасширеннаяПодсказка" id="10"/>
+			<SearchStringAddition name="ДанныеСтрокаПоиска" id="11">
 				<AdditionSource>
 					<Item>Данные</Item>
 					<Type>SearchStringRepresentation</Type>
 				</AdditionSource>
-				<ContextMenu name="ДанныеСтрокаПоискаКонтекстноеМеню" id="6"/>
-				<ExtendedTooltip name="ДанныеСтрокаПоискаРасширеннаяПодсказка" id="7"/>
+				<ContextMenu name="ДанныеСтрокаПоискаКонтекстноеМеню" id="12"/>
+				<ExtendedTooltip name="ДанныеСтрокаПоискаРасширеннаяПодсказка" id="13"/>
 			</SearchStringAddition>
-			<ViewStatusAddition name="ДанныеСостояниеПросмотра" id="8">
+			<ViewStatusAddition name="ДанныеСостояниеПросмотра" id="14">
 				<AdditionSource>
 					<Item>Данные</Item>
 					<Type>ViewStatusRepresentation</Type>
 				</AdditionSource>
-				<ContextMenu name="ДанныеСостояниеПросмотраКонтекстноеМеню" id="9"/>
-				<ExtendedTooltip name="ДанныеСостояниеПросмотраРасширеннаяПодсказка" id="10"/>
+				<ContextMenu name="ДанныеСостояниеПросмотраКонтекстноеМеню" id="15"/>
+				<ExtendedTooltip name="ДанныеСостояниеПросмотраРасширеннаяПодсказка" id="16"/>
 			</ViewStatusAddition>
-			<SearchControlAddition name="ДанныеУправлениеПоиском" id="11">
+			<SearchControlAddition name="ДанныеУправлениеПоиском" id="17">
 				<AdditionSource>
 					<Item>Данные</Item>
 					<Type>SearchControl</Type>
 				</AdditionSource>
-				<ContextMenu name="ДанныеУправлениеПоискомКонтекстноеМеню" id="12"/>
-				<ExtendedTooltip name="ДанныеУправлениеПоискомРасширеннаяПодсказка" id="13"/>
+				<ContextMenu name="ДанныеУправлениеПоискомКонтекстноеМеню" id="18"/>
+				<ExtendedTooltip name="ДанныеУправлениеПоискомРасширеннаяПодсказка" id="19"/>
 			</SearchControlAddition>
 			<ChildItems>
-				<InputField name="Дата" id="14">
+				<InputField name="Дата" id="20">
 					<DataPath>Данные.Дата</DataPath>
-					<ContextMenu name="ДатаКонтекстноеМеню" id="15"/>
-					<ExtendedTooltip name="ДатаРасширеннаяПодсказка" id="16"/>
+					<ContextMenu name="ДатаКонтекстноеМеню" id="21"/>
+					<ExtendedTooltip name="ДатаРасширеннаяПодсказка" id="22"/>
 				</InputField>
-				<InputField name="Сумма" id="17">
+				<InputField name="Сумма" id="23">
 					<DataPath>Данные.Сумма</DataPath>
-					<ContextMenu name="СуммаКонтекстноеМеню" id="18"/>
-					<ExtendedTooltip name="СуммаРасширеннаяПодсказка" id="19"/>
+					<ContextMenu name="СуммаКонтекстноеМеню" id="24"/>
+					<ExtendedTooltip name="СуммаРасширеннаяПодсказка" id="25"/>
 				</InputField>
-				<InputField name="Комментарий" id="20">
+				<InputField name="Комментарий" id="26">
 					<DataPath>Данные.Комментарий</DataPath>
-					<ContextMenu name="КомментарийКонтекстноеМеню" id="21"/>
-					<ExtendedTooltip name="КомментарийРасширеннаяПодсказка" id="22"/>
+					<ContextMenu name="КомментарийКонтекстноеМеню" id="27"/>
+					<ExtendedTooltip name="КомментарийРасширеннаяПодсказка" id="28"/>
 				</InputField>
 			</ChildItems>
 		</Table>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Объект" id="23">
+		<Attribute name="Объект" id="29">
 			<Type>
 				<v8:Type>cfg:DataProcessorObject.Таблица</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
-		<Attribute name="Данные" id="24">
+		<Attribute name="Данные" id="30">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
@@ -85,7 +107,7 @@
 				<v8:Type>v8:ValueTable</v8:Type>
 			</Type>
 			<Columns>
-				<Column name="Дата" id="25">
+				<Column name="Дата" id="31">
 					<Type>
 						<v8:Type>xs:dateTime</v8:Type>
 						<v8:DateQualifiers>
@@ -93,7 +115,7 @@
 						</v8:DateQualifiers>
 					</Type>
 				</Column>
-				<Column name="Сумма" id="26">
+				<Column name="Сумма" id="32">
 					<Type>
 						<v8:Type>xs:decimal</v8:Type>
 						<v8:NumberQualifiers>
@@ -103,7 +125,7 @@
 						</v8:NumberQualifiers>
 					</Type>
 				</Column>
-				<Column name="Комментарий" id="27">
+				<Column name="Комментарий" id="33">
 					<Type>
 						<v8:Type>xs:string</v8:Type>
 						<v8:StringQualifiers>
@@ -115,4 +137,15 @@
 			</Columns>
 		</Attribute>
 	</Attributes>
+	<Commands>
+		<Command name="Обновить" id="34">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Обновить</v8:content>
+				</v8:item>
+			</Title>
+			<Action>ОбновитьОбработка</Action>
+		</Command>
+	</Commands>
 </Form>

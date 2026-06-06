@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.47 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.48 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1779,7 +1779,8 @@ KNOWN_KEYS = {
     "commandBarLocation", "searchStringLocation", "viewStatusLocation", "searchControlLocation",
     "excludedCommands",
     "pagesRepresentation",
-    "type", "command", "stdCommand", "defaultButton", "locationInCommandBar",
+    "type", "command", "commandName", "stdCommand", "defaultButton", "locationInCommandBar",
+    "commandBar", "contextMenu",
     "src", "valuesPicture", "loadTransparent",
     "autofill",
     "choiceMode", "initialTreeView", "enableDrag", "enableStartDrag",
@@ -1833,6 +1834,28 @@ ELEMENT_TYPE_SYNONYMS = {
     "Popup": "popup",
     "ВсплывающееМеню": "popup",
 }
+
+# Тип-синонимы, применяемые ТОЛЬКО к строковому значению (имя элемента); объект/массив
+# у того же слова — companion-панель (свойство), см. normalize_panel_synonyms.
+STR_ONLY_TYPE_SYNONYMS = {"commandBar", "autoCommandBar", "КоманднаяПанель"}
+
+# Companion-панели как СВОЙСТВА (значение объект/массив): синоним → каноника.
+PANEL_SYNONYMS = {
+    'commandBar': ['commandBar', 'autoCommandBar', 'AutoCommandBar', 'autoCmdBar', 'cmdBar', 'КоманднаяПанель'],
+    'contextMenu': ['contextMenu', 'ContextMenu', 'КонтекстноеМеню'],
+}
+
+
+def normalize_panel_synonyms(el):
+    if not isinstance(el, dict):
+        return
+    for canon, syns in PANEL_SYNONYMS.items():
+        for syn in syns:
+            if syn in el and isinstance(el[syn], (list, dict)):
+                if syn != canon and canon not in el:
+                    el[canon] = el.pop(syn)
+                break
+
 
 # Maps Russian/English root of typed reference path to canonical English root
 REF_ROOT_SYNONYMS = {
@@ -2042,6 +2065,38 @@ def emit_companion(lines, tag, name, indent, content=None):
     lines.append(f'{indent}\t<Title formatted="{"true" if fmt else "false"}">')
     emit_ml_items(lines, f'{indent}\t\t', text)
     lines.append(f'{indent}\t</Title>')
+    lines.append(f'{indent}</{tag}>')
+
+
+def emit_companion_panel(lines, tag, name, indent, panel):
+    # Companion-командная-панель (ContextMenu/AutoCommandBar) с контентом: { autofill?, horizontalAlign?, children?[] }
+    # или массив = shorthand для { children }. Пусто/нет → self-closing.
+    cid = new_id()
+    autofill = None
+    halign = None
+    children = None
+    if isinstance(panel, list):
+        children = panel
+    elif panel is not None:
+        if panel.get('autofill') is not None:
+            autofill = bool(panel.get('autofill'))
+        if panel.get('horizontalAlign'):
+            halign = str(panel.get('horizontalAlign'))
+        children = panel.get('children')
+    has_children = bool(children) and len(children) > 0
+    if autofill is None and not has_children and not halign:
+        lines.append(f'{indent}<{tag} name="{name}" id="{cid}"/>')
+        return
+    lines.append(f'{indent}<{tag} name="{name}" id="{cid}">')
+    if halign:
+        lines.append(f'{indent}\t<HorizontalAlign>{halign}</HorizontalAlign>')
+    if autofill is not None:
+        lines.append(f'{indent}\t<Autofill>{"true" if autofill else "false"}</Autofill>')
+    if has_children:
+        lines.append(f'{indent}\t<ChildItems>')
+        for c in children:
+            emit_element(lines, c, f'{indent}\t\t', in_cmd_bar=True)
+        lines.append(f'{indent}\t</ChildItems>')
     lines.append(f'{indent}</{tag}>')
 
 
@@ -2372,9 +2427,15 @@ def emit_type(lines, type_str, indent):
 # --- Element emitters ---
 
 def emit_element(lines, el, indent, in_cmd_bar=False):
-    # Silent synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio)
+    # Companion-панели (объект/массив-значение) → commandBar/contextMenu, до тип-синонимов.
+    normalize_panel_synonyms(el)
+
+    # Silent synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio).
+    # commandBar/autoCommandBar/КоманднаяПанель → тип-элемент ТОЛЬКО при строковом значении (имя).
     for src, dst in ELEMENT_TYPE_SYNONYMS.items():
         if src in el and dst not in el:
+            if src in STR_ONLY_TYPE_SYNONYMS and not isinstance(el[src], str):
+                continue
             el[dst] = el.pop(src)
 
     type_key = None
@@ -2562,7 +2623,7 @@ def emit_input(lines, el, name, eid, indent):
         emit_mltext(lines, inner, 'InputHint', el['inputHint'])
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'input')
@@ -2595,7 +2656,7 @@ def emit_check(lines, el, name, eid, indent):
     emit_layout(lines, el, inner)
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'check')
@@ -2654,7 +2715,7 @@ def emit_radio_button_field(lines, el, name, eid, indent):
 
     emit_layout(lines, el, inner)
 
-    emit_companion(lines, 'ContextMenu', f'{name}КонтекстноеМеню', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}КонтекстноеМеню', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'radio')
@@ -2693,7 +2754,7 @@ def emit_label(lines, el, name, eid, indent):
     emit_layout(lines, el, inner)
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'label')
@@ -2721,7 +2782,7 @@ def emit_label_field(lines, el, name, eid, indent):
     emit_layout(lines, el, inner)
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'labelField')
@@ -2834,9 +2895,11 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}</CommandSet>')
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     # AutoCommandBar — with optional Autofill control
-    if el.get('tableAutofill') is not None:
+    if el.get('commandBar') is not None:
+        emit_companion_panel(lines, 'AutoCommandBar', f'{name}\u041a\u043e\u043c\u0430\u043d\u0434\u043d\u0430\u044f\u041f\u0430\u043d\u0435\u043b\u044c', inner, el.get('commandBar'))
+    elif el.get('tableAutofill') is not None:
         acb_id = new_id()
         acb_name = f'{name}\u041a\u043e\u043c\u0430\u043d\u0434\u043d\u0430\u044f\u041f\u0430\u043d\u0435\u043b\u044c'
         af_val = 'true' if el['tableAutofill'] else 'false'
@@ -2963,6 +3026,9 @@ def emit_button(lines, el, name, eid, indent, in_cmd_bar=False):
     # CommandName
     if el.get('command'):
         lines.append(f'{inner}<CommandName>Form.Command.{el["command"]}</CommandName>')
+    # commandName — глобальная команда «как есть» (CommonCommand.X, Catalog.X.Command.Y …), без обёртки Form.
+    if el.get('commandName') and not el.get('command'):
+        lines.append(f'{inner}<CommandName>{el["commandName"]}</CommandName>')
     if el.get('stdCommand'):
         sc = str(el['stdCommand'])
         m = re.match(r'^(.+)\.(.+)$', sc)
@@ -2971,7 +3037,7 @@ def emit_button(lines, el, name, eid, indent, in_cmd_bar=False):
         else:
             lines.append(f'{inner}<CommandName>Form.StandardCommand.{sc}</CommandName>')
 
-    emit_title(lines, el, name, inner, auto=not (el.get('command') or el.get('stdCommand')))
+    emit_title(lines, el, name, inner, auto=not (el.get('command') or el.get('commandName') or el.get('stdCommand')))
     emit_common_flags(lines, el, inner)
 
     if el.get('defaultButton') is True:
@@ -3019,7 +3085,7 @@ def emit_picture_decoration(lines, el, name, eid, indent):
     emit_layout(lines, el, inner)
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'picture')
@@ -3053,7 +3119,7 @@ def emit_picture_field(lines, el, name, eid, indent):
     emit_layout(lines, el, inner)
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'picField')
@@ -3091,7 +3157,7 @@ def emit_calendar(lines, el, name, eid, indent):
         lines.append(f'{inner}<ShowMonthsPanel>{"true" if el["showMonthsPanel"] else "false"}</ShowMonthsPanel>')
 
     # Companions
-    emit_companion(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner)
+    emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
     emit_events(lines, el, name, inner, 'calendar')
@@ -3646,10 +3712,22 @@ def main():
     def _normalize_synonyms(el):
         if not isinstance(el, dict):
             return
+        # Companion-панели (объект/массив-значение) → commandBar/contextMenu
+        normalize_panel_synonyms(el)
+        # Тип-синонимы: commandBar/autoCommandBar → элемент-тип ТОЛЬКО при строковом значении
         synonyms = {'commandBar': 'cmdBar', 'autoCommandBar': 'autoCmdBar', 'extTooltip': 'extendedTooltip'}
         for src, dst in synonyms.items():
             if src in el and dst not in el:
+                if src in STR_ONLY_TYPE_SYNONYMS and not isinstance(el[src], str):
+                    continue
                 el[dst] = el.pop(src)
+        # Рекурсия в детей панелей (commandBar/contextMenu)
+        for pk in ('commandBar', 'contextMenu'):
+            pv = el.get(pk)
+            kids = pv if isinstance(pv, list) else (pv.get('children') if isinstance(pv, dict) else None)
+            if isinstance(kids, list):
+                for child in kids:
+                    _normalize_synonyms(child)
         if isinstance(el.get('children'), list):
             for child in el['children']:
                 _normalize_synonyms(child)

@@ -1,4 +1,4 @@
-﻿# form-compile v1.47 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.48 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2264,6 +2264,38 @@ function Emit-Companion {
 	X "$indent</$tag>"
 }
 
+# Companion-командная-панель (ContextMenu/AutoCommandBar) с контентом: { autofill?, children?[] }
+# или массив = shorthand для { children }. Пусто/нет → self-closing companion (как Emit-Companion).
+# Дети — обычная грамматика button/buttonGroup/popup (Emit-Element, inCmdBar).
+function Emit-CompanionPanel {
+	param([string]$tag, [string]$name, [string]$indent, $panel)
+	$id = New-Id
+	$autofill = $null
+	$children = $null
+	$halign = $null
+	if ($panel -is [array]) {
+		$children = $panel
+	} elseif ($null -ne $panel) {
+		if ($null -ne $panel.PSObject.Properties['autofill'] -and $null -ne $panel.autofill) { $autofill = [bool]$panel.autofill }
+		if ($null -ne $panel.PSObject.Properties['horizontalAlign'] -and "$($panel.horizontalAlign)" -ne '') { $halign = "$($panel.horizontalAlign)" }
+		$children = $panel.children
+	}
+	$hasChildren = $children -and @($children).Count -gt 0
+	if ($null -eq $autofill -and -not $hasChildren -and -not $halign) {
+		X "$indent<$tag name=`"$name`" id=`"$id`"/>"
+		return
+	}
+	X "$indent<$tag name=`"$name`" id=`"$id`">"
+	if ($halign) { X "$indent`t<HorizontalAlign>$halign</HorizontalAlign>" }
+	if ($null -ne $autofill) { X "$indent`t<Autofill>$(if ($autofill){'true'}else{'false'})</Autofill>" }
+	if ($hasChildren) {
+		X "$indent`t<ChildItems>"
+		foreach ($c in @($children)) { Emit-Element -el $c -indent "$indent`t`t" -inCmdBar $true }
+		X "$indent`t</ChildItems>"
+	}
+	X "$indent</$tag>"
+}
+
 # Табличный addition (СтрокаПоиска/СостояниеПросмотра/УправлениеПоиском) с AdditionSource.
 # Item = имя таблицы, Type фиксирован по виду; внутри — companion ContextMenu/ExtendedTooltip.
 function Emit-TableAddition {
@@ -2283,8 +2315,14 @@ function Emit-TableAddition {
 function Emit-Element {
 	param($el, [string]$indent, [bool]$inCmdBar = $false)
 
+	# Companion-панели (объект/массив-значение) → commandBar/contextMenu, до тип-синонимов.
+	Normalize-PanelSynonyms $el
+
 	# Silent synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio).
 	# Maps any synonym to canonical short DSL key.
+	# commandBar/autoCommandBar/КоманднаяПанель → тип-элемент ТОЛЬКО при строковом значении (имя);
+	# объект/массив уже отнесён к панель-свойству выше.
+	$strOnlyKeys = @('commandBar','autoCommandBar','КоманднаяПанель')
 	$synonyms = @{
 		"commandBar"        = "cmdBar"
 		"autoCommandBar"    = "autoCmdBar"
@@ -2324,6 +2362,7 @@ function Emit-Element {
 	}
 	foreach ($pair in $synonyms.GetEnumerator()) {
 		if ($null -ne $el.PSObject.Properties[$pair.Key] -and $null -eq $el.PSObject.Properties[$pair.Value]) {
+			if ($strOnlyKeys -contains $pair.Key -and -not ($el.($pair.Key) -is [string])) { continue }
 			$val = $el.($pair.Key)
 			$el.PSObject.Properties.Remove($pair.Key) | Out-Null
 			$el | Add-Member -NotePropertyName $pair.Value -NotePropertyValue $val -Force
@@ -2357,6 +2396,8 @@ function Emit-Element {
 		"radioButtonType"=1;"choiceList"=1;"columnsCount"=1;"checkBoxType"=1;"editMode"=1
 		# naming & binding
 		"name"=1;"path"=1;"title"=1;"tooltip"=1;"tooltipRepresentation"=1;"extendedTooltip"=1
+		# companion-панели (свойства): командная панель + контекстное меню
+		"commandBar"=1;"contextMenu"=1
 		# visibility & state
 		"visible"=1;"hidden"=1;"enabled"=1;"disabled"=1;"readOnly"=1;"userVisible"=1
 		# events ("events" — основной формат; on/handlers — legacy, принимаются ради совместимости)
@@ -2393,7 +2434,7 @@ function Emit-Element {
 		# pages-specific
 		"pagesRepresentation"=1
 		# button-specific
-		"type"=1;"command"=1;"stdCommand"=1;"defaultButton"=1;"locationInCommandBar"=1
+		"type"=1;"command"=1;"commandName"=1;"stdCommand"=1;"defaultButton"=1;"locationInCommandBar"=1
 		# picture/decoration
 		"src"=1;"valuesPicture"=1;"loadTransparent"=1
 		# cmdBar-specific
@@ -2709,7 +2750,7 @@ function Emit-Input {
 	}
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "input"
@@ -2742,7 +2783,7 @@ function Emit-Check {
 	Emit-Layout -el $el -indent $inner
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "check"
@@ -2967,7 +3008,7 @@ function Emit-Radio {
 	Emit-Layout -el $el -indent $inner
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "radio"
@@ -3007,7 +3048,7 @@ function Emit-Label {
 	Emit-Layout -el $el -indent $inner
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "label"
@@ -3033,7 +3074,7 @@ function Emit-LabelField {
 	Emit-Layout -el $el -indent $inner
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "labelField"
@@ -3136,9 +3177,11 @@ function Emit-Table {
 	}
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
-	# AutoCommandBar — with optional Autofill control
-	if ($null -ne $el.tableAutofill) {
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
+	# AutoCommandBar: приоритет commandBar-свойства (контент); иначе tableAutofill-shorthand; иначе пусто.
+	if ($null -ne $el.commandBar) {
+		Emit-CompanionPanel -tag "AutoCommandBar" -name "${name}КоманднаяПанель" -indent $inner -panel $el.commandBar
+	} elseif ($null -ne $el.tableAutofill) {
 		$acbId = New-Id
 		X "$inner<AutoCommandBar name=`"${name}КоманднаяПанель`" id=`"$acbId`">"
 		$afVal = if ($el.tableAutofill) { "true" } else { "false" }
@@ -3285,6 +3328,10 @@ function Emit-Button {
 	if ($el.command) {
 		X "$inner<CommandName>Form.Command.$($el.command)</CommandName>"
 	}
+	# commandName — глобальная команда «как есть» (CommonCommand.X, Catalog.X.Command.Y …), без обёртки Form.
+	if ($el.commandName -and -not $el.command) {
+		X "$inner<CommandName>$($el.commandName)</CommandName>"
+	}
 	if ($el.stdCommand) {
 		$sc = "$($el.stdCommand)"
 		if ($sc -match '^(.+)\.(.+)$') {
@@ -3294,7 +3341,7 @@ function Emit-Button {
 		}
 	}
 
-	$btnAuto = -not ($el.command -or $el.stdCommand)
+	$btnAuto = -not ($el.command -or $el.commandName -or $el.stdCommand)
 	Emit-Title -el $el -name $name -indent $inner -auto:$btnAuto
 	Emit-CommonFlags -el $el -indent $inner
 
@@ -3347,7 +3394,7 @@ function Emit-PictureDecoration {
 	Emit-Layout -el $el -indent $inner
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "picture"
@@ -3381,7 +3428,7 @@ function Emit-PictureField {
 	Emit-Layout -el $el -indent $inner
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "picField"
@@ -3423,7 +3470,7 @@ function Emit-Calendar {
 	if ($null -ne $el.showMonthsPanel) { $v = if ($el.showMonthsPanel) { "true" } else { "false" }; X "$inner<ShowMonthsPanel>$v</ShowMonthsPanel>" }
 
 	# Companions
-	Emit-Companion -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "calendar"
@@ -3755,15 +3802,57 @@ function Emit-Properties {
 
 # --- 11b. Pre-pass: synonyms, main attribute inference, heuristics, autoCmdBar extraction ---
 
+# Companion-панели как СВОЙСТВА элемента (значение объект/массив): любой знакомый
+# синоним → каноника commandBar / contextMenu. Разводим с одноимёнными ТИПАМИ-элементами
+# по типу значения: строка = элемент-тип (имя), объект/массив = панель-свойство.
+function Normalize-PanelSynonyms {
+	param($el)
+	if ($null -eq $el) { return }
+	$panelSyns = @{
+		'commandBar' = @('commandBar','autoCommandBar','AutoCommandBar','autoCmdBar','cmdBar','КоманднаяПанель')
+		'contextMenu' = @('contextMenu','ContextMenu','КонтекстноеМеню')
+	}
+	foreach ($canon in $panelSyns.Keys) {
+		foreach ($syn in $panelSyns[$canon]) {
+			$p = $el.PSObject.Properties[$syn]
+			if ($null -ne $p -and ($p.Value -is [array] -or $p.Value -is [System.Management.Automation.PSCustomObject])) {
+				if ($syn -ne $canon -and $null -eq $el.PSObject.Properties[$canon]) {
+					$v = $p.Value
+					$el.PSObject.Properties.Remove($syn) | Out-Null
+					$el | Add-Member -NotePropertyName $canon -NotePropertyValue $v -Force
+				}
+				break
+			}
+		}
+	}
+}
+
 function Normalize-ElementSynonyms {
 	param($el)
 	if ($null -eq $el) { return }
-	$synonyms = @{ "commandBar" = "cmdBar"; "autoCommandBar" = "autoCmdBar"; "extTooltip" = "extendedTooltip" }
-	foreach ($pair in $synonyms.GetEnumerator()) {
-		if ($null -ne $el.PSObject.Properties[$pair.Key] -and $null -eq $el.PSObject.Properties[$pair.Value]) {
+	Normalize-PanelSynonyms $el
+	# Тип-синонимы (commandBar/autoCommandBar → элемент-тип) применяем ТОЛЬКО к строковому
+	# значению (имя элемента); объект/массив уже отнесён к панель-свойству выше.
+	$typeSyn = @{ "commandBar" = "cmdBar"; "autoCommandBar" = "autoCmdBar" }
+	foreach ($pair in $typeSyn.GetEnumerator()) {
+		$src = $el.PSObject.Properties[$pair.Key]
+		if ($null -ne $src -and ($src.Value -is [string]) -and $null -eq $el.PSObject.Properties[$pair.Value]) {
 			$val = $el.($pair.Key)
 			$el.PSObject.Properties.Remove($pair.Key) | Out-Null
 			$el | Add-Member -NotePropertyName $pair.Value -NotePropertyValue $val -Force
+		}
+	}
+	if ($el.PSObject.Properties["extTooltip"] -and $null -eq $el.PSObject.Properties["extendedTooltip"]) {
+		$val = $el.extTooltip
+		$el.PSObject.Properties.Remove("extTooltip") | Out-Null
+		$el | Add-Member -NotePropertyName "extendedTooltip" -NotePropertyValue $val -Force
+	}
+	# Рекурсия в детей панелей (commandBar/contextMenu) — нормализуем кнопки/группы внутри
+	foreach ($pk in @('commandBar','contextMenu')) {
+		$pp = $el.PSObject.Properties[$pk]
+		if ($null -ne $pp) {
+			$kids = if ($pp.Value -is [array]) { $pp.Value } elseif ($null -ne $pp.Value) { $pp.Value.children } else { $null }
+			if ($kids) { foreach ($child in $kids) { Normalize-ElementSynonyms $child } }
 		}
 	}
 	if ($el.PSObject.Properties["children"] -and $el.children) {

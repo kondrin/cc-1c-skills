@@ -18,7 +18,16 @@
     "elements": [
       { "table": "Данные", "path": "Данные", "changeRowSet": true, "titleLocation": "top",
         "viewStatusLocation": "None", "searchControlLocation": "None",
-        "excludedCommands": ["Add", "Delete", "MoveUp", "MoveDown"], "columns": [
+        "excludedCommands": ["Add", "Delete", "MoveUp", "MoveDown"],
+        "commandBar": { "autofill": false, "children": [
+          { "button": "ПанельОбновить", "command": "Обновить" }
+        ]},
+        "contextMenu": { "children": [
+          { "buttonGroup": "МенюГруппа", "children": [
+            { "button": "МенюОбновить", "command": "Обновить" }
+          ]}
+        ]},
+        "columns": [
         { "input": "Дата", "path": "Данные.Дата" },
         { "input": "Сумма", "path": "Данные.Сумма" },
         { "input": "Комментарий", "path": "Данные.Комментарий" }
@@ -31,6 +40,9 @@
         { "name": "Сумма", "type": "decimal(15,2)" },
         { "name": "Комментарий", "type": "string(200)" }
       ]}
+    ],
+    "commands": [
+      { "name": "Обновить", "action": "ОбновитьОбработка" }
     ]
   }
 }

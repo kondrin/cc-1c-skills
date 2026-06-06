@@ -1,4 +1,4 @@
-﻿# form-decompile v0.28 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.29 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -883,6 +883,28 @@ function Decompile-Children {
 	return ,@($list)
 }
 
+# Инверсия Emit-CompanionPanel: companion-командная-панель (ContextMenu/AutoCommandBar) с контентом
+# → { autofill?, horizontalAlign?, children?[] } либо $null, если companion пустой (self-closing).
+# $isDynListTable: для дин-список-таблицы пустой AutoCommandBar с autofill=false восстановит
+# эвристика компилятора — молчим (как с tableAutofill), чтобы не плодить ключ.
+function Decompile-CompanionPanel {
+	param($node, [string]$tag, [bool]$isDynListTable = $false)
+	$p = $node.SelectSingleNode("lf:$tag", $ns)
+	if (-not $p) { return $null }
+	$autofillRaw = Get-Child $p 'Autofill'
+	$halign = Get-Child $p 'HorizontalAlign'
+	$kids = Decompile-Children $p
+	$hasKids = $kids -and @($kids).Count -gt 0
+	if (-not $hasKids -and $null -eq $autofillRaw -and -not $halign) { return $null }
+	if ($isDynListTable -and $tag -eq 'AutoCommandBar' -and -not $hasKids -and -not $halign -and $autofillRaw -eq 'false') { return $null }
+	$o = [ordered]@{}
+	if ($halign) { $o['horizontalAlign'] = $halign }
+	if ($autofillRaw -eq 'false') { $o['autofill'] = $false }
+	elseif ($autofillRaw -eq 'true') { $o['autofill'] = $true }
+	if ($hasKids) { $o['children'] = $kids }
+	return $o
+}
+
 function Decompile-Element {
 	param($node)
 	$tag = $node.LocalName
@@ -1091,7 +1113,7 @@ function Decompile-Element {
 				if ($cmd -match '^Form\.Command\.(.+)$') { $obj['command'] = $matches[1] }
 				elseif ($cmd -match '^Form\.StandardCommand\.(.+)$') { $obj['stdCommand'] = $matches[1] }
 				elseif ($cmd -match '^Form\.Item\.(.+)\.StandardCommand\.(.+)$') { $obj['stdCommand'] = "$($matches[1]).$($matches[2])" }
-				else { $obj['command'] = $cmd }
+				else { $obj['commandName'] = $cmd }
 			}
 			Add-CommonProps $obj $node $name
 			$type = Get-Child $node 'Type'
@@ -1129,7 +1151,7 @@ function Decompile-Element {
 	if (-not $obj.Contains('title')) {
 		$autoTitle = $false
 		if ($tag -in @('LabelDecoration','Page','Popup')) { $autoTitle = $true }
-		elseif ($tag -eq 'Button') { $autoTitle = -not ($obj.Contains('command') -or $obj.Contains('stdCommand')) }
+		elseif ($tag -eq 'Button') { $autoTitle = -not ($obj.Contains('command') -or $obj.Contains('commandName') -or $obj.Contains('stdCommand')) }
 		elseif ($tag -in @('InputField','CheckBoxField','RadioButtonField','LabelField','Table','CalendarField')) { $autoTitle = -not $obj.Contains('path') }
 		if ($autoTitle) { $obj['title'] = '' }
 	}
@@ -1137,6 +1159,12 @@ function Decompile-Element {
 	# extendedTooltip: контент companion <ExtendedTooltip><Title> (любой элемент)
 	$etTitle = $node.SelectSingleNode("lf:ExtendedTooltip/lf:Title", $ns)
 	if ($etTitle) { $et = Get-MLFormattedValue $etTitle; if ($null -ne $et) { $obj['extendedTooltip'] = $et } }
+	# companion-панели с контентом: AutoCommandBar → commandBar, ContextMenu → contextMenu (любой элемент)
+	$isDynListTable = ($tag -eq 'Table') -and (Has-Child $node 'UpdateOnDataChange')
+	$cb = Decompile-CompanionPanel $node 'AutoCommandBar' $isDynListTable
+	if ($null -ne $cb) { $obj['commandBar'] = $cb }
+	$cm = Decompile-CompanionPanel $node 'ContextMenu'
+	if ($null -ne $cm) { $obj['contextMenu'] = $cm }
 	return $obj
 }
 
