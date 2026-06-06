@@ -298,6 +298,7 @@ companion-панели с собственным контентом. Оба не
 | `editMode` | string | Режим редактирования: `EnterOnInput`, `Directly` |
 | `skipOnInput` | bool | Пропускать при вводе |
 | `inputHint` | string | Подсказка ввода (placeholder) |
+| `choiceList` | array | Список выбора: массив `{ value, presentation?/title? }` — та же грамматика, что у `radio` (см. ниже) |
 | `width` | int | Ширина |
 | `height` | int | Высота |
 | `horizontalStretch` | bool | Растягивание по горизонтали |

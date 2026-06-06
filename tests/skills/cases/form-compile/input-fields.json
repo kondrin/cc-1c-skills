@@ -21,6 +21,10 @@
       { "input": "МногострочноеПоле", "path": "МногострочноеПоле", "multiLine": true, "height": 5, "title": "Комментарий" },
       { "input": "ПолеПароля", "path": "ПолеПароля", "passwordMode": true, "title": "Пароль" },
       { "input": "ПолеСКнопками", "path": "ПолеСКнопками", "choiceButton": true, "clearButton": true, "title": "Выбор" },
+      { "input": "ПолеСписокВыбора", "path": "ПолеСписокВыбора", "title": "Список выбора", "choiceList": [
+        { "value": "Первый" },
+        { "value": "Второй", "presentation": "Второй вариант" }
+      ]},
       { "input": "ПолеПодсказка", "path": "ПолеПодсказка", "inputHint": "Введите значение...", "title": "Подсказка" },
       { "check": "Флаг", "path": "Флаг", "title": "Включено" },
       { "check": "ФлагПлатформенный", "path": "ФлагПлатформенный", "title": "Слева", "titleLocation": "" },
@@ -33,6 +37,7 @@
       { "name": "МногострочноеПоле", "type": "string" },
       { "name": "ПолеПароля", "type": "string(50)" },
       { "name": "ПолеСКнопками", "type": "string" },
+      { "name": "ПолеСписокВыбора", "type": "string" },
       { "name": "ПолеПодсказка", "type": "string" },
       { "name": "Флаг", "type": "boolean" },
       { "name": "ФлагПлатформенный", "type": "boolean" },

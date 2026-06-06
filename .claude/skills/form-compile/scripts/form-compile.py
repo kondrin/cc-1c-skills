@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.50 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.51 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1959,6 +1959,41 @@ def emit_choice_presentation(lines, pres, indent):
     lines.append(f"{indent}</Presentation>")
 
 
+def emit_choice_list(lines, el, indent):
+    # <ChoiceList> — у RadioButtonField и InputField. Элемент: { value, presentation?/title? }.
+    choice_list = el.get('choiceList') or []
+    if not choice_list:
+        return
+    lines.append(f'{indent}<ChoiceList>')
+    item_indent = f'{indent}\t'
+    for item in choice_list:
+        if not isinstance(item, dict):
+            continue
+        val_raw = item.get('value', item.get('значение'))
+        has_pres = any(k in item for k in ('presentation', 'представление', 'title'))
+        pres_raw = item.get('presentation', item.get('представление', item.get('title')))
+
+        norm = normalize_choice_value(val_raw)
+
+        if not has_pres:
+            if norm['xsi_type'] == 'xr:DesignTimeRef':
+                tail = norm['text'].split('.')[-1]
+                pres_raw = title_from_name(tail)
+            else:
+                pres_raw = norm['text']
+
+        lines.append(f'{item_indent}<xr:Item>')
+        val_indent = f'{item_indent}\t'
+        lines.append(f'{val_indent}<xr:Presentation/>')
+        lines.append(f'{val_indent}<xr:CheckState>0</xr:CheckState>')
+        lines.append(f'{val_indent}<xr:Value xsi:type="FormChoiceListDesTimeValue">')
+        emit_choice_presentation(lines, pres_raw, f'{val_indent}\t')
+        lines.append(f'{val_indent}\t<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
+        lines.append(f'{val_indent}</xr:Value>')
+        lines.append(f'{item_indent}</xr:Item>')
+    lines.append(f'{indent}</ChoiceList>')
+
+
 def normalize_radio_button_type(raw):
     if not raw:
         return "Auto"
@@ -2624,6 +2659,8 @@ def emit_input(lines, el, name, eid, indent):
     if el.get('inputHint'):
         emit_mltext(lines, inner, 'InputHint', el['inputHint'])
 
+    emit_choice_list(lines, el, inner)
+
     # Companions
     emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
@@ -2684,36 +2721,7 @@ def emit_radio_button_field(lines, el, name, eid, indent):
     if el.get('columnsCount') is not None:
         lines.append(f'{inner}<ColumnsCount>{el["columnsCount"]}</ColumnsCount>')
 
-    choice_list = el.get('choiceList') or []
-    if choice_list:
-        lines.append(f'{inner}<ChoiceList>')
-        item_indent = f'{inner}\t'
-        for item in choice_list:
-            if not isinstance(item, dict):
-                continue
-            val_raw = item.get('value', item.get('значение'))
-            has_pres = any(k in item for k in ('presentation', 'представление', 'title'))
-            pres_raw = item.get('presentation', item.get('представление', item.get('title')))
-
-            norm = normalize_choice_value(val_raw)
-
-            if not has_pres:
-                if norm['xsi_type'] == 'xr:DesignTimeRef':
-                    tail = norm['text'].split('.')[-1]
-                    pres_raw = title_from_name(tail)
-                else:
-                    pres_raw = norm['text']
-
-            lines.append(f'{item_indent}<xr:Item>')
-            val_indent = f'{item_indent}\t'
-            lines.append(f'{val_indent}<xr:Presentation/>')
-            lines.append(f'{val_indent}<xr:CheckState>0</xr:CheckState>')
-            lines.append(f'{val_indent}<xr:Value xsi:type="FormChoiceListDesTimeValue">')
-            emit_choice_presentation(lines, pres_raw, f'{val_indent}\t')
-            lines.append(f'{val_indent}\t<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
-            lines.append(f'{val_indent}</xr:Value>')
-            lines.append(f'{item_indent}</xr:Item>')
-        lines.append(f'{inner}</ChoiceList>')
+    emit_choice_list(lines, el, inner)
 
     emit_layout(lines, el, inner)
 

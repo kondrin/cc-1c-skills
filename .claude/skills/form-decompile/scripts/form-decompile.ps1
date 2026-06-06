@@ -1,4 +1,4 @@
-﻿# form-decompile v0.32 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.33 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -909,6 +909,28 @@ function Decompile-CompanionPanel {
 	return $o
 }
 
+# Инверсия Emit-ChoiceList: <ChoiceList><xr:Item>… → [ { value, presentation? } ] либо $null.
+# У RadioButtonField и InputField.
+function Decompile-ChoiceList {
+	param($node)
+	$cl = $node.SelectSingleNode("lf:ChoiceList", $ns)
+	if (-not $cl) { return $null }
+	$items = New-Object System.Collections.ArrayList
+	foreach ($it in @($cl.SelectNodes("xr:Item", $ns))) {
+		$valNode = $it.SelectSingleNode("xr:Value/lf:Value", $ns)
+		$presNode = $it.SelectSingleNode("xr:Value/lf:Presentation", $ns)
+		$ci = [ordered]@{}
+		if ($valNode) {
+			$xsiType = $valNode.GetAttribute("type", $NS_XSI)
+			$ci['value'] = Convert-TypedValue $valNode.InnerText $xsiType
+		}
+		if ($presNode) { $p = Get-LangText $presNode; if ($p) { $ci['presentation'] = $p } }
+		[void]$items.Add($ci)
+	}
+	if ($items.Count -gt 0) { return ,@($items) }
+	return $null
+}
+
 function Decompile-Element {
 	param($node)
 	$tag = $node.LocalName
@@ -961,6 +983,7 @@ function Decompile-Element {
 			foreach ($p in @('ChoiceButton','ClearButton','SpinButton','DropListButton')) {
 				$v = Get-Child $node $p; if ($null -ne $v) { $obj[($p.Substring(0,1).ToLower()+$p.Substring(1))] = (To-Bool $v) }
 			}
+			$cl = Decompile-ChoiceList $node; if ($cl) { $obj['choiceList'] = $cl }
 		}
 		'CheckBoxField' {
 			$obj[$key] = $name
@@ -980,22 +1003,7 @@ function Decompile-Element {
 			Add-TitleLocation $obj $node 'None'
 			$rbt = Get-Child $node 'RadioButtonType'; if ($rbt) { $obj['radioButtonType'] = $rbt }
 			$cc = Get-Child $node 'ColumnsCount'; if ($cc) { $obj['columnsCount'] = [int]$cc }
-			$cl = $node.SelectSingleNode("lf:ChoiceList", $ns)
-			if ($cl) {
-				$items = New-Object System.Collections.ArrayList
-				foreach ($it in @($cl.SelectNodes("xr:Item", $ns))) {
-					$valNode = $it.SelectSingleNode("xr:Value/lf:Value", $ns)
-					$presNode = $it.SelectSingleNode("xr:Value/lf:Presentation", $ns)
-					$ci = [ordered]@{}
-					if ($valNode) {
-						$xsiType = $valNode.GetAttribute("type", $NS_XSI)
-						$ci['value'] = Convert-TypedValue $valNode.InnerText $xsiType
-					}
-					if ($presNode) { $p = Get-LangText $presNode; if ($p) { $ci['presentation'] = $p } }
-					[void]$items.Add($ci)
-				}
-				if ($items.Count -gt 0) { $obj['choiceList'] = @($items) }
-			}
+			$cl = Decompile-ChoiceList $node; if ($cl) { $obj['choiceList'] = $cl }
 		}
 		'LabelDecoration' {
 			$obj[$key] = $name

@@ -1,4 +1,4 @@
-﻿# form-compile v1.50 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.51 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2753,6 +2753,8 @@ function Emit-Input {
 		Emit-MLText -tag "InputHint" -text $el.inputHint -indent $inner
 	}
 
+	Emit-ChoiceList -el $el -indent $inner
+
 	# Companions
 	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
@@ -2927,6 +2929,62 @@ function Emit-ChoicePresentation {
 	X "$indent</Presentation>"
 }
 
+# Emit <ChoiceList> (список выбора) — у RadioButtonField и InputField.
+# Элемент: { value, presentation?/title? } (+ рус. синонимы значение/представление).
+function Emit-ChoiceList {
+	param($el, [string]$indent)
+	if (-not $el.choiceList -or $el.choiceList.Count -eq 0) { return }
+	X "$indent<ChoiceList>"
+	$itemIndent = "$indent`t"
+	foreach ($item in $el.choiceList) {
+		# value (+ рус. синоним "значение")
+		$valRaw = $null
+		if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
+			if ($item.Contains("value")) { $valRaw = $item["value"] }
+			elseif ($item.Contains("значение")) { $valRaw = $item["значение"] }
+		} else {
+			if ($item.PSObject.Properties["value"])    { $valRaw = $item.value }
+			elseif ($item.PSObject.Properties["значение"]) { $valRaw = $item."значение" }
+		}
+
+		# presentation (presentation OR title синоним)
+		$presRaw = $null
+		$hasPres = $false
+		if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
+			if ($item.Contains("presentation")) { $presRaw = $item["presentation"]; $hasPres = $true }
+			elseif ($item.Contains("представление")) { $presRaw = $item["представление"]; $hasPres = $true }
+			elseif ($item.Contains("title")) { $presRaw = $item["title"]; $hasPres = $true }
+		} else {
+			if ($item.PSObject.Properties["presentation"]) { $presRaw = $item.presentation; $hasPres = $true }
+			elseif ($item.PSObject.Properties["представление"]) { $presRaw = $item."представление"; $hasPres = $true }
+			elseif ($item.PSObject.Properties["title"]) { $presRaw = $item.title; $hasPres = $true }
+		}
+
+		$norm = Normalize-ChoiceValue -value $valRaw
+
+		# авто-вывод presentation, если не задан
+		if (-not $hasPres) {
+			if ($norm.XsiType -eq "xr:DesignTimeRef") {
+				$tail = ($norm.Text -split '\.')[-1]
+				$presRaw = Title-FromName -name $tail
+			} else {
+				$presRaw = $norm.Text
+			}
+		}
+
+		X "$itemIndent<xr:Item>"
+		$valIndent = "$itemIndent`t"
+		X "$valIndent<xr:Presentation/>"
+		X "$valIndent<xr:CheckState>0</xr:CheckState>"
+		X "$valIndent<xr:Value xsi:type=`"FormChoiceListDesTimeValue`">"
+		Emit-ChoicePresentation -pres $presRaw -indent "$valIndent`t"
+		X "$valIndent`t<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+		X "$valIndent</xr:Value>"
+		X "$itemIndent</xr:Item>"
+	}
+	X "$indent</ChoiceList>"
+}
+
 function Emit-Radio {
 	param($el, [string]$name, [int]$id, [string]$indent)
 
@@ -2954,60 +3012,7 @@ function Emit-Radio {
 		X "$inner<ColumnsCount>$($el.columnsCount)</ColumnsCount>"
 	}
 
-	# ChoiceList
-	if ($el.choiceList -and $el.choiceList.Count -gt 0) {
-		X "$inner<ChoiceList>"
-		$itemIndent = "$inner`t"
-		foreach ($item in $el.choiceList) {
-			# Pull value (and tolerate Russian synonym "значение")
-			$valRaw = $null
-			if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
-				if ($item.Contains("value")) { $valRaw = $item["value"] }
-				elseif ($item.Contains("значение")) { $valRaw = $item["значение"] }
-			} else {
-				if ($item.PSObject.Properties["value"])    { $valRaw = $item.value }
-				elseif ($item.PSObject.Properties["значение"]) { $valRaw = $item."значение" }
-			}
-
-			# Pull presentation (presentation OR title synonym)
-			$presRaw = $null
-			$hasPres = $false
-			if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
-				if ($item.Contains("presentation")) { $presRaw = $item["presentation"]; $hasPres = $true }
-				elseif ($item.Contains("представление")) { $presRaw = $item["представление"]; $hasPres = $true }
-				elseif ($item.Contains("title")) { $presRaw = $item["title"]; $hasPres = $true }
-			} else {
-				if ($item.PSObject.Properties["presentation"]) { $presRaw = $item.presentation; $hasPres = $true }
-				elseif ($item.PSObject.Properties["представление"]) { $presRaw = $item."представление"; $hasPres = $true }
-				elseif ($item.PSObject.Properties["title"]) { $presRaw = $item.title; $hasPres = $true }
-			}
-
-			$norm = Normalize-ChoiceValue -value $valRaw
-
-			# Auto-derive presentation if missing
-			if (-not $hasPres) {
-				if ($norm.XsiType -eq "xr:DesignTimeRef") {
-					$tail = ($norm.Text -split '\.')[-1]
-					$presRaw = Title-FromName -name $tail
-				} elseif ($norm.XsiType -eq "xs:string") {
-					$presRaw = $norm.Text
-				} else {
-					$presRaw = $norm.Text
-				}
-			}
-
-			X "$itemIndent<xr:Item>"
-			$valIndent = "$itemIndent`t"
-			X "$valIndent<xr:Presentation/>"
-			X "$valIndent<xr:CheckState>0</xr:CheckState>"
-			X "$valIndent<xr:Value xsi:type=`"FormChoiceListDesTimeValue`">"
-			Emit-ChoicePresentation -pres $presRaw -indent "$valIndent`t"
-			X "$valIndent`t<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
-			X "$valIndent</xr:Value>"
-			X "$itemIndent</xr:Item>"
-		}
-		X "$inner</ChoiceList>"
-	}
+	Emit-ChoiceList -el $el -indent $inner
 
 	Emit-Layout -el $el -indent $inner
 
