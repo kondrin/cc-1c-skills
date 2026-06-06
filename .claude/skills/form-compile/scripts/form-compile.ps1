@@ -1,4 +1,4 @@
-﻿# form-compile v1.41 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.42 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2337,7 +2337,7 @@ function Emit-Element {
 		# hierarchy
 		"children"=1;"columns"=1
 		# table-specific
-		"changeRowSet"=1;"changeRowOrder"=1;"header"=1;"footer"=1
+		"changeRowSet"=1;"changeRowOrder"=1;"autoInsertNewRow"=1;"rowFilter"=1;"header"=1;"footer"=1
 		"commandBarLocation"=1;"searchStringLocation"=1;"viewStatusLocation"=1;"searchControlLocation"=1
 		"excludedCommands"=1
 		"choiceMode"=1;"initialTreeView"=1;"enableDrag"=1;"enableStartDrag"=1
@@ -3016,8 +3016,16 @@ function Emit-Table {
 		X "$inner<Representation>$($el.representation)</Representation>"
 	}
 	if ($el.titleLocation) { X "$inner<TitleLocation>$(Map-TitleLoc "$($el.titleLocation)")</TitleLocation>" }
-	if ($el.changeRowSet -eq $true) { X "$inner<ChangeRowSet>true</ChangeRowSet>" }
-	if ($el.changeRowOrder -eq $true) { X "$inner<ChangeRowOrder>true</ChangeRowOrder>" }
+	# ChangeRowSet/Order — эмитим явное значение (в т.ч. false: платформа пишет его на ValueTable)
+	if ($el.PSObject.Properties['changeRowSet'] -and $null -ne $el.changeRowSet) {
+		X "$inner<ChangeRowSet>$(if ($el.changeRowSet -eq $true){'true'}else{'false'})</ChangeRowSet>"
+	}
+	if ($el.PSObject.Properties['changeRowOrder'] -and $null -ne $el.changeRowOrder) {
+		X "$inner<ChangeRowOrder>$(if ($el.changeRowOrder -eq $true){'true'}else{'false'})</ChangeRowOrder>"
+	}
+	if ($el.autoInsertNewRow -eq $true) { X "$inner<AutoInsertNewRow>true</AutoInsertNewRow>" }
+	# RowFilter — nil-плейсхолдер (всегда пустой); ключ присутствует → эмитим
+	if ($el.PSObject.Properties['rowFilter']) { X "$inner<RowFilter xsi:nil=`"true`"/>" }
 	if ($el.height) { X "$inner<HeightInTableRows>$($el.height)</HeightInTableRows>" }
 	if ($el.header -eq $false) { X "$inner<Header>false</Header>" }
 	if ($el.footer -eq $true) { X "$inner<Footer>true</Footer>" }

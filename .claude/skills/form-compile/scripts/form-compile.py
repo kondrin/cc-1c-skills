@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.41 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.42 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1775,7 +1775,7 @@ KNOWN_KEYS = {
     "hyperlink", "formatted",
     "showTitle", "united", "collapsed",
     "children", "columns",
-    "changeRowSet", "changeRowOrder", "header", "footer",
+    "changeRowSet", "changeRowOrder", "autoInsertNewRow", "rowFilter", "header", "footer",
     "commandBarLocation", "searchStringLocation", "viewStatusLocation", "searchControlLocation",
     "excludedCommands",
     "pagesRepresentation",
@@ -2716,10 +2716,16 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<Representation>{el["representation"]}</Representation>')
     if el.get('titleLocation'):
         lines.append(f'{inner}<TitleLocation>{map_title_loc(el["titleLocation"])}</TitleLocation>')
-    if el.get('changeRowSet') is True:
-        lines.append(f'{inner}<ChangeRowSet>true</ChangeRowSet>')
-    if el.get('changeRowOrder') is True:
-        lines.append(f'{inner}<ChangeRowOrder>true</ChangeRowOrder>')
+    # ChangeRowSet/Order — явное значение (в т.ч. false: платформа пишет его на ValueTable)
+    if 'changeRowSet' in el and el['changeRowSet'] is not None:
+        lines.append(f'{inner}<ChangeRowSet>{"true" if el["changeRowSet"] is True else "false"}</ChangeRowSet>')
+    if 'changeRowOrder' in el and el['changeRowOrder'] is not None:
+        lines.append(f'{inner}<ChangeRowOrder>{"true" if el["changeRowOrder"] is True else "false"}</ChangeRowOrder>')
+    if el.get('autoInsertNewRow') is True:
+        lines.append(f'{inner}<AutoInsertNewRow>true</AutoInsertNewRow>')
+    # RowFilter — nil-плейсхолдер (ключ присутствует → эмитим)
+    if 'rowFilter' in el:
+        lines.append(f'{inner}<RowFilter xsi:nil="true"/>')
     if el.get('height'):
         lines.append(f'{inner}<HeightInTableRows>{el["height"]}</HeightInTableRows>')
     if el.get('header') is False:

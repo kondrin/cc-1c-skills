@@ -1,4 +1,4 @@
-﻿# form-decompile v0.23 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.24 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -974,8 +974,11 @@ function Decompile-Element {
 			Add-CommonProps $obj $node $name
 			$tl = Get-Child $node 'TitleLocation'; if ($tl) { $obj['titleLocation'] = $tl.ToLower() }
 			$rep = Get-Child $node 'Representation'; if ($rep) { $obj['representation'] = $rep }
-			if ((Get-Child $node 'ChangeRowSet') -eq 'true') { $obj['changeRowSet'] = $true }
-			if ((Get-Child $node 'ChangeRowOrder') -eq 'true') { $obj['changeRowOrder'] = $true }
+			$crs = Get-Child $node 'ChangeRowSet'; if ($null -ne $crs) { $obj['changeRowSet'] = ($crs -eq 'true') }
+			$cro = Get-Child $node 'ChangeRowOrder'; if ($null -ne $cro) { $obj['changeRowOrder'] = ($cro -eq 'true') }
+			if ((Get-Child $node 'AutoInsertNewRow') -eq 'true') { $obj['autoInsertNewRow'] = $true }
+			if ((Get-Child $node 'EnableDrag') -eq 'true') { $obj['enableDrag'] = $true }
+			if ($node.SelectSingleNode("lf:RowFilter", $ns)) { $obj['rowFilter'] = $null }
 			if ((Get-Child $node 'Header') -eq 'false') { $obj['header'] = $false }
 			if ((Get-Child $node 'Footer') -eq 'true') { $obj['footer'] = $true }
 			$htr = Get-Child $node 'HeightInTableRows'; if ($htr) { $obj['height'] = [int]$htr }

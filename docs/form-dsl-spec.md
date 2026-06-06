@@ -315,8 +315,11 @@
 | `path` | string | DataPath |
 | `columns` | array | Колонки (элементы input/check/labelField/picField, либо `columnGroup` для группировки) |
 | `representation` | string | `List`, `Tree`, `HierarchicalList` |
-| `changeRowSet` | bool | Разрешить добавление/удаление строк |
-| `changeRowOrder` | bool | Разрешить перемещение строк |
+| `changeRowSet` | bool | Разрешить добавление/удаление строк (эмитится явное значение, в т.ч. `false`) |
+| `changeRowOrder` | bool | Разрешить перемещение строк (явное значение) |
+| `autoInsertNewRow` | bool | Автодобавление новой строки |
+| `enableDrag` | bool | Разрешить перетаскивание из таблицы |
+| `rowFilter` | null | Отбор строк (nil-плейсхолдер `<RowFilter xsi:nil="true"/>`); значение всегда `null` |
 | `height` | int | Высота в строках таблицы |
 | `header` | bool | Показывать шапку |
 | `footer` | bool | Показывать подвал |
