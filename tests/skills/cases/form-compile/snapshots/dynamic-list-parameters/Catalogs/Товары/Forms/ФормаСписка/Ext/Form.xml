@@ -27,6 +27,8 @@
 			<AllowRootChoice>false</AllowRootChoice>
 			<UpdateOnDataChange>Auto</UpdateOnDataChange>
 			<AllowGettingCurrentRowURL>true</AllowGettingCurrentRowURL>
+			<BackColor>web:Honeydew</BackColor>
+			<BorderColor>style:BorderColor</BorderColor>
 			<ContextMenu name="СписокКонтекстноеМеню" id="2"/>
 			<AutoCommandBar name="СписокКоманднаяПанель" id="3">
 				<Autofill>false</Autofill>
@@ -64,6 +66,10 @@
 				</InputField>
 				<InputField name="Наименование" id="17">
 					<DataPath>Список.Наименование</DataPath>
+					<TitleTextColor>web:FireBrick</TitleTextColor>
+					<Border width="1">
+						<v8ui:style xsi:type="v8ui:ControlBorderType">Single</v8ui:style>
+					</Border>
 					<ContextMenu name="НаименованиеКонтекстноеМеню" id="18"/>
 					<ExtendedTooltip name="НаименованиеРасширеннаяПодсказка" id="19"/>
 				</InputField>

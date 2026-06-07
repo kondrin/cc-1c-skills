@@ -38,9 +38,9 @@
       } }
     ],
     "elements": [
-      { "table": "Список", "path": "Список", "columns": [
+      { "table": "Список", "path": "Список", "backColor": "web:Honeydew", "borderColor": "style:BorderColor", "columns": [
         { "input": "Код", "path": "Список.Код" },
-        { "input": "Наименование", "path": "Список.Наименование" }
+        { "input": "Наименование", "path": "Список.Наименование", "titleTextColor": "web:FireBrick", "border": { "width": 1, "style": "Single" } }
       ]}
     ]
   }

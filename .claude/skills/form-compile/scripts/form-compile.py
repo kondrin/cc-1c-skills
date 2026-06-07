@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.65 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.66 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -2744,6 +2744,9 @@ def emit_group(lines, el, name, eid, indent):
     emit_common_flags(lines, el, inner)
     emit_layout(lines, el, inner)
 
+    # Оформление (цвета/шрифты/граница) — перед компаньоном
+    emit_appearance(lines, el, inner, 'field')
+
     # Companion: ExtendedTooltip
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
 
@@ -2779,6 +2782,9 @@ def emit_column_group(lines, el, name, eid, indent):
 
     emit_common_flags(lines, el, inner)
     emit_layout(lines, el, inner)
+
+    # Оформление (цвета/шрифты/граница) — перед компаньоном
+    emit_appearance(lines, el, inner, 'field')
 
     emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner, el.get('extendedTooltip'))
 
@@ -3101,6 +3107,9 @@ def emit_table(lines, el, name, eid, indent):
             lines.append(f'{inner}\t<ExcludedCommand>{cmd}</ExcludedCommand>')
         lines.append(f'{inner}</CommandSet>')
 
+    # Оформление (цвета/граница таблицы) — перед компаньонами
+    emit_appearance(lines, el, inner, 'field')
+
     # Companions
     emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     # AutoCommandBar — with optional Autofill control
@@ -3293,6 +3302,9 @@ def emit_picture_decoration(lines, el, name, eid, indent):
         lines.append(f'{inner}<Hyperlink>true</Hyperlink>')
     emit_layout(lines, el, inner)
 
+    # Оформление PictureDecoration: XSD расщепляет appearance вокруг Title (Border после Title)
+    # + позиция Picture — отдельный кластер, пока не разводим (декомпилятор захватывает в keys).
+
     # Companions
     emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
@@ -3324,6 +3336,9 @@ def emit_picture_field(lines, el, name, eid, indent):
     # Required for a Boolean-bound PictureField to actually show an icon.
     # Скаляр (Ref) или объект {src, loadTransparent}; LoadTransparent эмитится всегда.
     emit_picture_ref(lines, el.get('valuesPicture'), 'ValuesPicture', inner)
+
+    # Оформление (цвета/шрифты/граница) — перед компаньонами
+    emit_appearance(lines, el, inner, 'field')
 
     # Companions
     emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))
@@ -3362,6 +3377,9 @@ def emit_calendar(lines, el, name, eid, indent):
         lines.append(f'{inner}<HeightInMonths>{el["heightInMonths"]}</HeightInMonths>')
     if el.get('showMonthsPanel') is not None:
         lines.append(f'{inner}<ShowMonthsPanel>{"true" if el["showMonthsPanel"] else "false"}</ShowMonthsPanel>')
+
+    # Оформление (цвета/шрифты/граница) — перед компаньонами
+    emit_appearance(lines, el, inner, 'field')
 
     # Companions
     emit_companion_panel(lines, 'ContextMenu', f'{name}\u041a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u043d\u043e\u0435\u041c\u0435\u043d\u044e', inner, el.get('contextMenu'))

@@ -56,9 +56,21 @@
 			<Font ref="style:NormalTextFont" kind="StyleItem"/>
 			<ExtendedTooltip name="ОКРасширеннаяПодсказка" id="11"/>
 		</Button>
+		<UsualGroup name="ГруппаОформление" id="12">
+			<BackColor>web:Honeydew</BackColor>
+			<ExtendedTooltip name="ГруппаОформлениеРасширеннаяПодсказка" id="13"/>
+			<ChildItems>
+				<InputField name="Цена2" id="14">
+					<DataPath>Объект.Цена</DataPath>
+					<TextColor>web:DimGray</TextColor>
+					<ContextMenu name="Цена2КонтекстноеМеню" id="15"/>
+					<ExtendedTooltip name="Цена2РасширеннаяПодсказка" id="16"/>
+				</InputField>
+			</ChildItems>
+		</UsualGroup>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Объект" id="12">
+		<Attribute name="Объект" id="17">
 			<Type>
 				<v8:Type>cfg:CatalogObject.Товары</v8:Type>
 			</Type>

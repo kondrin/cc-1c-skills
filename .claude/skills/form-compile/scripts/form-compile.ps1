@@ -1,4 +1,4 @@
-﻿# form-compile v1.65 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.66 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2830,6 +2830,9 @@ function Emit-Group {
 	Emit-CommonFlags -el $el -indent $inner
 	Emit-Layout -el $el -indent $inner
 
+	# Оформление (цвета/шрифты/граница) — перед компаньоном
+	Emit-Appearance -el $el -indent $inner -profile 'field'
+
 	# Companion: ExtendedTooltip
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
 
@@ -2868,6 +2871,9 @@ function Emit-ColumnGroup {
 
 	Emit-CommonFlags -el $el -indent $inner
 	Emit-Layout -el $el -indent $inner
+
+	# Оформление (цвета/шрифты/граница) — перед компаньоном
+	Emit-Appearance -el $el -indent $inner -profile 'field'
 
 	# Companion: ExtendedTooltip
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
@@ -3381,6 +3387,9 @@ function Emit-Table {
 		X "$inner</CommandSet>"
 	}
 
+	# Оформление (цвета/граница таблицы) — перед компаньонами
+	Emit-Appearance -el $el -indent $inner -profile 'field'
+
 	# Companions
 	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	# AutoCommandBar: приоритет commandBar-свойства (контент); иначе tableAutofill-shorthand; иначе пусто.
@@ -3598,6 +3607,9 @@ function Emit-PictureDecoration {
 	if ($el.hyperlink -eq $true) { X "$inner<Hyperlink>true</Hyperlink>" }
 	Emit-Layout -el $el -indent $inner
 
+	# Оформление PictureDecoration: XSD расщепляет appearance вокруг Title (Border после Title)
+	# + позиция Picture — отдельный кластер, пока не разводим (декомпилятор захватывает в keys).
+
 	# Companions
 	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
@@ -3628,6 +3640,9 @@ function Emit-PictureField {
 	# Required for a Boolean-bound PictureField to actually show an icon.
 	# Скаляр (Ref) или объект {src, loadTransparent}; LoadTransparent эмитится всегда.
 	Emit-PictureRef -val $el.valuesPicture -picTag 'ValuesPicture' -indent $inner
+
+	# Оформление (цвета/шрифты/граница) — перед компаньонами
+	Emit-Appearance -el $el -indent $inner -profile 'field'
 
 	# Companions
 	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
@@ -3670,6 +3685,9 @@ function Emit-Calendar {
 	if ($null -ne $el.widthInMonths) { X "$inner<WidthInMonths>$($el.widthInMonths)</WidthInMonths>" }
 	if ($null -ne $el.heightInMonths) { X "$inner<HeightInMonths>$($el.heightInMonths)</HeightInMonths>" }
 	if ($null -ne $el.showMonthsPanel) { $v = if ($el.showMonthsPanel) { "true" } else { "false" }; X "$inner<ShowMonthsPanel>$v</ShowMonthsPanel>" }
+
+	# Оформление (цвета/шрифты/граница) — перед компаньонами
+	Emit-Appearance -el $el -indent $inner -profile 'field'
 
 	# Companions
 	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
