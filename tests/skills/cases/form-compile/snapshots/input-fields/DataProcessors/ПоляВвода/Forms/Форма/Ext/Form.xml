@@ -27,6 +27,18 @@
 			<EditMode>EnterOnInput</EditMode>
 			<HorizontalStretch>false</HorizontalStretch>
 			<VerticalStretch>false</VerticalStretch>
+			<Format>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ЧДЦ=2</v8:content>
+				</v8:item>
+			</Format>
+			<EditFormat>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ЧДЦ=2; ЧН=</v8:content>
+				</v8:item>
+			</EditFormat>
 			<ContextMenu name="ОбычноеПолеКонтекстноеМеню" id="2"/>
 			<ExtendedTooltip name="ОбычноеПолеРасширеннаяПодсказка" id="3"/>
 		</InputField>
@@ -34,6 +46,16 @@
 			<DataPath>ОбычноеПоле</DataPath>
 			<TitleLocation>Left</TitleLocation>
 			<Hiperlink>true</Hiperlink>
+			<Format>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>ДЛФ=D</v8:content>
+				</v8:item>
+				<v8:item>
+					<v8:lang>en</v8:lang>
+					<v8:content>DLF=D</v8:content>
+				</v8:item>
+			</Format>
 			<ContextMenu name="СсылкаКонтекстноеМеню" id="5"/>
 			<ExtendedTooltip name="СсылкаРасширеннаяПодсказка" id="6"/>
 		</LabelField>
@@ -323,6 +345,12 @@
 			</Title>
 			<CheckBoxType>Switcher</CheckBoxType>
 			<TitleLocation>Right</TitleLocation>
+			<Format>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>БЛ=Нет; БИ=Да</v8:content>
+				</v8:item>
+			</Format>
 			<ContextMenu name="ФлагТумблерКонтекстноеМеню" id="38"/>
 			<ExtendedTooltip name="ФлагТумблерРасширеннаяПодсказка" id="39"/>
 		</CheckBoxField>

@@ -352,6 +352,8 @@ companion-панели с собственным контентом. Оба не
 | `skipOnInput` | bool | Пропускать при вводе |
 | `inputHint` | string | Подсказка ввода (placeholder) |
 | `choiceList` | array | Список выбора: массив `{ value, presentation?/title? }` — та же грамматика, что у `radio` (см. ниже) |
+| `format` | string/object | Формат значения (`<Format>`). Строка форматной строки 1С (`ЧДЦ=2`, `ДЛФ=D`, `БЛ=Нет; БИ=Да`) или мультиязык `{ru, en}`. Так же у `labelField` и `check` |
+| `editFormat` | string/object | Формат редактирования (`<EditFormat>`). Та же грамматика, что `format` |
 | `wrap` | bool | Перенос по словам (`<Wrap>`) |
 | `openButton` | bool | Кнопка открытия (`<OpenButton>`) |
 | `listChoiceMode` | bool | Режим выбора из списка (`<ListChoiceMode>`) |

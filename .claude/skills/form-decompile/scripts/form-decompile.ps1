@@ -1,4 +1,4 @@
-﻿# form-decompile v0.49 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.50 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1249,6 +1249,13 @@ function Decompile-TypeLink {
 	return $o
 }
 
+# Захват <Format>/<EditFormat> (LocalStringType) → format/editFormat (строка или {ru,en}).
+function Add-FormatProps {
+	param($obj, $node)
+	$fmt = $node.SelectSingleNode("lf:Format", $ns); if ($fmt) { $t = Get-LangText $fmt; if ($null -ne $t -and $t -ne '') { $obj['format'] = $t } }
+	$efmt = $node.SelectSingleNode("lf:EditFormat", $ns); if ($efmt) { $t = Get-LangText $efmt; if ($null -ne $t -and $t -ne '') { $obj['editFormat'] = $t } }
+}
+
 function Decompile-Element {
 	param($node)
 	$tag = $node.LocalName
@@ -1315,6 +1322,7 @@ function Decompile-Element {
 			}
 			$cbr = Get-Child $node 'ChoiceButtonRepresentation'; if ($cbr) { $obj['choiceButtonRepresentation'] = $cbr }
 			$cl = Decompile-ChoiceList $node; if ($cl) { $obj['choiceList'] = $cl }
+			Add-FormatProps $obj $node
 			# Параметры выбора / Связи параметров выбора / Связь по типу
 			$cp = Decompile-ChoiceParameters $node; if ($cp) { $obj['choiceParameters'] = $cp }
 			$cpl = Decompile-ChoiceParameterLinks $node; if ($cpl) { $obj['choiceParameterLinks'] = $cpl }
@@ -1330,6 +1338,7 @@ function Decompile-Element {
 			if ($null -eq $cbt) { $obj['checkBoxType'] = '' }
 			elseif ($cbt -ne 'Auto') { $obj['checkBoxType'] = $cbt.Substring(0,1).ToLower() + $cbt.Substring(1) }
 			Add-TitleLocation $obj $node 'Right'
+			Add-FormatProps $obj $node
 		}
 		'RadioButtonField' {
 			$obj[$key] = $name
@@ -1356,6 +1365,7 @@ function Decompile-Element {
 			$em = Get-Child $node 'EditMode'; if ($em) { $obj['editMode'] = $em }
 			# LabelField: тег <Hiperlink> (опечатка платформы), не <Hyperlink>
 			if ((Get-Child $node 'Hiperlink') -eq 'true') { $obj['hyperlink'] = $true }
+			Add-FormatProps $obj $node
 		}
 		'PictureDecoration' {
 			$obj[$key] = $name

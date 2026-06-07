@@ -1,4 +1,4 @@
-﻿# form-compile v1.71 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.72 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2439,6 +2439,7 @@ function Emit-Element {
 		"wrap"=1;"openButton"=1;"listChoiceMode"=1;"showInFooter"=1
 		"extendedEditMultipleValues"=1;"chooseType"=1;"autoCellHeight"=1
 		"choiceButtonRepresentation"=1;"footerHorizontalAlign"=1;"headerHorizontalAlign"=1
+		"format"=1;"editFormat"=1;"choiceParameters"=1;"choiceParameterLinks"=1;"typeLink"=1
 		# label/hyperlink
 		"hyperlink"=1;"formatted"=1
 		# group-specific
@@ -2938,6 +2939,10 @@ function Emit-Input {
 		Emit-MLText -tag "InputHint" -text $el.inputHint -indent $inner
 	}
 
+	# Формат / формат редактирования (LocalStringType — строка или {ru,en})
+	if ($el.format)     { Emit-MLText -tag "Format" -text $el.format -indent $inner }
+	if ($el.editFormat) { Emit-MLText -tag "EditFormat" -text $el.editFormat -indent $inner }
+
 	Emit-ChoiceList -el $el -indent $inner
 
 	# Связи по типу / связи параметров выбора / параметры выбора
@@ -2981,6 +2986,10 @@ function Emit-Check {
 	Emit-TitleLocation -el $el -indent $inner -smartDefault "Right"
 
 	Emit-Layout -el $el -indent $inner
+
+	# Формат / формат редактирования (LocalStringType — строка или {ru,en})
+	if ($el.format)     { Emit-MLText -tag "Format" -text $el.format -indent $inner }
+	if ($el.editFormat) { Emit-MLText -tag "EditFormat" -text $el.editFormat -indent $inner }
 
 	# Оформление (цвета/шрифты/граница) — перед компаньонами
 	Emit-Appearance -el $el -indent $inner -profile 'field'
@@ -3447,6 +3456,10 @@ function Emit-LabelField {
 	# ВНИМАНИЕ: у LabelField платформенный тег именно <Hiperlink> (опечатка 1С), не <Hyperlink>.
 	if ($el.hyperlink -eq $true) { X "$inner<Hiperlink>true</Hiperlink>" }
 	Emit-Layout -el $el -indent $inner
+
+	# Формат / формат редактирования (LocalStringType — строка или {ru,en})
+	if ($el.format)     { Emit-MLText -tag "Format" -text $el.format -indent $inner }
+	if ($el.editFormat) { Emit-MLText -tag "EditFormat" -text $el.editFormat -indent $inner }
 
 	# Оформление (цвета/шрифты/граница + header/footer) — перед компаньонами
 	Emit-Appearance -el $el -indent $inner -profile 'field'

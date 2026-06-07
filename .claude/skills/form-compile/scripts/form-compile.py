@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.71 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.72 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1775,6 +1775,7 @@ KNOWN_KEYS = {
     "wrap", "openButton", "listChoiceMode", "showInHeader", "showInFooter",
     "extendedEditMultipleValues", "chooseType", "autoCellHeight",
     "choiceButtonRepresentation", "footerHorizontalAlign", "headerHorizontalAlign",
+    "format", "editFormat", "choiceParameters", "choiceParameterLinks", "typeLink",
     "hyperlink", "formatted",
     "showTitle", "united", "collapsed", "behavior",
     "children", "columns",
@@ -3008,6 +3009,12 @@ def emit_input(lines, el, name, eid, indent):
     if el.get('inputHint'):
         emit_mltext(lines, inner, 'InputHint', el['inputHint'])
 
+    # Формат / формат редактирования (LocalStringType — строка или {ru,en})
+    if el.get('format'):
+        emit_mltext(lines, inner, 'Format', el['format'])
+    if el.get('editFormat'):
+        emit_mltext(lines, inner, 'EditFormat', el['editFormat'])
+
     emit_choice_list(lines, el, inner)
 
     # Связи по типу / связи параметров выбора / параметры выбора
@@ -3051,6 +3058,12 @@ def emit_check(lines, el, name, eid, indent):
     emit_title_location(lines, el, inner, 'Right')
 
     emit_layout(lines, el, inner)
+
+    # Формат / формат редактирования (LocalStringType — строка или {ru,en})
+    if el.get('format'):
+        emit_mltext(lines, inner, 'Format', el['format'])
+    if el.get('editFormat'):
+        emit_mltext(lines, inner, 'EditFormat', el['editFormat'])
 
     # Оформление (цвета/шрифты/граница) — перед компаньонами
     emit_appearance(lines, el, inner, 'field')
@@ -3158,6 +3171,12 @@ def emit_label_field(lines, el, name, eid, indent):
     if el.get('hyperlink') is True:
         lines.append(f'{inner}<Hiperlink>true</Hiperlink>')
     emit_layout(lines, el, inner)
+
+    # Формат / формат редактирования (LocalStringType — строка или {ru,en})
+    if el.get('format'):
+        emit_mltext(lines, inner, 'Format', el['format'])
+    if el.get('editFormat'):
+        emit_mltext(lines, inner, 'EditFormat', el['editFormat'])
 
     # Оформление (цвета/шрифты/граница + header/footer) — перед компаньонами
     emit_appearance(lines, el, inner, 'field')

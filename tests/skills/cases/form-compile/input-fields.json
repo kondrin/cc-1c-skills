@@ -16,8 +16,8 @@
   "input": {
     "title": "Поля ввода",
     "elements": [
-      { "input": "ОбычноеПоле", "path": "ОбычноеПоле", "title": "Обычное поле", "tooltip": "Введите значение поля", "tooltipRepresentation": "ShowBottom", "editMode": "EnterOnInput", "horizontalStretch": false, "verticalStretch": false },
-      { "labelField": "Ссылка", "path": "ОбычноеПоле", "titleLocation": "left", "hyperlink": true },
+      { "input": "ОбычноеПоле", "path": "ОбычноеПоле", "title": "Обычное поле", "tooltip": "Введите значение поля", "tooltipRepresentation": "ShowBottom", "editMode": "EnterOnInput", "horizontalStretch": false, "verticalStretch": false, "format": "ЧДЦ=2", "editFormat": "ЧДЦ=2; ЧН=" },
+      { "labelField": "Ссылка", "path": "ОбычноеПоле", "titleLocation": "left", "hyperlink": true, "format": { "ru": "ДЛФ=D", "en": "DLF=D" } },
       { "input": "МногострочноеПоле", "path": "МногострочноеПоле", "multiLine": true, "height": 5, "title": "Комментарий", "wrap": false, "showInHeader": false, "showInFooter": false, "autoCellHeight": true, "footerHorizontalAlign": "Right", "openButton": false, "chooseType": false },
       { "input": "ПолеПароля", "path": "ПолеПароля", "passwordMode": true, "title": "Пароль" },
       { "input": "ПолеСКнопками", "path": "ПолеСКнопками", "choiceButton": true, "clearButton": true, "title": "Выбор" },
@@ -48,7 +48,7 @@
       { "check": "Флаг", "path": "Флаг", "title": "Включено" },
       { "check": "ФлагПлатформенный", "path": "ФлагПлатформенный", "title": "Слева", "titleLocation": "" },
       { "check": "ФлагЯвный", "path": "ФлагЯвный", "title": "Сверху", "titleLocation": "top" },
-      { "check": "ФлагТумблер", "path": "ФлагТумблер", "title": "Тумблер", "checkBoxType": "switcher" }
+      { "check": "ФлагТумблер", "path": "ФлагТумблер", "title": "Тумблер", "checkBoxType": "switcher", "format": "БЛ=Нет; БИ=Да" }
     ],
     "attributes": [
       { "name": "Объект", "type": "DataProcessorObject.ПоляВвода", "main": true },
