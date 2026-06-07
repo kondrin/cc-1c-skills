@@ -1,4 +1,4 @@
-﻿# form-decompile v0.47 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.48 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -40,6 +40,7 @@ $NS_DCSSET = "http://v8.1c.ru/8.1/data-composition-system/settings"
 $NS_DCSSCH = "http://v8.1c.ru/8.1/data-composition-system/schema"
 $NS_DCSCOR = "http://v8.1c.ru/8.1/data-composition-system/core"
 $NS_V8UI   = "http://v8.1c.ru/8.1/data/ui"
+$NS_APP    = "http://v8.1c.ru/8.2/managed-application/core"
 
 $ns = New-Object System.Xml.XmlNamespaceManager($xmlDoc.NameTable)
 $ns.AddNamespace("lf", $NS_LF)
@@ -50,6 +51,7 @@ $ns.AddNamespace("dcsset", $NS_DCSSET)
 $ns.AddNamespace("dcssch", $NS_DCSSCH)
 $ns.AddNamespace("dcscor", $NS_DCSCOR)
 $ns.AddNamespace("v8ui", $NS_V8UI)
+$ns.AddNamespace("app", $NS_APP)
 
 # Каноничные GUID пустых контейнеров ListSettings (умолчание платформы, ~90% форм).
 # Если ListSettings = пустой скелет с этими GUID → декомпилятор опускает настройки вовсе,
@@ -1178,6 +1180,70 @@ function Decompile-ChoiceList {
 	return $null
 }
 
+# Значение Параметра выбора (<lf:Value>): скаляр через Convert-TypedValue, либо
+# v8:FixedArray → массив скаляров (каждый — FormChoiceListDesTimeValue с внутренним lf:Value).
+function Convert-ChoiceParamValue {
+	param($valNode)
+	$vt = $valNode.GetAttribute("type", $NS_XSI)
+	if ($vt -match 'FixedArray$') {
+		$arr = New-Object System.Collections.ArrayList
+		foreach ($it in @($valNode.SelectNodes("v8:Value", $ns))) {
+			$inner = $it.SelectSingleNode("lf:Value", $ns)
+			if ($inner) { [void]$arr.Add((Convert-TypedValue -raw $inner.InnerText -xsiType ($inner.GetAttribute("type", $NS_XSI)))) }
+		}
+		return ,@($arr)
+	}
+	return Convert-TypedValue -raw $valNode.InnerText -xsiType $vt
+}
+
+# Инверсия Emit-ChoiceParameters: <ChoiceParameters><app:item name="X"><app:value><Value…> → [{name, value}].
+function Decompile-ChoiceParameters {
+	param($node)
+	$cpn = $node.SelectSingleNode("lf:ChoiceParameters", $ns)
+	if (-not $cpn) { return $null }
+	$items = New-Object System.Collections.ArrayList
+	foreach ($it in @($cpn.SelectNodes("app:item", $ns))) {
+		$o = [ordered]@{}
+		$o['name'] = $it.GetAttribute("name")
+		$valNode = $it.SelectSingleNode("app:value/lf:Value", $ns)
+		if ($valNode) { $o['value'] = Convert-ChoiceParamValue $valNode }
+		[void]$items.Add($o)
+	}
+	if ($items.Count -gt 0) { return ,@($items) }
+	return $null
+}
+
+# Инверсия Emit-ChoiceParameterLinks: <ChoiceParameterLinks><xr:Link><xr:Name><xr:DataPath><xr:ValueChange> →
+# [{name, dataPath, valueChange?}]. valueChange дефолт Clear → опускаем (компилятор восстановит).
+function Decompile-ChoiceParameterLinks {
+	param($node)
+	$cln = $node.SelectSingleNode("lf:ChoiceParameterLinks", $ns)
+	if (-not $cln) { return $null }
+	$items = New-Object System.Collections.ArrayList
+	foreach ($lk in @($cln.SelectNodes("xr:Link", $ns))) {
+		$o = [ordered]@{}
+		$o['name'] = Get-Text $lk "xr:Name"
+		$o['dataPath'] = Get-Text $lk "xr:DataPath"
+		$vc = Get-Text $lk "xr:ValueChange"
+		if ($vc -and $vc -ne 'Clear') { $o['valueChange'] = $vc }
+		[void]$items.Add($o)
+	}
+	if ($items.Count -gt 0) { return ,@($items) }
+	return $null
+}
+
+# Инверсия Emit-TypeLink: <TypeLink><xr:DataPath><xr:LinkItem> → {dataPath, linkItem}.
+function Decompile-TypeLink {
+	param($node)
+	$tn = $node.SelectSingleNode("lf:TypeLink", $ns)
+	if (-not $tn) { return $null }
+	$o = [ordered]@{}
+	$o['dataPath'] = Get-Text $tn "xr:DataPath"
+	$li = Get-Text $tn "xr:LinkItem"
+	if ($null -ne $li -and $li -ne '') { $o['linkItem'] = [int]$li }
+	return $o
+}
+
 function Decompile-Element {
 	param($node)
 	$tag = $node.LocalName
@@ -1244,6 +1310,10 @@ function Decompile-Element {
 			}
 			$cbr = Get-Child $node 'ChoiceButtonRepresentation'; if ($cbr) { $obj['choiceButtonRepresentation'] = $cbr }
 			$cl = Decompile-ChoiceList $node; if ($cl) { $obj['choiceList'] = $cl }
+			# Параметры выбора / Связи параметров выбора / Связь по типу
+			$cp = Decompile-ChoiceParameters $node; if ($cp) { $obj['choiceParameters'] = $cp }
+			$cpl = Decompile-ChoiceParameterLinks $node; if ($cpl) { $obj['choiceParameterLinks'] = $cpl }
+			$tlk = Decompile-TypeLink $node; if ($tlk) { $obj['typeLink'] = $tlk }
 		}
 		'CheckBoxField' {
 			$obj[$key] = $name

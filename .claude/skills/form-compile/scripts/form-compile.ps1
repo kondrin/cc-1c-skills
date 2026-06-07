@@ -1,4 +1,4 @@
-﻿# form-compile v1.67 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.68 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2940,6 +2940,11 @@ function Emit-Input {
 
 	Emit-ChoiceList -el $el -indent $inner
 
+	# Связи по типу / связи параметров выбора / параметры выбора
+	Emit-TypeLink -el $el -indent $inner
+	Emit-ChoiceParameterLinks -el $el -indent $inner
+	Emit-ChoiceParameters -el $el -indent $inner
+
 	# Оформление (цвета/шрифты/граница) — перед компаньонами
 	Emit-Appearance -el $el -indent $inner -profile 'field'
 
@@ -3175,6 +3180,103 @@ function Emit-ChoiceList {
 		X "$itemIndent</xr:Item>"
 	}
 	X "$indent</ChoiceList>"
+}
+
+# Чтение свойства из hashtable/PSCustomObject по списку синонимов (первый найденный, иначе $null).
+function Get-ElProp {
+	param($obj, [string[]]$names)
+	if ($null -eq $obj) { return $null }
+	foreach ($n in $names) {
+		if ($obj -is [System.Collections.IDictionary]) {
+			if ($obj.Contains($n)) { return $obj[$n] }
+		} elseif ($obj.PSObject -and $obj.PSObject.Properties[$n]) {
+			return $obj.PSObject.Properties[$n].Value
+		}
+	}
+	return $null
+}
+
+# Внутреннее значение параметра выбора (FormChoiceListDesTimeValue): <Presentation/> + <Value>.
+# Скаляр → один Value (через Normalize-ChoiceValue); массив → v8:FixedArray из вложенных FormChoiceListDesTimeValue.
+function Emit-ChoiceParamValue {
+	param($value, [string]$indent)
+	X "$indent<Presentation/>"
+	$isArray = ($value -is [System.Array]) -or ($value -is [System.Collections.IList] -and $value -isnot [string])
+	if ($isArray) {
+		X "$indent<Value xsi:type=`"v8:FixedArray`">"
+		foreach ($v in $value) {
+			$norm = Normalize-ChoiceValue -value $v
+			X "$indent`t<v8:Value xsi:type=`"FormChoiceListDesTimeValue`">"
+			X "$indent`t`t<Presentation/>"
+			X "$indent`t`t<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+			X "$indent`t</v8:Value>"
+		}
+		X "$indent</Value>"
+	} else {
+		$norm = Normalize-ChoiceValue -value $value
+		X "$indent<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+	}
+}
+
+# <ChoiceParameters> (параметры выбора поля ввода) — [{name, value}]. value через Normalize-ChoiceValue;
+# массив значений → FixedArray. Рус. синонимы имя/значение.
+function Emit-ChoiceParameters {
+	param($el, [string]$indent)
+	$cp = $el.choiceParameters
+	if (-not $cp -or @($cp).Count -eq 0) { return }
+	X "$indent<ChoiceParameters>"
+	foreach ($item in @($cp)) {
+		$name = Get-ElProp $item @('name','имя')
+		$val = Get-ElProp $item @('value','значение')
+		X "$indent`t<app:item name=`"$(Esc-Xml "$name")`">"
+		X "$indent`t`t<app:value xsi:type=`"FormChoiceListDesTimeValue`">"
+		Emit-ChoiceParamValue -value $val -indent "$indent`t`t`t"
+		X "$indent`t`t</app:value>"
+		X "$indent`t</app:item>"
+	}
+	X "$indent</ChoiceParameters>"
+}
+
+# <ChoiceParameterLinks> (связи параметров выбора) — [{name, dataPath, valueChange?}].
+# valueChange всегда эмитится, дефолт Clear; forgiving Clear/DontChange + рус. синонимы.
+function Emit-ChoiceParameterLinks {
+	param($el, [string]$indent)
+	$cpl = $el.choiceParameterLinks
+	if (-not $cpl -or @($cpl).Count -eq 0) { return }
+	X "$indent<ChoiceParameterLinks>"
+	foreach ($lk in @($cpl)) {
+		$name = Get-ElProp $lk @('name','имя')
+		$dp = Get-ElProp $lk @('dataPath','path','путь')
+		$vcRaw = Get-ElProp $lk @('valueChange','режимИзменения')
+		$vc = "Clear"
+		if ($vcRaw) {
+			$vc = switch -Regex ("$vcRaw".ToLower()) {
+				'^(clear|очистить|очистка)$'             { "Clear"; break }
+				'^(dontchange|неизменять|неменять|нет)$' { "DontChange"; break }
+				default                                  { "$vcRaw" }
+			}
+		}
+		X "$indent`t<xr:Link>"
+		X "$indent`t`t<xr:Name>$(Esc-Xml "$name")</xr:Name>"
+		X "$indent`t`t<xr:DataPath xsi:type=`"xs:string`">$(Esc-Xml "$dp")</xr:DataPath>"
+		X "$indent`t`t<xr:ValueChange>$vc</xr:ValueChange>"
+		X "$indent`t</xr:Link>"
+	}
+	X "$indent</ChoiceParameterLinks>"
+}
+
+# <TypeLink> (связь по типу) — {dataPath, linkItem}. linkItem дефолт 0.
+function Emit-TypeLink {
+	param($el, [string]$indent)
+	$tl = $el.typeLink
+	if (-not $tl) { return }
+	$dp = Get-ElProp $tl @('dataPath','path','путь')
+	$li = Get-ElProp $tl @('linkItem','элементСвязи')
+	if ($null -eq $li) { $li = 0 }
+	X "$indent<TypeLink>"
+	X "$indent`t<xr:DataPath>$(Esc-Xml "$dp")</xr:DataPath>"
+	X "$indent`t<xr:LinkItem>$li</xr:LinkItem>"
+	X "$indent</TypeLink>"
 }
 
 function Emit-Radio {

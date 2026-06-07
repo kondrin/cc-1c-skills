@@ -2001,6 +2001,99 @@ def emit_choice_list(lines, el, indent):
     lines.append(f'{indent}</ChoiceList>')
 
 
+def get_el_prop(obj, names):
+    # Читает свойство из dict по списку синонимов (первый найденный, иначе None).
+    if not isinstance(obj, dict):
+        return None
+    for n in names:
+        if n in obj:
+            return obj[n]
+    return None
+
+
+def emit_choice_param_value(lines, value, indent):
+    # Внутреннее значение параметра выбора (FormChoiceListDesTimeValue): <Presentation/> + <Value>.
+    # Скаляр → один Value; массив → v8:FixedArray из вложенных FormChoiceListDesTimeValue.
+    lines.append(f'{indent}<Presentation/>')
+    if isinstance(value, (list, tuple)):
+        lines.append(f'{indent}<Value xsi:type="v8:FixedArray">')
+        for v in value:
+            norm = normalize_choice_value(v)
+            lines.append(f'{indent}\t<v8:Value xsi:type="FormChoiceListDesTimeValue">')
+            lines.append(f'{indent}\t\t<Presentation/>')
+            lines.append(f'{indent}\t\t<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
+            lines.append(f'{indent}\t</v8:Value>')
+        lines.append(f'{indent}</Value>')
+    else:
+        norm = normalize_choice_value(value)
+        lines.append(f'{indent}<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
+
+
+def emit_choice_parameters(lines, el, indent):
+    # <ChoiceParameters> (параметры выбора поля ввода) — [{name, value}]. value через
+    # normalize_choice_value; массив значений → FixedArray. Рус. синонимы имя/значение.
+    cp = el.get('choiceParameters') or []
+    if not cp:
+        return
+    lines.append(f'{indent}<ChoiceParameters>')
+    for item in cp:
+        name = get_el_prop(item, ('name', 'имя'))
+        val = get_el_prop(item, ('value', 'значение'))
+        name_s = '' if name is None else str(name)
+        lines.append(f'{indent}\t<app:item name="{esc_xml(name_s)}">')
+        lines.append(f'{indent}\t\t<app:value xsi:type="FormChoiceListDesTimeValue">')
+        emit_choice_param_value(lines, val, f'{indent}\t\t\t')
+        lines.append(f'{indent}\t\t</app:value>')
+        lines.append(f'{indent}\t</app:item>')
+    lines.append(f'{indent}</ChoiceParameters>')
+
+
+def emit_choice_parameter_links(lines, el, indent):
+    # <ChoiceParameterLinks> (связи параметров выбора) — [{name, dataPath, valueChange?}].
+    # valueChange всегда эмитится, дефолт Clear; forgiving Clear/DontChange + рус. синонимы.
+    cpl = el.get('choiceParameterLinks') or []
+    if not cpl:
+        return
+    lines.append(f'{indent}<ChoiceParameterLinks>')
+    for lk in cpl:
+        name = get_el_prop(lk, ('name', 'имя'))
+        dp = get_el_prop(lk, ('dataPath', 'path', 'путь'))
+        vc_raw = get_el_prop(lk, ('valueChange', 'режимИзменения'))
+        vc = 'Clear'
+        if vc_raw:
+            s = str(vc_raw).lower()
+            if s in ('clear', 'очистить', 'очистка'):
+                vc = 'Clear'
+            elif s in ('dontchange', 'неизменять', 'неменять', 'нет'):
+                vc = 'DontChange'
+            else:
+                vc = str(vc_raw)
+        name_s = '' if name is None else str(name)
+        dp_s = '' if dp is None else str(dp)
+        lines.append(f'{indent}\t<xr:Link>')
+        lines.append(f'{indent}\t\t<xr:Name>{esc_xml(name_s)}</xr:Name>')
+        lines.append(f'{indent}\t\t<xr:DataPath xsi:type="xs:string">{esc_xml(dp_s)}</xr:DataPath>')
+        lines.append(f'{indent}\t\t<xr:ValueChange>{vc}</xr:ValueChange>')
+        lines.append(f'{indent}\t</xr:Link>')
+    lines.append(f'{indent}</ChoiceParameterLinks>')
+
+
+def emit_type_link(lines, el, indent):
+    # <TypeLink> (связь по типу) — {dataPath, linkItem}. linkItem дефолт 0.
+    tl = el.get('typeLink')
+    if not tl:
+        return
+    dp = get_el_prop(tl, ('dataPath', 'path', 'путь'))
+    li = get_el_prop(tl, ('linkItem', 'элементСвязи'))
+    if li is None:
+        li = 0
+    dp_s = '' if dp is None else str(dp)
+    lines.append(f'{indent}<TypeLink>')
+    lines.append(f'{indent}\t<xr:DataPath>{esc_xml(dp_s)}</xr:DataPath>')
+    lines.append(f'{indent}\t<xr:LinkItem>{li}</xr:LinkItem>')
+    lines.append(f'{indent}</TypeLink>')
+
+
 def normalize_radio_button_type(raw):
     if not raw:
         return "Auto"
@@ -2846,6 +2939,11 @@ def emit_input(lines, el, name, eid, indent):
         emit_mltext(lines, inner, 'InputHint', el['inputHint'])
 
     emit_choice_list(lines, el, inner)
+
+    # Связи по типу / связи параметров выбора / параметры выбора
+    emit_type_link(lines, el, inner)
+    emit_choice_parameter_links(lines, el, inner)
+    emit_choice_parameters(lines, el, inner)
 
     # Оформление (цвета/шрифты/граница) — перед компаньонами
     emit_appearance(lines, el, inner, 'field')

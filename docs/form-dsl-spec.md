@@ -364,6 +364,31 @@ companion-панели с собственным контентом. Оба не
 | `verticalStretch` | bool | Растягивание по вертикали |
 | `autoMaxWidth` | bool | Автомаксимальная ширина |
 | `autoMaxHeight` | bool | Автомаксимальная высота |
+| `choiceParameters` | array | Параметры выбора — см. ниже |
+| `choiceParameterLinks` | array | Связи параметров выбора — см. ниже |
+| `typeLink` | object | Связь по типу — см. ниже |
+
+##### Параметры выбора, связи параметров выбора, связь по типу
+
+Свойства поля ввода, управляющие выбором значения и типом. Имена параметров (`"Отбор.Х"`) — строки 1С как есть.
+
+```json
+{ "input": "Контрагент", "path": "Объект.Контрагент",
+  "choiceParameters": [
+    { "name": "Отбор.Активный", "value": true },
+    { "name": "Отбор.ВидПродукции", "value": ["Enum.Виды.Агрохимикат", "Enum.Виды.Пестицид"] }
+  ],
+  "choiceParameterLinks": [
+    { "name": "Отбор.Организация", "dataPath": "Объект.Организация" },
+    { "name": "Отбор.Тип", "dataPath": "Объект.Тип", "valueChange": "DontChange" }
+  ],
+  "typeLink": { "dataPath": "Объект.ЗначениеДата", "linkItem": 0 }
+}
+```
+
+- **`choiceParameters`** — `[{ name, value }]`. `value` через ту же нормализацию, что `choiceList`: bool / число / строка / ссылка-путь (`Enum.X.Y`, `Catalog.X` и синонимы `Перечисление.`/`Справочник.`). **Массив** значений → фиксированный массив (`FixedArray`). Синонимы ключей: `имя`/`значение`.
+- **`choiceParameterLinks`** — `[{ name, dataPath, valueChange? }]`. `valueChange`: `Clear` (дефолт, опускается) / `DontChange`; forgiving `очистить`/`неизменять`. Синонимы: `имя`/`путь`/`режимИзменения`.
+- **`typeLink`** — `{ dataPath, linkItem }`. `linkItem` — индекс (дефолт `0`). Синонимы: `путь`/`элементСвязи`.
 
 #### check — CheckBoxField
 
