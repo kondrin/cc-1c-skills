@@ -51,6 +51,19 @@
 						<Value xsi:type="xr:DesignTimeRef">Enum.СпособыКурса.EnumValue.Ручной</Value>
 					</xr:Value>
 				</xr:Item>
+				<xr:Item>
+					<xr:Presentation/>
+					<xr:CheckState>0</xr:CheckState>
+					<xr:Value xsi:type="FormChoiceListDesTimeValue">
+						<Presentation>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>(не задан)</v8:content>
+							</v8:item>
+						</Presentation>
+						<Value xsi:type="xr:DesignTimeRef">Enum.СпособыКурса.EmptyRef</Value>
+					</xr:Value>
+				</xr:Item>
 			</ChoiceList>
 			<ContextMenu name="СпособКурсаКонтекстноеМеню" id="2"/>
 			<ExtendedTooltip name="СпособКурсаРасширеннаяПодсказка" id="3"/>

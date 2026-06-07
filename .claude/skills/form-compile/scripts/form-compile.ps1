@@ -1,4 +1,4 @@
-﻿# form-compile v1.70 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.71 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -3070,8 +3070,9 @@ function Normalize-ChoiceValue {
 				if ($parts.Count -eq 2) {
 					# "Enum.X" alone — not a value, treat as string
 				} elseif ($parts.Count -eq 3) {
-					# "Enum.X.Y" — insert .EnumValue.
-					$normalized = "Enum.$typeName.EnumValue.$($parts[2])"
+					# "Enum.X.Y" — insert .EnumValue. ("EmptyRef" — пустая ссылка, БЕЗ вставки)
+					if ($parts[2] -eq 'EmptyRef') { $normalized = "Enum.$typeName.EmptyRef" }
+					else { $normalized = "Enum.$typeName.EnumValue.$($parts[2])" }
 				} else {
 					# "Enum.X.<member>.Y..."  — replace member with EnumValue (handles ЗначениеПеречисления too)
 					$member = $parts[2]
@@ -3131,6 +3132,13 @@ function Emit-ChoicePresentation {
 	X "$indent</Presentation>"
 }
 
+# <Value> для choiceList/choiceParameters: пустой текст → самозакрывающийся тег (зеркало платформы).
+function Get-ChoiceValueTag {
+	param($norm)
+	if ([string]::IsNullOrEmpty($norm.Text)) { return "<Value xsi:type=`"$($norm.XsiType)`"/>" }
+	return "<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+}
+
 # Emit <ChoiceList> (список выбора) — у RadioButtonField и InputField.
 # Элемент: { value, presentation?/title? } (+ рус. синонимы значение/представление).
 function Emit-ChoiceList {
@@ -3180,7 +3188,7 @@ function Emit-ChoiceList {
 		X "$valIndent<xr:CheckState>0</xr:CheckState>"
 		X "$valIndent<xr:Value xsi:type=`"FormChoiceListDesTimeValue`">"
 		Emit-ChoicePresentation -pres $presRaw -indent "$valIndent`t"
-		X "$valIndent`t<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+		X "$valIndent`t$(Get-ChoiceValueTag $norm)"
 		X "$valIndent</xr:Value>"
 		X "$itemIndent</xr:Item>"
 	}
@@ -3262,13 +3270,13 @@ function Emit-ChoiceParamValue {
 			$norm = Normalize-ChoiceValue -value $v
 			X "$indent`t<v8:Value xsi:type=`"FormChoiceListDesTimeValue`">"
 			X "$indent`t`t<Presentation/>"
-			X "$indent`t`t<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+			X "$indent`t`t$(Get-ChoiceValueTag $norm)"
 			X "$indent`t</v8:Value>"
 		}
 		X "$indent</Value>"
 	} else {
 		$norm = Normalize-ChoiceValue -value $value
-		X "$indent<Value xsi:type=`"$($norm.XsiType)`">$(Esc-Xml $norm.Text)</Value>"
+		X "$indent$(Get-ChoiceValueTag $norm)"
 	}
 }
 

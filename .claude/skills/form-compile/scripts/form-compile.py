@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.70 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.71 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1928,7 +1928,10 @@ def normalize_choice_value(value):
             type_name = parts[1]
             normalized = None
             if canon_root == "Enum":
-                if len(parts) == 3:
+                if len(parts) == 3 and parts[2] == 'EmptyRef':
+                    # "Enum.X.EmptyRef" — пустая ссылка, НЕ значение перечисления (без .EnumValue.)
+                    normalized = f"Enum.{type_name}.EmptyRef"
+                elif len(parts) == 3:
                     normalized = f"Enum.{type_name}.EnumValue.{parts[2]}"
                 elif len(parts) >= 4:
                     member = parts[2]
@@ -1970,6 +1973,13 @@ def emit_choice_presentation(lines, pres, indent):
     lines.append(f"{indent}</Presentation>")
 
 
+def choice_value_tag(norm):
+    # <Value> для choiceList/choiceParameters: пустой текст → самозакрывающийся тег (зеркало платформы).
+    if not norm["text"]:
+        return f'<Value xsi:type="{norm["xsi_type"]}"/>'
+    return f'<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>'
+
+
 def emit_choice_list(lines, el, indent):
     # <ChoiceList> — у RadioButtonField и InputField. Элемент: { value, presentation?/title? }.
     choice_list = el.get('choiceList') or []
@@ -1999,7 +2009,7 @@ def emit_choice_list(lines, el, indent):
         lines.append(f'{val_indent}<xr:CheckState>0</xr:CheckState>')
         lines.append(f'{val_indent}<xr:Value xsi:type="FormChoiceListDesTimeValue">')
         emit_choice_presentation(lines, pres_raw, f'{val_indent}\t')
-        lines.append(f'{val_indent}\t<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
+        lines.append(f'{val_indent}\t{choice_value_tag(norm)}')
         lines.append(f'{val_indent}</xr:Value>')
         lines.append(f'{item_indent}</xr:Item>')
     lines.append(f'{indent}</ChoiceList>')
@@ -2075,12 +2085,12 @@ def emit_choice_param_value(lines, value, indent):
             norm = normalize_choice_value(v)
             lines.append(f'{indent}\t<v8:Value xsi:type="FormChoiceListDesTimeValue">')
             lines.append(f'{indent}\t\t<Presentation/>')
-            lines.append(f'{indent}\t\t<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
+            lines.append(f'{indent}\t\t{choice_value_tag(norm)}')
             lines.append(f'{indent}\t</v8:Value>')
         lines.append(f'{indent}</Value>')
     else:
         norm = normalize_choice_value(value)
-        lines.append(f'{indent}<Value xsi:type="{norm["xsi_type"]}">{esc_xml(norm["text"])}</Value>')
+        lines.append(f'{indent}{choice_value_tag(norm)}')
 
 
 def emit_choice_parameters(lines, el, indent):

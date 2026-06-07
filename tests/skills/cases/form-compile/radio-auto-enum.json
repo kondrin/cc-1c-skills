@@ -37,7 +37,8 @@
         "columnsCount": 1,
         "choiceList": [
           { "value": "Enum.СпособыКурса.EnumValue.Авто",   "presentation": { "ru": "Автоматически", "en": "Automatic" } },
-          { "value": "Enum.СпособыКурса.EnumValue.Ручной", "presentation": "вручную" }
+          { "value": "Enum.СпособыКурса.EnumValue.Ручной", "presentation": "вручную" },
+          { "value": "Enum.СпособыКурса.EmptyRef",         "presentation": "(не задан)" }
         ]
       }
     ]
