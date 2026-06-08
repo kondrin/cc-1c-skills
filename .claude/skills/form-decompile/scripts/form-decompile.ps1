@@ -1,4 +1,4 @@
-﻿# form-decompile v0.50 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.51 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -214,7 +214,9 @@ function ConvertTo-CompactJson {
 # --- 2. Helpers ---
 
 # Companion-элементы (авто-генерируемые компилятором) — пропускаем при обходе детей.
-$COMPANION_TAGS = @('ContextMenu','ExtendedTooltip','AutoCommandBar','SearchStringAddition','ViewStatusAddition','SearchControlAddition')
+# Дополнения (Search*/ViewStatus) БОЛЬШЕ не companion — декомпилируются как тип-элементы
+# (кастомные в AutoCommandBar/ChildItems → commandBar.children; стандартные на уровне таблицы → карта additions).
+$COMPANION_TAGS = @('ContextMenu','ExtendedTooltip','AutoCommandBar')
 
 # Извлечь мультиязычный Title/Presentation → string (ru) или ordered hash {ru,en,...}
 function Get-LangText {
@@ -1114,7 +1116,8 @@ $ELEMENT_KEY = @{
 	'UsualGroup'='group'; 'ColumnGroup'='columnGroup'; 'ButtonGroup'='buttonGroup'; 'InputField'='input'; 'CheckBoxField'='check';
 	'RadioButtonField'='radio'; 'LabelDecoration'='label'; 'LabelField'='labelField';
 	'PictureDecoration'='picture'; 'PictureField'='picField'; 'CalendarField'='calendar';
-	'Table'='table'; 'Pages'='pages'; 'Page'='page'; 'Button'='button'; 'CommandBar'='cmdBar'; 'Popup'='popup'
+	'Table'='table'; 'Pages'='pages'; 'Page'='page'; 'Button'='button'; 'CommandBar'='cmdBar'; 'Popup'='popup';
+	'SearchStringAddition'='searchString'; 'ViewStatusAddition'='viewStatus'; 'SearchControlAddition'='searchControl'
 }
 
 function Decompile-Children {
@@ -1254,6 +1257,37 @@ function Add-FormatProps {
 	param($obj, $node)
 	$fmt = $node.SelectSingleNode("lf:Format", $ns); if ($fmt) { $t = Get-LangText $fmt; if ($null -ne $t -and $t -ne '') { $obj['format'] = $t } }
 	$efmt = $node.SelectSingleNode("lf:EditFormat", $ns); if ($efmt) { $t = Get-LangText $efmt; if ($null -ne $t -and $t -ne '') { $obj['editFormat'] = $t } }
+}
+
+# Ядро дополнения: source + общие свойства (Add-CommonProps) + horizontalLocation.
+# Layout (Add-Layout) добавляется ОТДЕЛЬНО (в Decompile-Element — пост-обработкой, в standalone — явно).
+function Add-AdditionCore {
+	param($obj, $node, [string]$elName)
+	$src = $node.SelectSingleNode("lf:AdditionSource/lf:Item", $ns); if ($src) { $obj['source'] = $src.InnerText }
+	Add-CommonProps $obj $node $elName
+	$hl = Get-Child $node 'HorizontalLocation'; if ($hl) { $obj['horizontalLocation'] = $hl.ToLower() }
+}
+
+# Стандартные дополнения уровня таблицы (прямые дети <Table>): извлечь ТОЛЬКО отклонения в карту
+# { тип: {свойства} }. Имя (=tableName+suffix) и source (=tableName) — дефолтные, опускаем.
+function Decompile-TableAdditions {
+	param($tableNode, [string]$tableName)
+	$tagToKey = @{ 'SearchStringAddition'='searchString'; 'ViewStatusAddition'='viewStatus'; 'SearchControlAddition'='searchControl' }
+	$map = [ordered]@{}
+	foreach ($child in $tableNode.ChildNodes) {
+		if ($child.NodeType -ne [System.Xml.XmlNodeType]::Element) { continue }
+		if (-not $tagToKey.ContainsKey($child.LocalName)) { continue }
+		$key = $tagToKey[$child.LocalName]
+		$nm = $child.GetAttribute("name")
+		$o = [ordered]@{}; $o[$key] = $nm
+		Add-AdditionCore $o $child $nm
+		Add-Layout $o $child
+		$o.Remove($key)                                                          # имя авто
+		if ($o.Contains('source') -and $o['source'] -eq $tableName) { $o.Remove('source') }  # source=таблица дефолт
+		if ($o.Count -gt 0) { $map[$key] = $o }
+	}
+	if ($map.Count -gt 0) { return $map }
+	return $null
 }
 
 function Decompile-Element {
@@ -1410,7 +1444,13 @@ function Decompile-Element {
 			if ((Get-Child $node 'Header') -eq 'false') { $obj['header'] = $false }
 			if ((Get-Child $node 'Footer') -eq 'true') { $obj['footer'] = $true }
 			$htr = Get-Child $node 'HeightInTableRows'; if ($htr) { $obj['height'] = [int]$htr }
-			$cbl = Get-Child $node 'CommandBarLocation'; if ($cbl) { $obj['commandBarLocation'] = $cbl }
+			# CommandBarLocation: для дин-список-таблицы компилятор авто-инжектит "None" → инвертируем
+			# (нет тега → суппресс-маркер ""; "None" → опускаем = авто-дефолт; иначе → захват).
+			$cbl = Get-Child $node 'CommandBarLocation'
+			if (Has-Child $node 'UpdateOnDataChange') {
+				if ($null -eq $cbl) { $obj['commandBarLocation'] = '' }
+				elseif ($cbl -ne 'None') { $obj['commandBarLocation'] = $cbl }
+			} elseif ($cbl) { $obj['commandBarLocation'] = $cbl }
 			$ssl = Get-Child $node 'SearchStringLocation'; if ($ssl) { $obj['searchStringLocation'] = $ssl }
 			$vsl = Get-Child $node 'ViewStatusLocation'; if ($vsl) { $obj['viewStatusLocation'] = $vsl }
 			$scl = Get-Child $node 'SearchControlLocation'; if ($scl) { $obj['searchControlLocation'] = $scl }
@@ -1447,6 +1487,9 @@ function Decompile-Element {
 			}
 			$cols = Decompile-Children $node
 			if ($cols) { $obj['columns'] = $cols }
+			# Стандартные дополнения уровня таблицы (прямые дети) → карта отклонений additions
+			$addMap = Decompile-TableAdditions $node $name
+			if ($addMap) { $obj['additions'] = $addMap }
 		}
 		'Pages' {
 			$obj[$key] = $name
@@ -1510,6 +1553,9 @@ function Decompile-Element {
 			$kids = Decompile-Children $node
 			if ($kids) { $obj['children'] = $kids }
 		}
+		'SearchStringAddition'  { $obj[$key] = $name; Add-AdditionCore $obj $node $name }
+		'ViewStatusAddition'    { $obj[$key] = $name; Add-AdditionCore $obj $node $name }
+		'SearchControlAddition' { $obj[$key] = $name; Add-AdditionCore $obj $node $name }
 	}
 	# title: "" — подавление авто-вывода: для типов, где компилятор вывел бы
 	# заголовок из имени, а в оригинале <Title> отсутствует.

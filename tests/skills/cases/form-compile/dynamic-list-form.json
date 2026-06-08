@@ -24,10 +24,15 @@
       } }
     ],
     "elements": [
-      { "table": "Список", "path": "Список", "columns": [
-        { "input": "Код", "path": "Список.Code" },
-        { "input": "Наименование", "path": "Список.Description" }
-      ]}
+      { "table": "Список", "path": "Список",
+        "additions": { "viewStatus": { "horizontalLocation": "left" } },
+        "commandBar": [
+          { "searchString": "ПоискСписка", "source": "Список", "width": 15, "horizontalStretch": true }
+        ],
+        "columns": [
+          { "input": "Код", "path": "Список.Code" },
+          { "input": "Наименование", "path": "Список.Description" }
+        ]}
     ]
   }
 }

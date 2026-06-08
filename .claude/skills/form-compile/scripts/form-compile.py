@@ -1811,6 +1811,8 @@ KNOWN_KEYS = {
     "userSettingsGroup", "rowsPicture",
     # AutoCommandBar-маркер (autofill heuristic) на элементе/таблице
     "autoCmdBar",
+    # дополнения командной панели таблицы (тип-ключи + свойства)
+    "searchString", "viewStatus", "searchControl", "source", "horizontalLocation", "additions",
 }
 
 # picture/picField — НИЗКИЙ приоритет: 'picture' это и тип (PictureDecoration), и свойство-иконка
@@ -1818,7 +1820,7 @@ KNOWN_KEYS = {
 # pages/page ПЕРЕД group: у Page/Pages ключ 'group' — это направление раскладки детей
 # (<Group>Horizontal</Group>), а не тип UsualGroup. Реальная UsualGroup ключа page/pages не несёт.
 TYPE_KEYS = ["columnGroup", "buttonGroup", "pages", "page", "group", "input", "check", "radio", "label", "labelField", "table",
-             "button", "calendar", "cmdBar", "popup", "picField", "picture"]
+             "button", "calendar", "cmdBar", "popup", "searchString", "viewStatus", "searchControl", "picField", "picture"]
 
 # Synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio)
 ELEMENT_TYPE_SYNONYMS = {
@@ -1857,6 +1859,20 @@ ELEMENT_TYPE_SYNONYMS = {
     "Кнопка": "button",
     "Popup": "popup",
     "ВсплывающееМеню": "popup",
+    # дополнения командной панели таблицы — forgiving: XML-тег/Type/рус.имя → канон
+    "SearchStringAddition": "searchString",
+    "SearchStringRepresentation": "searchString",
+    "строкаПоиска": "searchString",
+    "отображениеСтрокиПоиска": "searchString",
+    "Отображение строки поиска": "searchString",
+    "ViewStatusAddition": "viewStatus",
+    "ViewStatusRepresentation": "viewStatus",
+    "состояниеПросмотра": "viewStatus",
+    "Состояние просмотра": "viewStatus",
+    "SearchControlAddition": "searchControl",
+    "SearchControl": "searchControl",
+    "управлениеПоиском": "searchControl",
+    "Управление поиском": "searchControl",
 }
 
 # Тип-синонимы, применяемые ТОЛЬКО к строковому значению (имя элемента); объект/массив
@@ -2324,18 +2340,89 @@ def emit_companion_panel(lines, tag, name, indent, panel):
     lines.append(f'{indent}</{tag}>')
 
 
-def emit_table_addition(lines, tag, table_name, name_suffix, src_type, indent):
-    # Табличный addition с AdditionSource (Item = имя таблицы, Type фиксирован).
-    add_name = f'{table_name}{name_suffix}'
+# Дополнения командной панели таблицы: тип DSL → XML-тег + AdditionSource.Type + суффикс имени.
+ADDITION_TYPE_MAP = {
+    'searchString':  {'tag': 'SearchStringAddition',  'type': 'SearchStringRepresentation', 'suffix': 'СтрокаПоиска'},
+    'viewStatus':    {'tag': 'ViewStatusAddition',    'type': 'ViewStatusRepresentation',   'suffix': 'СостояниеПросмотра'},
+    'searchControl': {'tag': 'SearchControlAddition', 'type': 'SearchControl',               'suffix': 'УправлениеПоиском'},
+}
+ADDITION_KEY_SYNONYMS = {
+    'searchString':  ['SearchStringAddition', 'SearchStringRepresentation', 'строкаПоиска', 'отображениеСтрокиПоиска'],
+    'viewStatus':    ['ViewStatusAddition', 'ViewStatusRepresentation', 'состояниеПросмотра'],
+    'searchControl': ['SearchControlAddition', 'SearchControl', 'управлениеПоиском'],
+}
+# Имя текущей таблицы — дефолт source для кастомных дополнений в commandBar.
+_current_table_name = {'name': None}
+
+
+def get_hlocation(el):
+    # HorizontalLocation: auto (дефолт, опускаем) / left / right; forgiving + рус.
+    if not isinstance(el, dict):
+        return None
+    v = el.get('horizontalLocation')
+    if not v:
+        return None
+    s = str(v).lower()
+    if s in ('auto', 'авто'):
+        return None
+    if s in ('left', 'слева', 'лево'):
+        return 'Left'
+    if s in ('right', 'справа', 'право'):
+        return 'Right'
+    return str(v)
+
+
+def emit_addition_body(lines, props, source, src_type, add_name, indent):
+    # Тело дополнения: AdditionSource + свойства (как у поля) + companions. props может быть None.
+    inner = f'{indent}\t'
+    lines.append(f'{inner}<AdditionSource>')
+    lines.append(f'{inner}\t<Item>{source}</Item>')
+    lines.append(f'{inner}\t<Type>{src_type}</Type>')
+    lines.append(f'{inner}</AdditionSource>')
+    if props:
+        if props.get('title'):
+            emit_mltext(lines, inner, 'Title', props['title'])
+        emit_common_flags(lines, props, inner)
+        if props.get('tooltip'):
+            emit_mltext(lines, inner, 'ToolTip', props['tooltip'])
+        if props.get('tooltipRepresentation'):
+            lines.append(f'{inner}<ToolTipRepresentation>{props["tooltipRepresentation"]}</ToolTipRepresentation>')
+        hl = get_hlocation(props)
+        if hl:
+            lines.append(f'{inner}<HorizontalLocation>{hl}</HorizontalLocation>')
+        emit_layout(lines, props, inner)
+        emit_appearance(lines, props, inner, 'field')
+    emit_companion(lines, 'ContextMenu', f'{add_name}КонтекстноеМеню', inner)
+    emit_companion(lines, 'ExtendedTooltip', f'{add_name}РасширеннаяПодсказка', inner)
+
+
+def emit_addition(lines, el, name, eid, type_key, indent):
+    # Кастомное дополнение (тип-элемент в commandBar): source дефолтит в текущую таблицу.
+    m = ADDITION_TYPE_MAP[type_key]
+    source = el.get('source') or _current_table_name['name'] or ''
+    lines.append(f'{indent}<{m["tag"]} name="{name}" id="{eid}">')
+    emit_addition_body(lines, el, source, m['type'], name, indent)
+    lines.append(f'{indent}</{m["tag"]}>')
+
+
+def emit_table_addition(lines, type_key, table_name, indent, override=None):
+    # Стандартное табличное дополнение (авто-генерация). override — объект отклонений из карты additions.
+    m = ADDITION_TYPE_MAP[type_key]
+    add_name = f'{table_name}{m["suffix"]}'
     aid = new_id()
-    lines.append(f'{indent}<{tag} name="{add_name}" id="{aid}">')
-    lines.append(f'{indent}\t<AdditionSource>')
-    lines.append(f'{indent}\t\t<Item>{table_name}</Item>')
-    lines.append(f'{indent}\t\t<Type>{src_type}</Type>')
-    lines.append(f'{indent}\t</AdditionSource>')
-    emit_companion(lines, 'ContextMenu', f'{add_name}КонтекстноеМеню', f'{indent}\t')
-    emit_companion(lines, 'ExtendedTooltip', f'{add_name}РасширеннаяПодсказка', f'{indent}\t')
-    lines.append(f'{indent}</{tag}>')
+    lines.append(f'{indent}<{m["tag"]} name="{add_name}" id="{aid}">')
+    emit_addition_body(lines, override, table_name, m['type'], add_name, indent)
+    lines.append(f'{indent}</{m["tag"]}>')
+
+
+def get_addition_override(additions, type_key):
+    # Прочитать override-объект для типа из per-table карты additions (с синонимами).
+    if not isinstance(additions, dict):
+        return None
+    for k in [type_key] + ADDITION_KEY_SYNONYMS[type_key]:
+        if k in additions:
+            return additions[k]
+    return None
 
 
 # Role-adjustable boolean (xr:Common + 0..N xr:Value name="Role.X").
@@ -2866,6 +2953,9 @@ def emit_element(lines, el, indent, in_cmd_bar=False):
         'calendar': emit_calendar,
         'cmdBar': emit_command_bar,
         'popup': emit_popup,
+        'searchString':  lambda lines, el, name, eid, indent: emit_addition(lines, el, name, eid, 'searchString', indent),
+        'viewStatus':    lambda lines, el, name, eid, indent: emit_addition(lines, el, name, eid, 'viewStatus', indent),
+        'searchControl': lambda lines, el, name, eid, indent: emit_addition(lines, el, name, eid, 'searchControl', indent),
     }
 
     emitter = emitters.get(type_key)
@@ -3240,6 +3330,7 @@ def emit_dynlist_table_block(lines, el, indent):
 
 
 def emit_table(lines, el, name, eid, indent):
+    _current_table_name['name'] = name   # дефолт source для кастомных дополнений в commandBar
     lines.append(f'{indent}<Table name="{name}" id="{eid}">')
     inner = f'{indent}\t'
 
@@ -3331,9 +3422,10 @@ def emit_table(lines, el, name, eid, indent):
     else:
         emit_companion(lines, 'AutoCommandBar', f'{name}\u041a\u043e\u043c\u0430\u043d\u0434\u043d\u0430\u044f\u041f\u0430\u043d\u0435\u043b\u044c', inner)
     emit_companion(lines, 'ExtendedTooltip', f'{name}\u0420\u0430\u0441\u0448\u0438\u0440\u0435\u043d\u043d\u0430\u044f\u041f\u043e\u0434\u0441\u043a\u0430\u0437\u043a\u0430', inner, el.get('extendedTooltip'))
-    emit_table_addition(lines, 'SearchStringAddition', name, '\u0421\u0442\u0440\u043e\u043a\u0430\u041f\u043e\u0438\u0441\u043a\u0430', 'SearchStringRepresentation', inner)
-    emit_table_addition(lines, 'ViewStatusAddition', name, '\u0421\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435\u041f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430', 'ViewStatusRepresentation', inner)
-    emit_table_addition(lines, 'SearchControlAddition', name, '\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435\u041f\u043e\u0438\u0441\u043a\u043e\u043c', 'SearchControl', inner)
+    adds = el.get('additions')
+    emit_table_addition(lines, 'searchString',  name, inner, get_addition_override(adds, 'searchString'))
+    emit_table_addition(lines, 'viewStatus',    name, inner, get_addition_override(adds, 'viewStatus'))
+    emit_table_addition(lines, 'searchControl', name, inner, get_addition_override(adds, 'searchControl'))
 
     # Columns
     if el.get('columns') and len(el['columns']) > 0:

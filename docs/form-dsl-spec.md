@@ -511,6 +511,30 @@ companion-панели с собственным контентом. Оба не
 | `viewStatusLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
 | `searchControlLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
 | `excludedCommands` | string[] | Исключённые стандартные команды таблицы (`Add`, `Delete`, `MoveUp`, `SortListAsc`, …) → `<CommandSet>` |
+| `additions` | object | Отклонения стандартных дополнений командной панели (см. ниже) |
+
+> `commandBarLocation` у **дин-список-таблицы** компилятор авто-подставляет `None`. Чтобы оставить тег пустым (платформа не написала его) — задайте `commandBarLocation: ""` (суппресс-маркер); декомпилятор так и делает.
+
+##### Дополнения командной панели (поиск / состояние / управление)
+
+Дополнения — «представления» встроенного поиска таблицы: `searchString` (отображение строки поиска), `viewStatus` (состояние просмотра), `searchControl` (управление поиском). Это полноценные элементы (полный набор свойств поля). Две позиции:
+
+**(1) Стандартные** (платформа авто-генерит на уровне таблицы) — указываются ТОЛЬКО отклонения, через карту `additions` (ключ = тип):
+```json
+{ "table": "Список", "additions": { "viewStatus": { "horizontalLocation": "left" } } }
+```
+
+**(2) Кастомные** (размещённые в командной панели) — обычные элементы в `commandBar`:
+```json
+{ "table": "Список", "commandBar": [
+  { "searchString": "ПоискСписка", "source": "Список", "width": 15, "horizontalStretch": true }
+]}
+```
+
+- Тип-ключ: `searchString` / `viewStatus` / `searchControl` (forgiving: XML-тег `SearchStringAddition`, `<Type>` `SearchStringRepresentation`, рус. `строкаПоиска`/«Отображение строки поиска»).
+- `source` → `AdditionSource.Item`; **дефолт = имя родительской таблицы**.
+- `horizontalLocation`: `auto` (дефолт) / `left` / `right` (+ рус. `слева`/`справа`). Применимо и к обычным элементам командных панелей.
+- Прочие свойства (`title`, `visible`, `userVisible`, `enabled`, `tooltip`, оформление, `width`/`maxWidth`/`autoMaxWidth`/`horizontalStretch`/`groupHorizontalAlign`/…) — как у поля.
 
 ##### Таблица динамического списка
 

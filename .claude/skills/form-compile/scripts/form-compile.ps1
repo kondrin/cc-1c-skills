@@ -2329,20 +2329,85 @@ function Emit-CompanionPanel {
 	X "$indent</$tag>"
 }
 
-# Табличный addition (СтрокаПоиска/СостояниеПросмотра/УправлениеПоиском) с AdditionSource.
-# Item = имя таблицы, Type фиксирован по виду; внутри — companion ContextMenu/ExtendedTooltip.
+# Дополнения командной панели таблицы: тип DSL → XML-тег + AdditionSource.Type.
+$script:additionTypeMap = [ordered]@{
+	'searchString'  = @{ Tag = 'SearchStringAddition';  Type = 'SearchStringRepresentation'; Suffix = 'СтрокаПоиска' }
+	'viewStatus'    = @{ Tag = 'ViewStatusAddition';    Type = 'ViewStatusRepresentation';   Suffix = 'СостояниеПросмотра' }
+	'searchControl' = @{ Tag = 'SearchControlAddition'; Type = 'SearchControl';               Suffix = 'УправлениеПоиском' }
+}
+# Синонимы типа дополнения (для override-карты additions и резолва тип-ключа).
+$script:additionKeySynonyms = @{
+	'searchString'  = @('SearchStringAddition','SearchStringRepresentation','строкаПоиска','отображениеСтрокиПоиска')
+	'viewStatus'    = @('ViewStatusAddition','ViewStatusRepresentation','состояниеПросмотра')
+	'searchControl' = @('SearchControlAddition','SearchControl','управлениеПоиском')
+}
+
+# HorizontalLocation: auto (дефолт, тег опускаем) / left / right; forgiving + рус.синонимы.
+function Get-HLocation {
+	param($el)
+	$v = if ($el -and $el.PSObject.Properties['horizontalLocation']) { $el.horizontalLocation } else { $null }
+	if (-not $v) { return $null }
+	switch -Regex ("$v".ToLower()) {
+		'^(auto|авто)$'          { return $null }    # дефолт — не эмитим
+		'^(left|слева|лево)$'    { return 'Left' }
+		'^(right|справа|право)$'  { return 'Right' }
+		default                  { return "$v" }
+	}
+}
+
+# Тело дополнения: AdditionSource + свойства (как у поля) + companions. $props может быть $null
+# (стандартное дополнение без отклонений). Порядок 1С-толерантен (diff порядок-независим).
+function Emit-AdditionBody {
+	param($props, [string]$source, [string]$srcType, [string]$addName, [string]$indent)
+	$inner = "$indent`t"
+	X "$inner<AdditionSource>"
+	X "$inner`t<Item>$source</Item>"
+	X "$inner`t<Type>$srcType</Type>"
+	X "$inner</AdditionSource>"
+	if ($props) {
+		if ($props.PSObject.Properties['title'] -and $props.title) { Emit-MLText -tag "Title" -text $props.title -indent $inner }
+		Emit-CommonFlags -el $props -indent $inner
+		if ($props.tooltip) { Emit-MLText -tag "ToolTip" -text $props.tooltip -indent $inner }
+		if ($props.tooltipRepresentation) { X "$inner<ToolTipRepresentation>$($props.tooltipRepresentation)</ToolTipRepresentation>" }
+		$hl = Get-HLocation $props; if ($hl) { X "$inner<HorizontalLocation>$hl</HorizontalLocation>" }
+		Emit-Layout -el $props -indent $inner
+		Emit-Appearance -el $props -indent $inner -profile 'field'
+	}
+	Emit-Companion -tag "ContextMenu" -name "${addName}КонтекстноеМеню" -indent $inner
+	Emit-Companion -tag "ExtendedTooltip" -name "${addName}РасширеннаяПодсказка" -indent $inner
+}
+
+# Кастомное дополнение (тип-элемент в commandBar): source дефолтит в текущую таблицу.
+function Emit-Addition {
+	param($el, [string]$name, [int]$id, [string]$typeKey, [string]$indent)
+	$map = $script:additionTypeMap[$typeKey]
+	$source = if ($el.source) { "$($el.source)" } elseif ($script:currentTableName) { $script:currentTableName } else { '' }
+	X "$indent<$($map.Tag) name=`"$name`" id=`"$id`">"
+	Emit-AdditionBody -props $el -source $source -srcType $map.Type -addName $name -indent $indent
+	X "$indent</$($map.Tag)>"
+}
+
+# Стандартное табличное дополнение (авто-генерация на уровне таблицы). $override — объект отклонений
+# из per-table карты additions (или $null = чистый дефолт).
 function Emit-TableAddition {
-	param([string]$tag, [string]$tableName, [string]$nameSuffix, [string]$srcType, [string]$indent)
-	$addName = "$tableName$nameSuffix"
+	param([string]$typeKey, [string]$tableName, [string]$indent, $override = $null)
+	$map = $script:additionTypeMap[$typeKey]
+	$addName = "$tableName$($map.Suffix)"
 	$id = New-Id
-	X "$indent<$tag name=`"$addName`" id=`"$id`">"
-	X "$indent`t<AdditionSource>"
-	X "$indent`t`t<Item>$tableName</Item>"
-	X "$indent`t`t<Type>$srcType</Type>"
-	X "$indent`t</AdditionSource>"
-	Emit-Companion -tag "ContextMenu" -name "${addName}КонтекстноеМеню" -indent "$indent`t"
-	Emit-Companion -tag "ExtendedTooltip" -name "${addName}РасширеннаяПодсказка" -indent "$indent`t"
-	X "$indent</$tag>"
+	X "$indent<$($map.Tag) name=`"$addName`" id=`"$id`">"
+	Emit-AdditionBody -props $override -source $tableName -srcType $map.Type -addName $addName -indent $indent
+	X "$indent</$($map.Tag)>"
+}
+
+# Прочитать override-объект для типа дополнения из per-table карты additions (с синонимами).
+function Get-AdditionOverride {
+	param($additions, [string]$typeKey)
+	if ($null -eq $additions) { return $null }
+	foreach ($k in @($typeKey) + $script:additionKeySynonyms[$typeKey]) {
+		$p = $additions.PSObject.Properties[$k]
+		if ($p) { return $p.Value }
+	}
+	return $null
 }
 
 function Emit-Element {
@@ -2392,6 +2457,20 @@ function Emit-Element {
 		"Кнопка"            = "button"
 		"Popup"             = "popup"
 		"ВсплывающееМеню"   = "popup"
+		# Дополнения командной панели таблицы (тип-как-ключ) — forgiving: XML-тег/Type/рус.имя → канон
+		"SearchStringAddition"       = "searchString"
+		"SearchStringRepresentation" = "searchString"
+		"строкаПоиска"               = "searchString"
+		"отображениеСтрокиПоиска"    = "searchString"
+		"Отображение строки поиска"  = "searchString"
+		"ViewStatusAddition"         = "viewStatus"
+		"ViewStatusRepresentation"   = "viewStatus"
+		"состояниеПросмотра"         = "viewStatus"
+		"Состояние просмотра"        = "viewStatus"
+		"SearchControlAddition"      = "searchControl"
+		"SearchControl"              = "searchControl"
+		"управлениеПоиском"          = "searchControl"
+		"Управление поиском"         = "searchControl"
 	}
 	foreach ($pair in $synonyms.GetEnumerator()) {
 		if ($null -ne $el.PSObject.Properties[$pair.Key] -and $null -eq $el.PSObject.Properties[$pair.Value]) {
@@ -2410,7 +2489,7 @@ function Emit-Element {
 	# у popup/button/cmdBar. Тип-ключ владельца (popup/button/…) должен выиграть.
 	# pages/page ПЕРЕД group: у Page/Pages ключ 'group' — это направление раскладки детей
 	# (<Group>Horizontal</Group>), а не тип UsualGroup. Реальная UsualGroup ключа page/pages не несёт.
-	foreach ($key in @("columnGroup","buttonGroup","pages","page","group","input","check","radio","label","labelField","table","button","calendar","cmdBar","popup","picField","picture")) {
+	foreach ($key in @("columnGroup","buttonGroup","pages","page","group","input","check","radio","label","labelField","table","button","calendar","cmdBar","popup","searchString","viewStatus","searchControl","picField","picture")) {
 		if ($el.$key -ne $null) {
 			$typeKey = $key
 			break
@@ -2484,6 +2563,8 @@ function Emit-Element {
 		"autofill"=1
 		# AutoCommandBar-маркер (autofill heuristic) на элементе/таблице
 		"autoCmdBar"=1
+		# дополнения командной панели таблицы (тип-ключи + свойства)
+		"searchString"=1;"viewStatus"=1;"searchControl"=1;"source"=1;"horizontalLocation"=1;"additions"=1
 	}
 	# Оформление (цвета/шрифты/граница) — авто-регистрация из самих структур, чтобы allowlist
 	# не дрейфовал при добавлении новых ключей/синонимов. Канонические + forgiving-синонимы.
@@ -2514,6 +2595,9 @@ function Emit-Element {
 		"page"     { Emit-Page -el $el -name $name -id $id -indent $indent }
 		"button"   { Emit-Button -el $el -name $name -id $id -indent $indent -inCmdBar $inCmdBar }
 		"picture"  { Emit-PictureDecoration -el $el -name $name -id $id -indent $indent }
+		"searchString"  { Emit-Addition -el $el -name $name -typeKey "searchString"  -id $id -indent $indent }
+		"viewStatus"    { Emit-Addition -el $el -name $name -typeKey "viewStatus"    -id $id -indent $indent }
+		"searchControl" { Emit-Addition -el $el -name $name -typeKey "searchControl" -id $id -indent $indent }
 		"picField" { Emit-PictureField -el $el -name $name -id $id -indent $indent }
 		"calendar" { Emit-Calendar -el $el -name $name -id $id -indent $indent }
 		"cmdBar"   { Emit-CommandBar -el $el -name $name -id $id -indent $indent }
@@ -3529,6 +3613,7 @@ function Emit-DynListTableBlock {
 function Emit-Table {
 	param($el, [string]$name, [int]$id, [string]$indent)
 
+	$script:currentTableName = $name   # дефолт source для кастомных дополнений в commandBar
 	X "$indent<Table name=`"$name`" id=`"$id`">"
 	$inner = "$indent`t"
 
@@ -3606,9 +3691,10 @@ function Emit-Table {
 		Emit-Companion -tag "AutoCommandBar" -name "${name}КоманднаяПанель" -indent $inner
 	}
 	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
-	Emit-TableAddition -tag "SearchStringAddition" -tableName $name -nameSuffix "СтрокаПоиска" -srcType "SearchStringRepresentation" -indent $inner
-	Emit-TableAddition -tag "ViewStatusAddition" -tableName $name -nameSuffix "СостояниеПросмотра" -srcType "ViewStatusRepresentation" -indent $inner
-	Emit-TableAddition -tag "SearchControlAddition" -tableName $name -nameSuffix "УправлениеПоиском" -srcType "SearchControl" -indent $inner
+	$adds = $el.additions
+	Emit-TableAddition -typeKey 'searchString'  -tableName $name -indent $inner -override (Get-AdditionOverride $adds 'searchString')
+	Emit-TableAddition -typeKey 'viewStatus'    -tableName $name -indent $inner -override (Get-AdditionOverride $adds 'viewStatus')
+	Emit-TableAddition -typeKey 'searchControl' -tableName $name -indent $inner -override (Get-AdditionOverride $adds 'searchControl')
 
 	# Columns
 	if ($el.columns -and $el.columns.Count -gt 0) {
