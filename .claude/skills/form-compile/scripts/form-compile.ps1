@@ -1,4 +1,4 @@
-﻿# form-compile v1.78 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.79 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -4398,11 +4398,12 @@ function Emit-Attributes {
 		}
 		# valueType: уточнение типа значений ValueList → <Settings xsi:type="v8:TypeDescription">
 		# (та же грамматика типа, что и Type, включая составной "A | B"). Forgiving-синонимы.
-		$vtSpec = $null
+		# Три состояния: нет ключа → нет Settings; "" → пустой <Settings…/>; тип → с типом.
+		$vtSpec = $null; $hasVt = $false
 		foreach ($k in @('valueType','typeDescription','описаниеТипов','типЗначений')) {
-			if ($attr.PSObject.Properties[$k] -and $attr.$k) { $vtSpec = $attr.$k; break }
+			if ($attr.PSObject.Properties[$k]) { $vtSpec = $attr.$k; $hasVt = $true; break }
 		}
-		if ($vtSpec) {
+		if ($hasVt) {
 			Emit-Type -typeStr "$vtSpec" -indent $inner -tag "Settings" -tagAttrs ' xsi:type="v8:TypeDescription"'
 		}
 

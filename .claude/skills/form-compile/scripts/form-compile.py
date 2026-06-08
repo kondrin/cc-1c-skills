@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.78 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.79 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -4122,13 +4122,16 @@ def emit_attributes(lines, attrs, indent):
             lines.append(f'{inner}<Type/>')
         # valueType: ОписаниеТипов значений ValueList → <Settings xsi:type="v8:TypeDescription">
         # (та же грамматика типа, включая составной "A | B"). Forgiving-синонимы.
+        # Три состояния: нет ключа → нет Settings; "" → пустой <Settings…/>; тип → с типом.
         vt_spec = None
+        has_vt = False
         for k in ('valueType', 'typeDescription', 'описаниеТипов', 'типЗначений'):
-            if attr.get(k):
+            if k in attr:
                 vt_spec = attr[k]
+                has_vt = True
                 break
-        if vt_spec:
-            emit_type(lines, str(vt_spec), inner, tag="Settings", tag_attrs=' xsi:type="v8:TypeDescription"')
+        if has_vt:
+            emit_type(lines, '' if vt_spec is None else str(vt_spec), inner, tag="Settings", tag_attrs=' xsi:type="v8:TypeDescription"')
 
         if attr.get('main') is True:
             lines.append(f'{inner}<MainAttribute>true</MainAttribute>')
