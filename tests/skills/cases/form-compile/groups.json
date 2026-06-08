@@ -22,7 +22,7 @@
         { "input": "Поле2", "path": "Поле2", "title": "Поле 2" },
         { "labelField": "Метка", "path": "Поле1", "groupVerticalAlign": "Center" }
       ]},
-      { "group": "vertical", "name": "ГруппаПодвал", "behavior": "collapsible", "collapsed": true, "title": { "ru": "Подвал", "en": "Footer" }, "showLeftMargin": false, "enableContentChange": false, "children": [
+      { "group": "vertical", "name": "ГруппаПодвал", "behavior": "collapsible", "collapsed": true, "title": { "ru": "Подвал", "en": "Footer" }, "collapsedTitle": "Развернуть подвал", "showLeftMargin": false, "enableContentChange": false, "children": [
         { "input": "Поле3", "path": "Поле3", "title": "Поле 3" }
       ]}
     ],

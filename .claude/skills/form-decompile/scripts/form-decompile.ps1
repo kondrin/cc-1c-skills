@@ -1,4 +1,4 @@
-﻿# form-decompile v0.60 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.61 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1347,6 +1347,7 @@ function Decompile-Element {
 			$rep = Get-Child $node 'Representation'
 			if ($rep) { $repmap=@{'None'='none';'NormalSeparation'='normal';'WeakSeparation'='weak';'StrongSeparation'='strong'}; if ($repmap.ContainsKey($rep)) { $obj['representation']=$repmap[$rep] } else { $obj['representation']=$rep } }
 			if ((Get-Child $node 'ShowTitle') -eq 'false') { $obj['showTitle'] = $false }
+			$crt = $node.SelectSingleNode("lf:CollapsedRepresentationTitle", $ns); if ($crt) { $ct = Get-LangText $crt; if ($null -ne $ct -and $ct -ne '') { $obj['collapsedTitle'] = $ct } }
 			if ((Get-Child $node 'United') -eq 'false') { $obj['united'] = $false }
 			if ((Get-Child $node 'Collapsed') -eq 'true') { $obj['collapsed'] = $true }
 			$kids = Decompile-Children $node

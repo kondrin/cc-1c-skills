@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.83 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.84 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1791,7 +1791,7 @@ KNOWN_KEYS = {
     "choiceButtonRepresentation", "footerHorizontalAlign", "headerHorizontalAlign",
     "format", "editFormat", "choiceParameters", "choiceParameterLinks", "typeLink",
     "hyperlink", "formatted",
-    "showTitle", "united", "collapsed", "behavior",
+    "collapsedTitle", "showTitle", "united", "collapsed", "behavior",
     "children", "columns",
     "changeRowSet", "changeRowOrder", "autoInsertNewRow", "rowFilter", "header", "footer",
     "commandBarLocation", "searchStringLocation", "viewStatusLocation", "searchControlLocation",
@@ -3082,6 +3082,9 @@ def emit_group(lines, el, name, eid, indent):
     # ShowTitle
     if el.get('showTitle') is False:
         lines.append(f'{inner}<ShowTitle>false</ShowTitle>')
+    # Заголовок свёрнутого представления (collapsible/popup) — мультиязычный текст
+    if el.get('collapsedTitle'):
+        emit_mltext(lines, inner, 'CollapsedRepresentationTitle', el['collapsedTitle'])
 
     # United
     if el.get('united') is False:

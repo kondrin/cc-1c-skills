@@ -78,6 +78,12 @@
 			<Group>Vertical</Group>
 			<Behavior>Collapsible</Behavior>
 			<Collapsed>true</Collapsed>
+			<CollapsedRepresentationTitle>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Развернуть подвал</v8:content>
+				</v8:item>
+			</CollapsedRepresentationTitle>
 			<EnableContentChange>false</EnableContentChange>
 			<ShowLeftMargin>false</ShowLeftMargin>
 			<ExtendedTooltip name="ГруппаПодвалРасширеннаяПодсказка" id="15"/>

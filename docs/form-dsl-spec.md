@@ -339,6 +339,7 @@ companion-панели с собственным контентом. Оба не
 | `group` | string | Ориентация: `horizontal`, `vertical`, `alwaysHorizontal`, `alwaysVertical`. **`""`** → `<Group>` не эмитится (тег отсутствовал в исходнике; платформа сериализует «Группировку», только если она задана в конфигураторе — даже явный `Vertical` хранится, поэтому `""` ≠ `vertical`). Ключ обязателен как тип-маркер группы. (Legacy: `collapsible` = `vertical` + `behavior:'collapsible'`) |
 | `behavior` | string | Поведение (`<Behavior>`): `usual`, `collapsible`, `popup`. **Отсутствие = Авто** (дефолт, не эмитится). Свёртываемая/всплывающая несут доп. свойства |
 | `collapsed` | bool | Свёрнута (у `collapsible`/`popup`) |
+| `collapsedTitle` | string/object | Заголовок свёрнутого представления (`<CollapsedRepresentationTitle>`), мультиязычный текст |
 | `children` | array | Вложенные элементы |
 | `showTitle` | bool | Показывать заголовок группы |
 | `representation` | string | `none`, `normal`, `weak`, `strong` |

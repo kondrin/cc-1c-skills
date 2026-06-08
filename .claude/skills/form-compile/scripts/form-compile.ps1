@@ -1,4 +1,4 @@
-﻿# form-compile v1.83 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.84 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2582,7 +2582,7 @@ function Emit-Element {
 		# label/hyperlink
 		"hyperlink"=1;"formatted"=1
 		# group-specific
-		"showTitle"=1;"united"=1;"collapsed"=1;"behavior"=1
+		"collapsedTitle"=1;"showTitle"=1;"united"=1;"collapsed"=1;"behavior"=1
 		# hierarchy
 		"children"=1;"columns"=1
 		# table-specific
@@ -3013,6 +3013,8 @@ function Emit-Group {
 
 	# ShowTitle
 	if ($el.showTitle -eq $false) { X "$inner<ShowTitle>false</ShowTitle>" }
+	# Заголовок свёрнутого представления (collapsible/popup) — мультиязычный текст
+	if ($el.collapsedTitle) { Emit-MLText -tag "CollapsedRepresentationTitle" -text $el.collapsedTitle -indent $inner }
 
 	# United
 	if ($el.united -eq $false) { X "$inner<United>false</United>" }
