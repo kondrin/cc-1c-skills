@@ -1,4 +1,4 @@
-﻿# form-decompile v0.70 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.71 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -788,7 +788,9 @@ function Add-Layout {
 	# Общие свойства элемента (любой тип): default/drag/skip
 	if ((Get-Child $node 'DefaultItem') -eq 'true') { $obj['defaultItem'] = $true }
 	$soi = Get-Child $node 'SkipOnInput'; if ($null -ne $soi) { $obj['skipOnInput'] = ($soi -eq 'true') }
-	if ((Get-Child $node 'EnableStartDrag') -eq 'true') { $obj['enableStartDrag'] = $true }
+	# EnableStartDrag/EnableDrag — фактическое значение (платформа эмитит и явный false, напр. SpreadSheet)
+	$esd = Get-Child $node 'EnableStartDrag'; if ($null -ne $esd) { $obj['enableStartDrag'] = ($esd -eq 'true') }
+	$edr = Get-Child $node 'EnableDrag'; if ($null -ne $edr) { $obj['enableDrag'] = ($edr -eq 'true') }
 	$fdm = Get-Child $node 'FileDragMode'; if ($fdm) { $obj['fileDragMode'] = $fdm }
 	# AutoMaxWidth: компилятор додумывает false для multiLine-input без явного ключа (multiLineDefault).
 	# Захват факт. значения; multiLine-input без тега → autoMaxWidth:true (суппресс эвристики).
@@ -1147,7 +1149,9 @@ $ELEMENT_KEY = @{
 	'RadioButtonField'='radio'; 'LabelDecoration'='label'; 'LabelField'='labelField';
 	'PictureDecoration'='picture'; 'PictureField'='picField'; 'CalendarField'='calendar';
 	'Table'='table'; 'Pages'='pages'; 'Page'='page'; 'Button'='button'; 'CommandBar'='cmdBar'; 'Popup'='popup';
-	'SearchStringAddition'='searchString'; 'ViewStatusAddition'='viewStatus'; 'SearchControlAddition'='searchControl'
+	'SearchStringAddition'='searchString'; 'ViewStatusAddition'='viewStatus'; 'SearchControlAddition'='searchControl';
+	'SpreadSheetDocumentField'='spreadsheet'; 'HTMLDocumentField'='html'; 'TextDocumentField'='textDoc';
+	'FormattedDocumentField'='formattedDoc'; 'ProgressBarField'='progressBar'; 'TrackBarField'='trackBar'
 }
 
 # Простые скаляры элемента (pass-through, зеркало $script:genericScalars компилятора). kind bool/value.
@@ -1167,6 +1171,23 @@ $GENERIC_SCALARS = @(
 	@{ Tag='CreateButton'; Key='createButton'; Kind='bool' }
 	@{ Tag='FixingInTable'; Key='fixingInTable'; Kind='value' }
 	@{ Tag='VerticalSpacing'; Key='verticalSpacing'; Kind='value' }
+	# Спец-поля (документ/датчик) — типоспец. enum/bool скаляры pass-through (зеркало компилятора)
+	@{ Tag='HorizontalScrollBar'; Key='horizontalScrollBar'; Kind='value' }
+	@{ Tag='ViewScalingMode'; Key='viewScalingMode'; Kind='value' }
+	@{ Tag='Output'; Key='output'; Kind='value' }
+	@{ Tag='SelectionShowMode'; Key='selectionShowMode'; Kind='value' }
+	@{ Tag='PointerType'; Key='pointerType'; Kind='value' }
+	@{ Tag='DrawingSelectionShowMode'; Key='drawingSelectionShowMode'; Kind='value' }
+	@{ Tag='WarningOnEditRepresentation'; Key='warningOnEditRepresentation'; Kind='value' }
+	@{ Tag='MarkingAppearance'; Key='markingAppearance'; Kind='value' }
+	@{ Tag='Protection'; Key='protection'; Kind='bool' }
+	@{ Tag='Edit'; Key='edit'; Kind='bool' }
+	@{ Tag='ShowGrid'; Key='showGrid'; Kind='bool' }
+	@{ Tag='ShowGroups'; Key='showGroups'; Kind='bool' }
+	@{ Tag='ShowHeaders'; Key='showHeaders'; Kind='bool' }
+	@{ Tag='ShowRowAndColumnNames'; Key='showRowAndColumnNames'; Kind='bool' }
+	@{ Tag='ShowCellNames'; Key='showCellNames'; Kind='bool' }
+	@{ Tag='ShowPercent'; Key='showPercent'; Kind='bool' }
 )
 
 # Захват generic-скаляров. Специфичная обработка (если ключ уже задан) — побеждает.
@@ -1350,6 +1371,28 @@ function Decompile-TableAdditions {
 	return $null
 }
 
+# Спец-поля «документ/датчик» — общий скелет поля (имя/path/CommonProps/TitleLocation/editMode).
+# Типоспец. enum/bool скаляры ловит пост-switch Add-GenericScalars; layout/companions — общий хвост.
+function Decompile-SimpleField {
+	param($obj, $node, [string]$name, [string]$key)
+	$obj[$key] = $name
+	$dp = Get-Child $node 'DataPath'; if ($dp) { $obj['path'] = $dp }
+	Add-CommonProps $obj $node $name
+	$tl = Get-Child $node 'TitleLocation'; if ($tl) { $obj['titleLocation'] = $tl.ToLower() }
+	$em = Get-Child $node 'EditMode'; if ($em) { $obj['editMode'] = $em }
+}
+
+# Числовые скаляры датчиков (ProgressBar/TrackBar) — без xsi:type (≠ типизированных InputField).
+function Add-GaugeScalars {
+	param($obj, $node, $tags)
+	foreach ($p in $tags) {
+		$v = Get-Child $node $p
+		if ($null -eq $v) { continue }
+		$key = $p.Substring(0,1).ToLower() + $p.Substring(1)
+		if ($v -match '^-?\d+$') { $obj[$key] = [int]$v } else { $obj[$key] = $v }
+	}
+}
+
 function Decompile-Element {
 	param($node)
 	$tag = $node.LocalName
@@ -1521,7 +1564,7 @@ function Decompile-Element {
 			$crs = Get-Child $node 'ChangeRowSet'; if ($null -ne $crs) { $obj['changeRowSet'] = ($crs -eq 'true') }
 			$cro = Get-Child $node 'ChangeRowOrder'; if ($null -ne $cro) { $obj['changeRowOrder'] = ($cro -eq 'true') }
 			if ((Get-Child $node 'AutoInsertNewRow') -eq 'true') { $obj['autoInsertNewRow'] = $true }
-			if ((Get-Child $node 'EnableDrag') -eq 'true') { $obj['enableDrag'] = $true }
+			# enableDrag — теперь общий (Add-Layout, фактическое значение)
 			if ($node.SelectSingleNode("lf:RowFilter", $ns)) { $obj['rowFilter'] = $null }
 			if ((Get-Child $node 'Header') -eq 'false') { $obj['header'] = $false }
 			if ((Get-Child $node 'Footer') -eq 'true') { $obj['footer'] = $true }
@@ -1653,6 +1696,12 @@ function Decompile-Element {
 		'SearchStringAddition'  { $obj[$key] = $name; Add-AdditionCore $obj $node $name }
 		'ViewStatusAddition'    { $obj[$key] = $name; Add-AdditionCore $obj $node $name }
 		'SearchControlAddition' { $obj[$key] = $name; Add-AdditionCore $obj $node $name }
+		'SpreadSheetDocumentField' { Decompile-SimpleField $obj $node $name $key }
+		'HTMLDocumentField'        { Decompile-SimpleField $obj $node $name $key }
+		'TextDocumentField'        { Decompile-SimpleField $obj $node $name $key }
+		'FormattedDocumentField'   { Decompile-SimpleField $obj $node $name $key }
+		'ProgressBarField'         { Decompile-SimpleField $obj $node $name $key; Add-GaugeScalars $obj $node @('MinValue','MaxValue') }
+		'TrackBarField'            { Decompile-SimpleField $obj $node $name $key; Add-GaugeScalars $obj $node @('MinValue','MaxValue','LargeStep','MarkingStep','Step') }
 	}
 	# DisplayImportance — атрибут открывающего тега (адаптивная важность отображения), захват «как есть».
 	$di = $node.GetAttribute("DisplayImportance"); if ($di) { $obj['displayImportance'] = $di }
@@ -1709,7 +1758,7 @@ $titleNode = $root.SelectSingleNode("lf:Title", $ns)
 if ($titleNode) { $t = Get-LangText $titleNode; if ($null -ne $t) { $dsl['title'] = $t } }
 
 # properties (прямые скаляры под <Form>, PascalCase → camelCase)
-$KNOWN_FORM_PROPS = @('AutoTitle','WindowOpeningMode','CommandBarLocation','SaveDataInSettings','AutoSaveDataInSettings','AutoTime','UsePostingMode','RepostOnWrite','AutoURL','AutoFillCheck','Customizable','EnterKeyBehavior','VerticalScroll','Width','Height','Group','UseForFoldersAndItems','SaveWindowSettings')
+$KNOWN_FORM_PROPS = @('AutoTitle','WindowOpeningMode','CommandBarLocation','SaveDataInSettings','AutoSaveDataInSettings','AutoTime','UsePostingMode','RepostOnWrite','AutoURL','AutoFillCheck','Customizable','EnterKeyBehavior','VerticalScroll','Width','Height','Group','UseForFoldersAndItems','SaveWindowSettings','ScalingMode','VerticalSpacing')
 $props = [ordered]@{}
 foreach ($pn in $KNOWN_FORM_PROPS) {
 	$v = Get-Child $root $pn

@@ -1,4 +1,4 @@
-﻿# form-compile v1.94 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.95 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2153,6 +2153,28 @@ function Emit-SingleType {
 		return
 	}
 
+	# Спец-типы платформы с собственным namespace (объявляется ЛОКАЛЬНО на <v8:Type>).
+	# Префикс d5p1 неоднозначен (5 разных URI), поэтому маппинг по полному значению типа.
+	# К таким типам привязаны спец-поля: mxl→SpreadSheetDocumentField, fd→FormattedDocumentField,
+	# d5p1:TextDocument→TextDocumentField, pdfdoc→PDF, pl→Planner, chart/geo/graphscheme/data-analysis.
+	$specialTypeNs = @{
+		"mxl:SpreadsheetDocument"               = "http://v8.1c.ru/8.2/data/spreadsheet"
+		"fd:FormattedDocument"                  = "http://v8.1c.ru/8.2/data/formatted-document"
+		"d5p1:TextDocument"                     = "http://v8.1c.ru/8.1/data/txtedt"
+		"d5p1:Chart"                            = "http://v8.1c.ru/8.2/data/chart"
+		"d5p1:GanttChart"                       = "http://v8.1c.ru/8.2/data/chart"
+		"d5p1:FlowchartContextType"             = "http://v8.1c.ru/8.2/data/graphscheme"
+		"d5p1:DataAnalysisTimeIntervalUnitType" = "http://v8.1c.ru/8.2/data/data-analysis"
+		"d5p1:GeographicalSchema"               = "http://v8.1c.ru/8.2/data/geo"
+		"pdfdoc:PDFDocument"                    = "http://v8.1c.ru/8.3/data/pdf"
+		"pl:Planner"                            = "http://v8.1c.ru/8.3/data/planner"
+	}
+	if ($specialTypeNs.ContainsKey($typeStr)) {
+		$pref = $typeStr.Substring(0, $typeStr.IndexOf(':'))
+		X "$indent<v8:Type xmlns:$pref=`"$($specialTypeNs[$typeStr])`">$typeStr</v8:Type>"
+		return
+	}
+
 	# Fallback with validation
 	if ($script:knownInvalidTypes.ContainsKey($typeStr)) {
 		throw "Invalid form attribute type '$typeStr': $($script:knownInvalidTypes[$typeStr])"
@@ -2524,6 +2546,19 @@ function Emit-Element {
 		"SearchControl"              = "searchControl"
 		"управлениеПоиском"          = "searchControl"
 		"Управление поиском"         = "searchControl"
+		# Спец-поля (документ/датчик) — XML-имя/рус. → канон
+		"SpreadSheetDocumentField"   = "spreadsheet"
+		"ПолеТабличногоДокумента"    = "spreadsheet"
+		"HTMLDocumentField"          = "html"
+		"ПолеHTMLДокумента"          = "html"
+		"TextDocumentField"          = "textDoc"
+		"ПолеТекстовогоДокумента"    = "textDoc"
+		"FormattedDocumentField"     = "formattedDoc"
+		"ПолеФорматированногоДокумента" = "formattedDoc"
+		"ProgressBarField"           = "progressBar"
+		"ПолеИндикатора"             = "progressBar"
+		"TrackBarField"              = "trackBar"
+		"ПолеПолосыРегулирования"    = "trackBar"
 	}
 	foreach ($pair in $synonyms.GetEnumerator()) {
 		if ($null -ne $el.PSObject.Properties[$pair.Key] -and $null -eq $el.PSObject.Properties[$pair.Value]) {
@@ -2556,7 +2591,7 @@ function Emit-Element {
 	# у popup/button/cmdBar. Тип-ключ владельца (popup/button/…) должен выиграть.
 	# pages/page ПЕРЕД group: у Page/Pages ключ 'group' — это направление раскладки детей
 	# (<Group>Horizontal</Group>), а не тип UsualGroup. Реальная UsualGroup ключа page/pages не несёт.
-	foreach ($key in @("columnGroup","buttonGroup","pages","page","group","input","check","radio","label","labelField","table","button","calendar","cmdBar","popup","searchString","viewStatus","searchControl","picField","picture")) {
+	foreach ($key in @("columnGroup","buttonGroup","pages","page","group","input","check","radio","label","labelField","table","button","calendar","cmdBar","popup","searchString","viewStatus","searchControl","picField","picture","spreadsheet","html","textDoc","formattedDoc","progressBar","trackBar")) {
 		if ($el.$key -ne $null) {
 			$typeKey = $key
 			break
@@ -2573,6 +2608,12 @@ function Emit-Element {
 		# type keys
 		"group"=1;"columnGroup"=1;"buttonGroup"=1;"input"=1;"check"=1;"radio"=1;"label"=1;"labelField"=1;"table"=1;"pages"=1;"page"=1
 		"button"=1;"picture"=1;"picField"=1;"calendar"=1;"cmdBar"=1;"popup"=1
+		# спец-поля (документ/датчик) — тип-ключи + типоспец. скаляры
+		"spreadsheet"=1;"html"=1;"textDoc"=1;"formattedDoc"=1;"progressBar"=1;"trackBar"=1
+		"showPercent"=1;"largeStep"=1;"markingStep"=1;"step"=1
+		"horizontalScrollBar"=1;"viewScalingMode"=1;"output"=1;"selectionShowMode"=1;"protection"=1
+		"edit"=1;"showGrid"=1;"showGroups"=1;"showHeaders"=1;"showRowAndColumnNames"=1;"showCellNames"=1
+		"pointerType"=1;"drawingSelectionShowMode"=1;"warningOnEditRepresentation"=1;"markingAppearance"=1
 		# columnGroup-specific
 		"showInHeader"=1
 		# radio-specific
@@ -2680,6 +2721,12 @@ function Emit-Element {
 		"calendar" { Emit-Calendar -el $el -name $name -id $id -indent $indent }
 		"cmdBar"   { Emit-CommandBar -el $el -name $name -id $id -indent $indent }
 		"popup"    { Emit-Popup -el $el -name $name -id $id -indent $indent }
+		"spreadsheet"  { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "SpreadSheetDocumentField" -typeKey "spreadsheet" }
+		"html"         { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "HTMLDocumentField" -typeKey "html" }
+		"textDoc"      { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "TextDocumentField" -typeKey "textDoc" }
+		"formattedDoc" { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "FormattedDocumentField" -typeKey "formattedDoc" }
+		"progressBar"  { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "ProgressBarField" -typeKey "progressBar" }
+		"trackBar"     { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "TrackBarField" -typeKey "trackBar" }
 	}
 }
 
@@ -2732,7 +2779,8 @@ function Emit-CommonElementProps {
 		$siv = if ($el.skipOnInput -eq $true) { 'true' } else { 'false' }
 		X "$indent<SkipOnInput>$siv</SkipOnInput>"
 	}
-	if ($el.enableStartDrag -eq $true) { X "$indent<EnableStartDrag>true</EnableStartDrag>" }
+	# EnableStartDrag — фактическое значение (платформа эмитит и явный false, напр. SpreadSheet)
+	if ($null -ne $el.enableStartDrag) { X "$indent<EnableStartDrag>$(if ($el.enableStartDrag){'true'}else{'false'})</EnableStartDrag>" }
 	if ($el.fileDragMode) { X "$indent<FileDragMode>$($el.fileDragMode)</FileDragMode>" }
 	# Cell-свойства поля в таблице (общие для Input/Label/Picture/CheckBox): захват «как есть»
 	foreach ($p in @(@('showInHeader','ShowInHeader'), @('showInFooter','ShowInFooter'), @('autoCellHeight','AutoCellHeight'))) {
@@ -2849,6 +2897,23 @@ $script:genericScalars = @(
 	@{ Tag='CreateButton';        Key='createButton';        Kind='bool'  }
 	@{ Tag='FixingInTable';       Key='fixingInTable';       Kind='value' }
 	@{ Tag='VerticalSpacing';     Key='verticalSpacing';     Kind='value' }
+	# Спец-поля (документ/датчик) — типоспец. enum/bool скаляры pass-through
+	@{ Tag='HorizontalScrollBar'; Key='horizontalScrollBar'; Kind='value' }
+	@{ Tag='ViewScalingMode';     Key='viewScalingMode';     Kind='value' }
+	@{ Tag='Output';              Key='output';              Kind='value' }
+	@{ Tag='SelectionShowMode';   Key='selectionShowMode';   Kind='value' }
+	@{ Tag='PointerType';         Key='pointerType';         Kind='value' }
+	@{ Tag='DrawingSelectionShowMode'; Key='drawingSelectionShowMode'; Kind='value' }
+	@{ Tag='WarningOnEditRepresentation'; Key='warningOnEditRepresentation'; Kind='value' }
+	@{ Tag='MarkingAppearance';   Key='markingAppearance';   Kind='value' }
+	@{ Tag='Protection';          Key='protection';          Kind='bool'  }
+	@{ Tag='Edit';                Key='edit';                Kind='bool'  }
+	@{ Tag='ShowGrid';            Key='showGrid';            Kind='bool'  }
+	@{ Tag='ShowGroups';          Key='showGroups';          Kind='bool'  }
+	@{ Tag='ShowHeaders';         Key='showHeaders';         Kind='bool'  }
+	@{ Tag='ShowRowAndColumnNames'; Key='showRowAndColumnNames'; Kind='bool' }
+	@{ Tag='ShowCellNames';       Key='showCellNames';       Kind='bool'  }
+	@{ Tag='ShowPercent';         Key='showPercent';         Kind='bool'  }
 )
 
 function Emit-GenericScalars {
@@ -3809,7 +3874,7 @@ function Emit-Table {
 	if ($el.verticalLines -eq $false) { X "$inner<VerticalLines>false</VerticalLines>" }
 	if ($el.horizontalLines -eq $false) { X "$inner<HorizontalLines>false</HorizontalLines>" }
 	if ($el.initialTreeView) { X "$inner<InitialTreeView>$($el.initialTreeView)</InitialTreeView>" }
-	if ($el.enableDrag -eq $true) { X "$inner<EnableDrag>true</EnableDrag>" }
+	if ($null -ne $el.enableDrag) { X "$inner<EnableDrag>$(if ($el.enableDrag){'true'}else{'false'})</EnableDrag>" }
 	if ($el.rowPictureDataPath) { X "$inner<RowPictureDataPath>$($el.rowPictureDataPath)</RowPictureDataPath>" }
 	if ($el.rowsPicture) {
 		# Строка = Ref (LoadTransparent дефолт false); объект {src, loadTransparent} → факт. значение
@@ -4151,6 +4216,45 @@ function Emit-Calendar {
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey "calendar"
 
 	X "$indent</CalendarField>"
+}
+
+# Спец-поля «документ/датчик» (SpreadSheet/HTML/Text/Formatted/ProgressBar/TrackBar):
+# единый скелет поля (path/title/flags/titleLocation/editMode/layout/companions/events).
+# Типоспец. enum/bool скаляры — через generic (Emit-Layout→Emit-GenericScalars);
+# числовые скаляры датчиков (min/max/шаги) — без xsi:type (≠ типизированных InputField).
+# enableDrag/enableStartDrag — общие (Emit-CommonElementProps), фактическое значение.
+function Emit-SimpleField {
+	param($el, [string]$name, [int]$id, [string]$indent, [string]$xmlTag, [string]$typeKey)
+
+	X "$indent<$xmlTag name=`"$name`" id=`"$id`"$(DI-Attr $el)>"
+	$inner = "$indent`t"
+
+	if ($el.path) { X "$inner<DataPath>$($el.path)</DataPath>" }
+	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
+	Emit-CommonFlags -el $el -indent $inner
+	if ($el.titleLocation) { X "$inner<TitleLocation>$(Map-TitleLoc "$($el.titleLocation)")</TitleLocation>" }
+	if ($el.editMode) { X "$inner<EditMode>$($el.editMode)</EditMode>" }
+
+	Emit-Layout -el $el -indent $inner
+
+	# EnableDrag — фактическое значение (SpreadSheet; платформа эмитит явный false). enableStartDrag — через Emit-Layout.
+	if ($null -ne $el.enableDrag) { X "$inner<EnableDrag>$(if ($el.enableDrag){'true'}else{'false'})</EnableDrag>" }
+
+	# Датчики (ProgressBar/TrackBar) — числовые скаляры (без xsi:type)
+	foreach ($p in @(@('minValue','MinValue'), @('maxValue','MaxValue'), @('largeStep','LargeStep'), @('markingStep','MarkingStep'), @('step','Step'))) {
+		if ($null -ne $el.($p[0])) { X "$inner<$($p[1])>$($el.($p[0]))</$($p[1])>" }
+	}
+
+	# Оформление (цвета/шрифты/граница) — перед компаньонами
+	Emit-Appearance -el $el -indent $inner -profile 'field'
+
+	# Companions
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
+	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
+
+	Emit-Events -el $el -elementName $name -indent $inner -typeKey $typeKey
+
+	X "$indent</$xmlTag>"
 }
 
 function Emit-CommandBar {

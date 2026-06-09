@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.94 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.95 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1829,6 +1829,12 @@ KNOWN_KEYS = {
     "choiceForm", "choiceHistoryOnInput", "footerDataPath", "minValue", "maxValue",
     # Button — пометка toggle-кнопки
     "checked",
+    # спец-поля (документ/датчик) — тип-ключи + типоспец. скаляры
+    "spreadsheet", "html", "textDoc", "formattedDoc", "progressBar", "trackBar",
+    "showPercent", "largeStep", "markingStep", "step",
+    "horizontalScrollBar", "viewScalingMode", "output", "selectionShowMode", "protection",
+    "edit", "showGrid", "showGroups", "showHeaders", "showRowAndColumnNames", "showCellNames",
+    "pointerType", "drawingSelectionShowMode", "warningOnEditRepresentation", "markingAppearance",
 }
 
 # picture/picField — НИЗКИЙ приоритет: 'picture' это и тип (PictureDecoration), и свойство-иконка
@@ -1836,7 +1842,8 @@ KNOWN_KEYS = {
 # pages/page ПЕРЕД group: у Page/Pages ключ 'group' — это направление раскладки детей
 # (<Group>Horizontal</Group>), а не тип UsualGroup. Реальная UsualGroup ключа page/pages не несёт.
 TYPE_KEYS = ["columnGroup", "buttonGroup", "pages", "page", "group", "input", "check", "radio", "label", "labelField", "table",
-             "button", "calendar", "cmdBar", "popup", "searchString", "viewStatus", "searchControl", "picField", "picture"]
+             "button", "calendar", "cmdBar", "popup", "searchString", "viewStatus", "searchControl", "picField", "picture",
+             "spreadsheet", "html", "textDoc", "formattedDoc", "progressBar", "trackBar"]
 
 # Synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio)
 ELEMENT_TYPE_SYNONYMS = {
@@ -1889,6 +1896,19 @@ ELEMENT_TYPE_SYNONYMS = {
     "SearchControl": "searchControl",
     "управлениеПоиском": "searchControl",
     "Управление поиском": "searchControl",
+    # Спец-поля (документ/датчик) — XML-имя/рус. → канон
+    "SpreadSheetDocumentField": "spreadsheet",
+    "ПолеТабличногоДокумента": "spreadsheet",
+    "HTMLDocumentField": "html",
+    "ПолеHTMLДокумента": "html",
+    "TextDocumentField": "textDoc",
+    "ПолеТекстовогоДокумента": "textDoc",
+    "FormattedDocumentField": "formattedDoc",
+    "ПолеФорматированногоДокумента": "formattedDoc",
+    "ProgressBarField": "progressBar",
+    "ПолеИндикатора": "progressBar",
+    "TrackBarField": "trackBar",
+    "ПолеПолосыРегулирования": "trackBar",
 }
 
 # Тип-синонимы, применяемые ТОЛЬКО к строковому значению (имя элемента); объект/массив
@@ -2511,8 +2531,9 @@ def emit_common_element_props(lines, el, indent):
     if 'skipOnInput' in el and el['skipOnInput'] is not None:
         siv = 'true' if el['skipOnInput'] is True else 'false'
         lines.append(f"{indent}<SkipOnInput>{siv}</SkipOnInput>")
-    if el.get('enableStartDrag') is True:
-        lines.append(f"{indent}<EnableStartDrag>true</EnableStartDrag>")
+    # EnableStartDrag — фактическое значение (платформа эмитит и явный false, напр. SpreadSheet)
+    if el.get('enableStartDrag') is not None:
+        lines.append(f'{indent}<EnableStartDrag>{"true" if el["enableStartDrag"] else "false"}</EnableStartDrag>')
     if el.get('fileDragMode'):
         lines.append(f"{indent}<FileDragMode>{el['fileDragMode']}</FileDragMode>")
     # Cell-свойства поля в таблице (общие для Input/Label/Picture/CheckBox): захват «как есть»
@@ -2697,6 +2718,23 @@ GENERIC_SCALARS = [
     ('CreateButton', 'createButton', 'bool'),
     ('FixingInTable', 'fixingInTable', 'value'),
     ('VerticalSpacing', 'verticalSpacing', 'value'),
+    # Spec-fields (document/gauge) - type-specific enum/bool scalars pass-through
+    ('HorizontalScrollBar', 'horizontalScrollBar', 'value'),
+    ('ViewScalingMode', 'viewScalingMode', 'value'),
+    ('Output', 'output', 'value'),
+    ('SelectionShowMode', 'selectionShowMode', 'value'),
+    ('PointerType', 'pointerType', 'value'),
+    ('DrawingSelectionShowMode', 'drawingSelectionShowMode', 'value'),
+    ('WarningOnEditRepresentation', 'warningOnEditRepresentation', 'value'),
+    ('MarkingAppearance', 'markingAppearance', 'value'),
+    ('Protection', 'protection', 'bool'),
+    ('Edit', 'edit', 'bool'),
+    ('ShowGrid', 'showGrid', 'bool'),
+    ('ShowGroups', 'showGroups', 'bool'),
+    ('ShowHeaders', 'showHeaders', 'bool'),
+    ('ShowRowAndColumnNames', 'showRowAndColumnNames', 'bool'),
+    ('ShowCellNames', 'showCellNames', 'bool'),
+    ('ShowPercent', 'showPercent', 'bool'),
 ]
 
 
@@ -2971,6 +3009,27 @@ def emit_single_type(lines, type_str, indent):
         lines.append(f'{indent}<v8:Type>cfg:{type_str}</v8:Type>')
         return
 
+    # Спец-типы платформы с собственным namespace (объявляется ЛОКАЛЬНО на <v8:Type>).
+    # Префикс d5p1 неоднозначен (5 разных URI), поэтому маппинг по полному значению типа.
+    # К таким типам привязаны спец-поля: mxl→SpreadSheetDocumentField, fd→FormattedDocumentField,
+    # d5p1:TextDocument→TextDocumentField, pdfdoc→PDF, pl→Planner, chart/geo/graphscheme/data-analysis.
+    special_type_ns = {
+        "mxl:SpreadsheetDocument": "http://v8.1c.ru/8.2/data/spreadsheet",
+        "fd:FormattedDocument": "http://v8.1c.ru/8.2/data/formatted-document",
+        "d5p1:TextDocument": "http://v8.1c.ru/8.1/data/txtedt",
+        "d5p1:Chart": "http://v8.1c.ru/8.2/data/chart",
+        "d5p1:GanttChart": "http://v8.1c.ru/8.2/data/chart",
+        "d5p1:FlowchartContextType": "http://v8.1c.ru/8.2/data/graphscheme",
+        "d5p1:DataAnalysisTimeIntervalUnitType": "http://v8.1c.ru/8.2/data/data-analysis",
+        "d5p1:GeographicalSchema": "http://v8.1c.ru/8.2/data/geo",
+        "pdfdoc:PDFDocument": "http://v8.1c.ru/8.3/data/pdf",
+        "pl:Planner": "http://v8.1c.ru/8.3/data/planner",
+    }
+    if type_str in special_type_ns:
+        pref = type_str.split(':', 1)[0]
+        lines.append(f'{indent}<v8:Type xmlns:{pref}="{special_type_ns[type_str]}">{type_str}</v8:Type>')
+        return
+
     # Fallback with validation
     if type_str in KNOWN_INVALID_TYPES:
         raise ValueError(f"Invalid form attribute type '{type_str}': {KNOWN_INVALID_TYPES[type_str]}")
@@ -3068,6 +3127,12 @@ def emit_element(lines, el, indent, in_cmd_bar=False):
         'searchString':  lambda lines, el, name, eid, indent: emit_addition(lines, el, name, eid, 'searchString', indent),
         'viewStatus':    lambda lines, el, name, eid, indent: emit_addition(lines, el, name, eid, 'viewStatus', indent),
         'searchControl': lambda lines, el, name, eid, indent: emit_addition(lines, el, name, eid, 'searchControl', indent),
+        'spreadsheet':   lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'SpreadSheetDocumentField', 'spreadsheet'),
+        'html':          lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'HTMLDocumentField', 'html'),
+        'textDoc':       lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'TextDocumentField', 'textDoc'),
+        'formattedDoc':  lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'FormattedDocumentField', 'formattedDoc'),
+        'progressBar':   lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'ProgressBarField', 'progressBar'),
+        'trackBar':      lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'TrackBarField', 'trackBar'),
     }
 
     emitter = emitters.get(type_key)
@@ -3519,8 +3584,8 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<HorizontalLines>false</HorizontalLines>')
     if el.get('initialTreeView'):
         lines.append(f'{inner}<InitialTreeView>{el["initialTreeView"]}</InitialTreeView>')
-    if el.get('enableDrag') is True:
-        lines.append(f'{inner}<EnableDrag>true</EnableDrag>')
+    if el.get('enableDrag') is not None:
+        lines.append(f'{inner}<EnableDrag>{"true" if el["enableDrag"] else "false"}</EnableDrag>')
     if el.get('rowPictureDataPath'):
         lines.append(f'{inner}<RowPictureDataPath>{el["rowPictureDataPath"]}</RowPictureDataPath>')
     if el.get('rowsPicture'):
@@ -3803,6 +3868,45 @@ def emit_picture_field(lines, el, name, eid, indent):
     emit_events(lines, el, name, inner, 'picField')
 
     lines.append(f'{indent}</PictureField>')
+
+
+def emit_simple_field(lines, el, name, eid, indent, xml_tag, type_key):
+    # Спец-поля "документ/датчик" (SpreadSheet/HTML/Text/Formatted/ProgressBar/TrackBar):
+    # единый скелет поля. Типоспец. enum/bool скаляры — через generic (emit_layout);
+    # числовые скаляры датчиков (min/max/шаги) — без xsi:type; enableDrag — фактическое значение.
+    lines.append(f'{indent}<{xml_tag} name="{name}" id="{eid}"{di_attr(el)}>')
+    inner = f'{indent}\t'
+
+    if el.get('path'):
+        lines.append(f'{inner}<DataPath>{el["path"]}</DataPath>')
+    emit_title(lines, el, name, inner, auto=not el.get('path'))
+    emit_common_flags(lines, el, inner)
+    if el.get('titleLocation'):
+        lines.append(f'{inner}<TitleLocation>{map_title_loc(el["titleLocation"])}</TitleLocation>')
+    if el.get('editMode'):
+        lines.append(f'{inner}<EditMode>{el["editMode"]}</EditMode>')
+
+    emit_layout(lines, el, inner)
+
+    # EnableDrag — фактическое значение (SpreadSheet; платформа эмитит явный false). enableStartDrag — через emit_layout.
+    if el.get('enableDrag') is not None:
+        lines.append(f'{inner}<EnableDrag>{"true" if el["enableDrag"] else "false"}</EnableDrag>')
+
+    # Датчики (ProgressBar/TrackBar) — числовые скаляры (без xsi:type)
+    for key, tag in (('minValue', 'MinValue'), ('maxValue', 'MaxValue'), ('largeStep', 'LargeStep'), ('markingStep', 'MarkingStep'), ('step', 'Step')):
+        if el.get(key) is not None:
+            lines.append(f'{inner}<{tag}>{el[key]}</{tag}>')
+
+    # Оформление (цвета/шрифты/граница) — перед компаньонами
+    emit_appearance(lines, el, inner, 'field')
+
+    # Companions
+    emit_companion_panel(lines, 'ContextMenu', f'{name}КонтекстноеМеню', inner, el.get('contextMenu'))
+    emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner, el.get('extendedTooltip'))
+
+    emit_events(lines, el, name, inner, type_key)
+
+    lines.append(f'{indent}</{xml_tag}>')
 
 
 def emit_calendar(lines, el, name, eid, indent):

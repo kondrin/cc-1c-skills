@@ -735,6 +735,29 @@ Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `Tabs
 | `representation` | string | `Auto`, `Picture`, `Text`, `PictureAndText` |
 | `children` | array | Кнопки (`button`) внутри группы |
 
+#### Спец-поля «документ/датчик»
+
+Поля для отображения специальных данных. Структурно — обычные поля (скелет `path`/`title`/`titleLocation`/
+flags/layout/оформление/companions/события общий), плюс собственные скаляры. Привязываются к реквизиту
+соответствующего платформенного типа (см. §8 «Платформенные типы»).
+
+| Ключ типа | XML-элемент | Тип реквизита | Спец. скаляры |
+|-----------|-------------|---------------|----------------|
+| `spreadsheet` | SpreadSheetDocumentField | `mxl:SpreadsheetDocument` | `output` (Disable/Enable), `protection`, `verticalScrollBar`/`horizontalScrollBar`, `viewScalingMode`, `selectionShowMode`, `pointerType`, `showGrid`/`showGroups`/`showHeaders`/`showRowAndColumnNames`/`showCellNames`, `edit`, `enableDrag`/`enableStartDrag` (фактическое значение) |
+| `html` | HTMLDocumentField | `string` | `output`, `warningOnEditRepresentation` |
+| `textDoc` | TextDocumentField | `d5p1:TextDocument` | `editMode` |
+| `formattedDoc` | FormattedDocumentField | `fd:FormattedDocument` | `editMode` |
+| `progressBar` | ProgressBarField | число | `showPercent`, `minValue`/`maxValue` (без `xsi:type`, ≠ типизированных у `input`) |
+| `trackBar` | TrackBarField | число | `minValue`/`maxValue`/`largeStep`/`markingStep`/`step` (числовые), `markingAppearance` |
+
+```json
+{ "spreadsheet": "ТаблицаОтчета", "path": "ТаблицаОтчета", "titleLocation": "none", "readOnly": true, "output": "Disable", "protection": true }
+{ "trackBar": "Масштаб", "path": "Масштаб", "minValue": 20, "maxValue": 400, "markingStep": 20 }
+```
+
+Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и рус. (`ПолеТабличногоДокумента`, `ПолеИндикатора`, …).
+Скаляры `output`/`protection`/… — generic pass-through; bool как `true`/`false`, enum verbatim.
+
 #### autoCmdBar — командная панель формы
 
 Командная панель самой формы (`<AutoCommandBar id="-1">`). Задаётся как элемент в `elements`; компилятор автоматически вынимает его из дерева. Нужен только если в панель помещаются **явные** кнопки/группы или меняется выравнивание/автозаполнение — иначе панель формируется автоматически.
@@ -949,6 +972,21 @@ Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `Tabs
 | `"UUID"` | `v8:UUID` (синоним `УникальныйИдентификатор`) |
 
 > Платформенные `v8:`-типы можно писать без префикса или по-русски — компилятор приводит к каноничному `v8:X`. Уже-префиксованную форму (`v8:StandardPeriod`) принимает как есть.
+
+**Спец-типы с собственным namespace** (для спец-полей). Хранятся verbatim с префиксом; компилятор объявляет
+namespace **локально** на `<v8:Type>`. Префикс `d5p1` неоднозначен (несколько URI) — резолв по полному значению типа.
+
+| DSL | XML (с локальным xmlns) |
+|-----|-----|
+| `"mxl:SpreadsheetDocument"` | `<v8:Type xmlns:mxl="http://v8.1c.ru/8.2/data/spreadsheet">mxl:SpreadsheetDocument</v8:Type>` |
+| `"fd:FormattedDocument"` | `xmlns:fd="…/formatted-document"` |
+| `"d5p1:TextDocument"` | `xmlns:d5p1="…/txtedt"` |
+| `"d5p1:Chart"` / `"d5p1:GanttChart"` | `xmlns:d5p1="…/chart"` |
+| `"d5p1:FlowchartContextType"` | `xmlns:d5p1="…/graphscheme"` |
+| `"d5p1:GeographicalSchema"` | `xmlns:d5p1="…/geo"` |
+| `"d5p1:DataAnalysisTimeIntervalUnitType"` | `xmlns:d5p1="…/data-analysis"` |
+| `"pdfdoc:PDFDocument"` | `xmlns:pdfdoc="…/pdf"` |
+| `"pl:Planner"` | `xmlns:pl="…/planner"` |
 
 ### Наборы типов (TypeSet → `<v8:TypeSet>`)
 
