@@ -1,4 +1,4 @@
-﻿# form-decompile v0.75 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.76 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -293,6 +293,10 @@ function Get-MLFormattedValue {
 	if (-not $titleNode) { return $null }
 	$text = Get-LangText $titleNode
 	if ($null -eq $text) { return $null }
+	# Whitespace-only заголовок (декорация-разделитель): PreserveWhitespace=false стрипает значимый
+	# пробел в <v8:content> </v8:content> → пустой текст при наличии узла content. Платформа НЕ
+	# эмитит пустой Title, значит исходно был пробел — восстанавливаем (иначе спутаем с суппресс-маркером "").
+	if ($text -is [string] -and $text -eq '' -and $titleNode.SelectSingleNode("v8:item/v8:content", $ns)) { $text = ' ' }
 	$fmtAttr = ($titleNode.GetAttribute('formatted') -eq 'true')
 	if ($fmtAttr -eq (Test-HasRealMarkup $text)) { return $text }
 	$o = [ordered]@{}; $o['text'] = $text; $o['formatted'] = $fmtAttr; return $o
