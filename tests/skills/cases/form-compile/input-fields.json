@@ -67,6 +67,10 @@
       { "name": "ФлагЯвный", "type": "boolean" },
       { "name": "ФлагТумблер", "type": "boolean" },
       { "name": "ЧисловоеПоле", "type": "number(10,2)" }
+    ],
+    "conditionalAppearance": [
+      { "selection": ["ОбычноеПоле"], "filter": ["ЧисловоеПоле > 100"], "appearance": { "ЦветФона": "style:FormBackColor" },
+        "presentation": { "ru": "Подсветка", "en": "Highlight" } }
     ]
   }
 }

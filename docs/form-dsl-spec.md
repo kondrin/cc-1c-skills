@@ -985,6 +985,31 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 
 ---
 
+## 7c. conditionalAppearance — условное оформление формы
+
+Форменный ключ `conditionalAppearance` (XML `<ConditionalAppearance>` — последний child `<Attributes>`).
+**Грамматика идентична `settings.conditionalAppearance` дин-списка** (DCS — см. §«order/filter/conditionalAppearance»):
+массив объектов `{ selection?, filter?, appearance?, presentation?, viewMode?, userSettingID?, use? }`.
+
+```json
+"conditionalAppearance": [
+  { "selection": ["ОбычноеПоле"], "filter": ["ЧисловоеПоле > 100"],
+    "appearance": { "ЦветФона": "style:FormBackColor" },
+    "presentation": { "ru": "Подсветка", "en": "Highlight" } }
+]
+```
+
+- `selection` — массив имён форматируемых полей (`<dcsset:field>`).
+- `filter` — условие (filter-shorthand, как в СКД).
+- `appearance` — словарь «параметр-DCS: значение» (рус. verbatim: `ЦветТекста`/`ЦветФона`/`Шрифт`/…). Цвет → `v8ui:Color`.
+- `presentation` — мультиязык → `xsi:type="v8:LocalStringType"`.
+
+Декомпилятор/компилятор переиспользуют `Build-ConditionalAppearance`/`Emit-ConditionalAppearance` настроек списка
+(отличие — тег-обёртка `ConditionalAppearance` без `dcsset:` и без блок-мета). `scope` (привязка к области) в формах
+не встречается; форма со `scope` → fail-ring3.
+
+---
+
 ## 8. Система типов (shorthand)
 
 ### Примитивные типы

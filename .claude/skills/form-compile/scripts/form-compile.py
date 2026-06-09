@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.100 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.101 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1640,12 +1640,12 @@ def emit_appearance_value(lines, key, val, indent):
     lines.append(f'{indent}</dcscor:item>')
 
 
-def emit_conditional_appearance(lines, items, indent, block_view_mode=None, block_user_setting_id=None):
+def emit_conditional_appearance(lines, items, indent, block_view_mode=None, block_user_setting_id=None, wrap_tag='dcsset:conditionalAppearance'):
     has_items = bool(items) and len(items) > 0
     has_block_meta = (block_view_mode is not None) or (block_user_setting_id is not None)
     if not has_items and not has_block_meta:
         return
-    lines.append(f'{indent}<dcsset:conditionalAppearance>')
+    lines.append(f'{indent}<{wrap_tag}>')
     for ca in (items or []):
         lines.append(f'{indent}\t<dcsset:item>')
         if ca.get('use') is False:
@@ -1670,7 +1670,10 @@ def emit_conditional_appearance(lines, items, indent, block_view_mode=None, bloc
             lines.append(f'{indent}\t\t</dcsset:appearance>')
         if ca.get('presentation'):
             if isinstance(ca['presentation'], dict):
-                emit_mltext(lines, f'{indent}\t\t', 'dcsset:presentation', ca['presentation'])
+                # Мультиязык → LocalStringType (платформа объявляет тип у локализованного presentation)
+                lines.append(f'{indent}\t\t<dcsset:presentation xsi:type="v8:LocalStringType">')
+                emit_ml_items(lines, f'{indent}\t\t\t', ca['presentation'])
+                lines.append(f'{indent}\t\t</dcsset:presentation>')
             else:
                 lines.append(f'{indent}\t\t<dcsset:presentation xsi:type="xs:string">{esc_xml(str(ca["presentation"]))}</dcsset:presentation>')
         if ca.get('viewMode'):
@@ -1695,7 +1698,7 @@ def emit_conditional_appearance(lines, items, indent, block_view_mode=None, bloc
     if block_user_setting_id is not None:
         uid = new_uuid() if str(block_user_setting_id) == 'auto' else str(block_user_setting_id)
         lines.append(f'{indent}\t<dcsset:userSettingID>{esc_xml(uid)}</dcsset:userSettingID>')
-    lines.append(f'{indent}</dcsset:conditionalAppearance>')
+    lines.append(f'{indent}</{wrap_tag}>')
 
 
 def write_utf8_bom(path, content):
@@ -4388,10 +4391,17 @@ def emit_dl_parameters(lines, params, indent):
         emit_dl_parameter(lines, p, parsed, indent)
 
 
-def emit_attributes(lines, attrs, indent):
+def emit_attributes(lines, attrs, indent, conditional_appearance=None):
+    has_ca = bool(conditional_appearance) and len(conditional_appearance) > 0
     # Платформа ВСЕГДА эмитит <Attributes> (100% корпуса; 162 формы — пустой <Attributes/>).
-    if not attrs or len(attrs) == 0:
+    if (not attrs or len(attrs) == 0) and not has_ca:
         lines.append(f'{indent}<Attributes/>')
+        return
+    if not attrs or len(attrs) == 0:
+        # Нет реквизитов, но есть условное оформление (последний child <Attributes>)
+        lines.append(f'{indent}<Attributes>')
+        emit_conditional_appearance(lines, conditional_appearance, f'{indent}\t', wrap_tag='ConditionalAppearance')
+        lines.append(f'{indent}</Attributes>')
         return
 
     lines.append(f'{indent}<Attributes>')
@@ -4595,6 +4605,8 @@ def emit_attributes(lines, attrs, indent):
             lines.append(f'{inner}</Settings>')
 
         lines.append(f'{indent}\t</Attribute>')
+    # Условное оформление формы — последний child <Attributes> (та же DCS-грамматика, что settings CA)
+    emit_conditional_appearance(lines, conditional_appearance, f'{indent}\t', wrap_tag='ConditionalAppearance')
     lines.append(f'{indent}</Attributes>')
 
 
@@ -5297,7 +5309,7 @@ def main():
         lines.append('\t</ChildItems>')
 
     # Attributes
-    emit_attributes(lines, defn.get('attributes'), '\t')
+    emit_attributes(lines, defn.get('attributes'), '\t', conditional_appearance=defn.get('conditionalAppearance'))
 
     # Parameters
     emit_parameters(lines, defn.get('parameters'), '\t')

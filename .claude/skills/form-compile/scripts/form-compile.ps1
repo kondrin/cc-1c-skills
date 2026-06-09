@@ -1,4 +1,4 @@
-﻿# form-compile v1.100 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.101 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1890,11 +1890,11 @@ function Emit-AppearanceValue {
 }
 
 function Emit-ConditionalAppearance {
-	param($items, [string]$indent, $blockViewMode = $null, $blockUserSettingID = $null)
+	param($items, [string]$indent, $blockViewMode = $null, $blockUserSettingID = $null, [string]$wrapTag = 'dcsset:conditionalAppearance')
 	$hasItems = $items -and $items.Count -gt 0
 	$hasBlockMeta = ($null -ne $blockViewMode) -or ($null -ne $blockUserSettingID)
 	if (-not $hasItems -and -not $hasBlockMeta) { return }
-	X "$indent<dcsset:conditionalAppearance>"
+	X "$indent<$wrapTag>"
 	foreach ($ca in $items) {
 		X "$indent`t<dcsset:item>"
 		if ($ca.use -eq $false) { X "$indent`t`t<dcsset:use>false</dcsset:use>" }
@@ -1915,7 +1915,12 @@ function Emit-ConditionalAppearance {
 			X "$indent`t`t</dcsset:appearance>"
 		}
 		if ($ca.presentation) {
-			if ($ca.presentation -is [hashtable] -or $ca.presentation -is [System.Collections.IDictionary] -or $ca.presentation -is [PSCustomObject]) { Emit-MLText -tag "dcsset:presentation" -text $ca.presentation -indent "$indent`t`t" }
+			if ($ca.presentation -is [hashtable] -or $ca.presentation -is [System.Collections.IDictionary] -or $ca.presentation -is [PSCustomObject]) {
+				# Мультиязык → LocalStringType (платформа объявляет тип у локализованного presentation)
+				X "$indent`t`t<dcsset:presentation xsi:type=`"v8:LocalStringType`">"
+				Emit-MLItems -val $ca.presentation -indent "$indent`t`t`t"
+				X "$indent`t`t</dcsset:presentation>"
+			}
 			else { X "$indent`t`t<dcsset:presentation xsi:type=`"xs:string`">$(Esc-Xml "$($ca.presentation)")</dcsset:presentation>" }
 		}
 		if ($ca.viewMode) { X "$indent`t`t<dcsset:viewMode>$(Esc-Xml "$($ca.viewMode)")</dcsset:viewMode>" }
@@ -1942,7 +1947,7 @@ function Emit-ConditionalAppearance {
 		$uid = if ("$blockUserSettingID" -eq 'auto') { New-Guid-String } else { "$blockUserSettingID" }
 		X "$indent`t<dcsset:userSettingID>$(Esc-Xml $uid)</dcsset:userSettingID>"
 	}
-	X "$indent</dcsset:conditionalAppearance>"
+	X "$indent</$wrapTag>"
 }
 
 # --- 5. Type emitter ---
@@ -4674,10 +4679,18 @@ function Emit-DLParameters {
 }
 
 function Emit-Attributes {
-	param($attrs, [string]$indent)
+	param($attrs, [string]$indent, $conditionalAppearance = $null)
 
+	$hasCA = $conditionalAppearance -and @($conditionalAppearance).Count -gt 0
 	# Платформа ВСЕГДА эмитит <Attributes> (100% корпуса; 162 формы — пустой <Attributes/>).
-	if (-not $attrs -or $attrs.Count -eq 0) { X "$indent<Attributes/>"; return }
+	if ((-not $attrs -or $attrs.Count -eq 0) -and -not $hasCA) { X "$indent<Attributes/>"; return }
+	if (-not $attrs -or $attrs.Count -eq 0) {
+		# Нет реквизитов, но есть условное оформление (последний child <Attributes>)
+		X "$indent<Attributes>"
+		Emit-ConditionalAppearance -items $conditionalAppearance -indent "$indent`t" -wrapTag 'ConditionalAppearance'
+		X "$indent</Attributes>"
+		return
+	}
 
 	X "$indent<Attributes>"
 	$seenAttrs = @{}
@@ -4890,6 +4903,8 @@ function Emit-Attributes {
 
 		X "$indent`t</Attribute>"
 	}
+	# Условное оформление формы — последний child <Attributes> (та же DCS-грамматика, что settings CA)
+	Emit-ConditionalAppearance -items $conditionalAppearance -indent "$indent`t" -wrapTag 'ConditionalAppearance'
 	X "$indent</Attributes>"
 }
 
@@ -5465,7 +5480,7 @@ if ($def.elements -and $def.elements.Count -gt 0) {
 }
 
 # 12g. Attributes
-Emit-Attributes -attrs $def.attributes -indent "`t"
+Emit-Attributes -attrs $def.attributes -indent "`t" -conditionalAppearance $def.conditionalAppearance
 
 # 12h. Parameters
 Emit-Parameters -params $def.parameters -indent "`t"

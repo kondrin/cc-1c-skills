@@ -1,4 +1,4 @@
-﻿# form-decompile v0.76 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.77 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -145,7 +145,8 @@ function Fail-Ring3 {
 	[Console]::Error.WriteLine("Для точечной работы с этой формой используй /form-edit.")
 	exit 3
 }
-foreach ($el in $xmlDoc.SelectNodes("//*[local-name()='ConditionalAppearance']")) { Fail-Ring3 -kind "ConditionalAppearance" -loc "form/ConditionalAppearance" }
+# ConditionalAppearance со scope (привязка к области) пока не воспроизводим — fail-ring3 только в этом случае.
+foreach ($el in $xmlDoc.SelectNodes("//*[local-name()='ConditionalAppearance']/*[local-name()='item']/*[local-name()='scope'][node()]")) { Fail-Ring3 -kind "ConditionalAppearance со scope" -loc "form/ConditionalAppearance/item/scope" }
 
 # --- 1c. Compact JSON serializer (созвучно skd-decompile: 2-проб. indent, inline в пределах lineLimit) ---
 function Convert-StringToJsonLiteral {
@@ -2097,6 +2098,16 @@ if ($attrsNode) {
 		[void]$attrs.Add($ao)
 	}
 	if ($attrs.Count -gt 0) { $dsl['attributes'] = @($attrs) }
+}
+
+# conditionalAppearance формы (<ConditionalAppearance> — последний child <Attributes>;
+# та же DCS-грамматика, что settings.conditionalAppearance → переиспользуем Build-ConditionalAppearance)
+if ($attrsNode) {
+	$caNode = $attrsNode.SelectSingleNode("lf:ConditionalAppearance", $ns)
+	if ($caNode) {
+		$ca = Build-ConditionalAppearance -caNode $caNode -loc "form/conditionalAppearance"
+		if (@($ca).Count -gt 0) { $dsl['conditionalAppearance'] = @($ca) }
+	}
 }
 
 # parameters
