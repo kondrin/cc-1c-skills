@@ -1,4 +1,4 @@
-﻿# form-decompile v0.63 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.64 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -756,8 +756,8 @@ function Build-ConditionalAppearance {
 }
 
 # Общие layout-свойства → в $obj (симметрично Emit-Layout компилятора).
-# Вызывается один раз для любого элемента. Height тут — пиксельная высота
-# (<Height>); Table хранит высоту в строках (<HeightInTableRows>) и ловит её сам.
+# Вызывается один раз для любого элемента. Height тут — высота элемента (<Height>),
+# в т.ч. у Table; высоту в строках (<HeightInTableRows>) Table ловит отдельно в heightInTableRows.
 function Add-Layout {
 	param($obj, $node)
 	# Общие свойства элемента (любой тип): default/drag/skip
@@ -1480,7 +1480,8 @@ function Decompile-Element {
 			if ($node.SelectSingleNode("lf:RowFilter", $ns)) { $obj['rowFilter'] = $null }
 			if ((Get-Child $node 'Header') -eq 'false') { $obj['header'] = $false }
 			if ((Get-Child $node 'Footer') -eq 'true') { $obj['footer'] = $true }
-			$htr = Get-Child $node 'HeightInTableRows'; if ($htr) { $obj['height'] = [int]$htr }
+			# Высота в строках — отдельный ключ heightInTableRows (≠ height = <Height>, его ловит Add-Layout)
+			$htr = Get-Child $node 'HeightInTableRows'; if ($htr) { $obj['heightInTableRows'] = [int]$htr }
 			# CommandBarLocation: для дин-список-таблицы компилятор авто-инжектит "None" → инвертируем
 			# (нет тега → суппресс-маркер ""; "None" → опускаем = авто-дефолт; иначе → захват).
 			$cbl = Get-Child $node 'CommandBarLocation'

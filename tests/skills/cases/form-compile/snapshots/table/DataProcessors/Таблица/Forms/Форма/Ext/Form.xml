@@ -13,8 +13,10 @@
 			<DataPath>Данные</DataPath>
 			<TitleLocation>Top</TitleLocation>
 			<ChangeRowSet>true</ChangeRowSet>
+			<HeightInTableRows>5</HeightInTableRows>
 			<ViewStatusLocation>None</ViewStatusLocation>
 			<SearchControlLocation>None</SearchControlLocation>
+			<Height>80</Height>
 			<CommandSet>
 				<ExcludedCommand>Add</ExcludedCommand>
 				<ExcludedCommand>Delete</ExcludedCommand>

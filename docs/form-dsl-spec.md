@@ -237,7 +237,7 @@ companion-панели с собственным контентом. Оба не
 | Свойство | XML | Значения |
 |----------|-----|----------|
 | `width` | `<Width>` | число |
-| `height` | `<Height>` | число (у `table` → `<HeightInTableRows>`, высота в строках) |
+| `height` | `<Height>` | число (высота элемента; у `table` — тоже `<Height>`. Высота в строках таблицы — отдельный ключ `heightInTableRows`, см. §table) |
 | `horizontalStretch` | `<HorizontalStretch>` | `true`/`false` (эмитится явное значение; отсутствие = дефолт) |
 | `verticalStretch` | `<VerticalStretch>` | `true`/`false` (аналогично) |
 | `autoMaxWidth` | `<AutoMaxWidth>` | `false` (у `input` при `multiLine` подставляется автоматически) |
@@ -529,7 +529,8 @@ companion-панели с собственным контентом. Оба не
 | `verticalLines` / `horizontalLines` | bool | Линии сетки (эмитится явное `false`) |
 | `initialTreeView` | string | `ExpandTopLevel`, `ExpandAllLevels`, `NoExpand` |
 | `rowsPicture` | string | Картинка строк (`CommonPicture.X`) |
-| `height` | int | Высота в строках таблицы |
+| `height` | int | Высота элемента таблицы (`<Height>`, как у прочих элементов) |
+| `heightInTableRows` | int | Высота в строках (`<HeightInTableRows>`) — отдельное свойство от `height`; таблица может нести оба |
 | `header` | bool | Показывать шапку |
 | `footer` | bool | Показывать подвал |
 | `commandBarLocation` | string | `None`, `Top`, `Bottom`, `Auto` |

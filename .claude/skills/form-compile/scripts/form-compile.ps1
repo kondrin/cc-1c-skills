@@ -1,4 +1,4 @@
-﻿# form-compile v1.87 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.88 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2603,7 +2603,7 @@ function Emit-Element {
 		"commandBarLocation"=1;"searchStringLocation"=1;"viewStatusLocation"=1;"searchControlLocation"=1
 		"excludedCommands"=1
 		"choiceMode"=1;"initialTreeView"=1;"enableDrag"=1;"enableStartDrag"=1
-		"rowPictureDataPath"=1;"tableAutofill"=1
+		"rowPictureDataPath"=1;"tableAutofill"=1;"heightInTableRows"=1
 		"rowSelectionMode"=1;"verticalLines"=1;"horizontalLines"=1
 		# dynamic-list table block
 		"defaultItem"=1;"useAlternationRowColor"=1;"fileDragMode"=1;"autoRefresh"=1
@@ -2713,7 +2713,7 @@ function Emit-CommonFlags {
 
 # Общие layout-свойства — применимы ко всем элементам. Порядок согласован с
 # историческим выводом input/label, чтобы не сдвигать существующие снапшоты.
-# -skipHeight: для Table (height → HeightInTableRows, эмитится в Emit-Table).
+# -skipHeight: подавить <Height> (зарезервирован; Table теперь эмитит <Height> generic-ом + свой <HeightInTableRows>).
 # -multiLineDefault: input без явного autoMaxWidth при multiLine → AutoMaxWidth=false.
 # Общие свойства элемента (любой тип, включая Button/cmdBar): default/skip/drag.
 function Emit-CommonElementProps {
@@ -3768,7 +3768,9 @@ function Emit-Table {
 	if ($el.autoInsertNewRow -eq $true) { X "$inner<AutoInsertNewRow>true</AutoInsertNewRow>" }
 	# RowFilter — nil-плейсхолдер (всегда пустой); ключ присутствует → эмитим
 	if ($el.PSObject.Properties['rowFilter']) { X "$inner<RowFilter xsi:nil=`"true`"/>" }
-	if ($el.height) { X "$inner<HeightInTableRows>$($el.height)</HeightInTableRows>" }
+	# Высота в строках таблицы (<HeightInTableRows>) — отдельное свойство от <Height> (высота элемента,
+	# эмитится generic-ом Emit-Layout ниже). Таблица может нести оба (237 в корпусе).
+	if ($el.heightInTableRows) { X "$inner<HeightInTableRows>$($el.heightInTableRows)</HeightInTableRows>" }
 	if ($el.header -eq $false) { X "$inner<Header>false</Header>" }
 	if ($el.footer -eq $true) { X "$inner<Footer>true</Footer>" }
 
@@ -3797,7 +3799,7 @@ function Emit-Table {
 	if ($el.PSObject.Properties["_dynList"] -and $el._dynList) { Emit-DynListTableBlock -el $el -indent $inner }
 	if ($el.viewStatusLocation) { X "$inner<ViewStatusLocation>$($el.viewStatusLocation)</ViewStatusLocation>" }
 	if ($el.searchControlLocation) { X "$inner<SearchControlLocation>$($el.searchControlLocation)</SearchControlLocation>" }
-	Emit-Layout -el $el -indent $inner -skipHeight
+	Emit-Layout -el $el -indent $inner
 
 	if ($el.excludedCommands -and $el.excludedCommands.Count -gt 0) {
 		X "$inner<CommandSet>"

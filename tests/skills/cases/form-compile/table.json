@@ -16,7 +16,7 @@
   "input": {
     "title": "Просмотр данных",
     "elements": [
-      { "table": "Данные", "path": "Данные", "changeRowSet": true, "titleLocation": "top",
+      { "table": "Данные", "path": "Данные", "changeRowSet": true, "titleLocation": "top", "height": 80, "heightInTableRows": 5,
         "viewStatusLocation": "None", "searchControlLocation": "None",
         "excludedCommands": ["Add", "Delete", "MoveUp", "MoveDown"],
         "commandBar": { "autofill": false, "children": [

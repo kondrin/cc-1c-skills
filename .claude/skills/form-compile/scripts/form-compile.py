@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.87 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.88 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1802,7 +1802,7 @@ KNOWN_KEYS = {
     "autofill",
     "choiceMode", "initialTreeView", "enableDrag", "enableStartDrag",
     "rowSelectionMode", "verticalLines", "horizontalLines",
-    "rowPictureDataPath", "tableAutofill",
+    "rowPictureDataPath", "tableAutofill", "heightInTableRows",
     # dynamic-list table block
     "defaultItem", "useAlternationRowColor", "fileDragMode", "autoRefresh",
     "autoRefreshPeriod", "choiceFoldersAndItems", "restoreCurrentRow", "showRoot",
@@ -2707,7 +2707,7 @@ def emit_generic_scalars(lines, el, indent):
 def emit_layout(lines, el, indent, skip_height=False, multi_line_default=False):
     # Общие layout-свойства — применимы ко всем элементам. Порядок согласован
     # с историческим выводом input/label, чтобы не сдвигать существующие снапшоты.
-    # skip_height: для Table (height → HeightInTableRows, эмитится в emit_table).
+    # skip_height: подавить <Height> (зарезервирован; Table теперь эмитит <Height> generic-ом + свой <HeightInTableRows>).
     # multi_line_default: input без явного autoMaxWidth при multiLine → AutoMaxWidth=false.
     emit_common_element_props(lines, el, indent)
     if 'autoMaxWidth' in el:
@@ -3468,8 +3468,10 @@ def emit_table(lines, el, name, eid, indent):
     # RowFilter — nil-плейсхолдер (ключ присутствует → эмитим)
     if 'rowFilter' in el:
         lines.append(f'{inner}<RowFilter xsi:nil="true"/>')
-    if el.get('height'):
-        lines.append(f'{inner}<HeightInTableRows>{el["height"]}</HeightInTableRows>')
+    # Высота в строках (<HeightInTableRows>) — отдельное свойство от <Height> (высота элемента,
+    # эмитится generic-ом emit_layout ниже). Таблица может нести оба (237 в корпусе).
+    if el.get('heightInTableRows'):
+        lines.append(f'{inner}<HeightInTableRows>{el["heightInTableRows"]}</HeightInTableRows>')
     if el.get('header') is False:
         lines.append(f'{inner}<Header>false</Header>')
     if el.get('footer') is True:
@@ -3510,7 +3512,7 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<ViewStatusLocation>{el["viewStatusLocation"]}</ViewStatusLocation>')
     if el.get('searchControlLocation'):
         lines.append(f'{inner}<SearchControlLocation>{el["searchControlLocation"]}</SearchControlLocation>')
-    emit_layout(lines, el, inner, skip_height=True)
+    emit_layout(lines, el, inner)
 
     if el.get('excludedCommands'):
         lines.append(f'{inner}<CommandSet>')
