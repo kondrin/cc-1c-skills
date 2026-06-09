@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.96 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.97 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1837,6 +1837,8 @@ KNOWN_KEYS = {
     "pointerType", "drawingSelectionShowMode", "warningOnEditRepresentation", "markingAppearance",
     # report-form контекст (generic-скаляры элементов)
     "horizontalSpacing", "representationInContextMenu", "settingsNamedItemDetailedRepresentation",
+    # хвост: высота элемента списка / ширина выпадающего списка / картинка кнопки выбора / прозрачный пиксель
+    "itemHeight", "dropListWidth", "choiceButtonPicture", "transparentPixel",
 }
 
 # picture/picField — НИЗКИЙ приоритет: 'picture' это и тип (PictureDecoration), и свойство-иконка
@@ -2175,12 +2177,18 @@ def emit_choice_parameters(lines, el, indent):
         if isinstance(item, str):
             item = from_choice_param_shorthand(item)
         name = get_el_prop(item, ('name', 'имя'))
+        has_val = isinstance(item, dict) and ('value' in item or 'значение' in item)
         val = get_el_prop(item, ('value', 'значение'))
         name_s = '' if name is None else str(name)
         lines.append(f'{indent}\t<app:item name="{esc_xml(name_s)}">')
-        lines.append(f'{indent}\t\t<app:value xsi:type="FormChoiceListDesTimeValue">')
-        emit_choice_param_value(lines, val, f'{indent}\t\t\t')
-        lines.append(f'{indent}\t\t</app:value>')
+        # Параметр выбора без значения → <app:value xsi:nil="true"/> (платформа, 13 в корпусе);
+        # со значением (в т.ч. пустой строкой) → FormChoiceListDesTimeValue.
+        if not has_val:
+            lines.append(f'{indent}\t\t<app:value xsi:nil="true"/>')
+        else:
+            lines.append(f'{indent}\t\t<app:value xsi:type="FormChoiceListDesTimeValue">')
+            emit_choice_param_value(lines, val, f'{indent}\t\t\t')
+            lines.append(f'{indent}\t\t</app:value>')
         lines.append(f'{indent}\t</app:item>')
     lines.append(f'{indent}</ChoiceParameters>')
 
@@ -2741,6 +2749,9 @@ GENERIC_SCALARS = [
     ('HorizontalSpacing', 'horizontalSpacing', 'value'),
     ('RepresentationInContextMenu', 'representationInContextMenu', 'value'),
     ('SettingsNamedItemDetailedRepresentation', 'settingsNamedItemDetailedRepresentation', 'bool'),
+    # Хвост: высота элемента списка (radio) / ширина выпадающего списка (input)
+    ('ItemHeight', 'itemHeight', 'value'),
+    ('DropListWidth', 'dropListWidth', 'value'),
 ]
 
 
@@ -3313,6 +3324,7 @@ def emit_input(lines, el, name, eid, indent):
             lines.append(f'{inner}<{tag} xsi:type="{mvt}">{esc_xml(str(el[key]))}</{tag}>')
     if el.get('choiceButtonRepresentation'):
         lines.append(f'{inner}<ChoiceButtonRepresentation>{el["choiceButtonRepresentation"]}</ChoiceButtonRepresentation>')
+    emit_picture_ref(lines, el.get('choiceButtonPicture'), 'ChoiceButtonPicture', inner)
     emit_layout(lines, el, inner, multi_line_default=(el.get('multiLine') is True))
 
     if el.get('inputHint'):
@@ -3474,6 +3486,9 @@ def emit_label_field(lines, el, name, eid, indent):
         lines.append(f'{inner}<TitleLocation>{map_title_loc(el["titleLocation"])}</TitleLocation>')
     if el.get('editMode'):
         lines.append(f'{inner}<EditMode>{el["editMode"]}</EditMode>')
+    # PasswordMode на LabelField — платформа эмитит явный false (редко); факт. значение
+    if el.get('passwordMode') is not None:
+        lines.append(f'{inner}<PasswordMode>{"true" if el["passwordMode"] else "false"}</PasswordMode>')
     emit_column_pics(lines, el, inner)
     # ВНИМАНИЕ: у LabelField платформенный тег <Hiperlink> (опечатка 1С), не <Hyperlink>.
     if el.get('hyperlink') is True:
@@ -3819,6 +3834,9 @@ def emit_picture_decoration(lines, el, name, eid, indent):
         else:
             lines.append(f'{inner}\t<xr:Ref>{esc_xml(src_str)}</xr:Ref>')
         lines.append(f'{inner}\t<xr:LoadTransparent>{lt}</xr:LoadTransparent>')
+        tpx = el.get('transparentPixel')
+        if tpx:
+            lines.append(f'{inner}\t<xr:TransparentPixel x="{tpx.get("x")}" y="{tpx.get("y")}"/>')
         lines.append(f'{inner}</Picture>')
 
     if el.get('hyperlink') is True:

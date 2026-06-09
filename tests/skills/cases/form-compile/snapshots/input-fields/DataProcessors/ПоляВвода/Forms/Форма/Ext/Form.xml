@@ -261,6 +261,9 @@
 						</Value>
 					</app:value>
 				</app:item>
+				<app:item name="Отбор.БезЗначения">
+					<app:value xsi:nil="true"/>
+				</app:item>
 			</ChoiceParameters>
 			<ContextMenu name="ПолеСвязиКонтекстноеМеню" id="26"/>
 			<ExtendedTooltip name="ПолеСвязиРасширеннаяПодсказка" id="27"/>

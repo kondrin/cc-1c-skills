@@ -73,6 +73,7 @@
 | `autoShowState` | `<AutoShowState>` | `Auto`, `DontShow`, `ShowOnComposition` |
 | `reportResultViewMode` | `<ReportResultViewMode>` | `Auto` |
 | `viewModeApplicationOnSetReportResult` | `<ViewModeApplicationOnSetReportResult>` | `Auto` |
+| `variantAppearance` | `<VariantAppearance>` | Имя реквизита оформления варианта (форма отчёта) |
 
 Нераспознанные ключи преобразуются с автоматическим PascalCase (первая буква в верхний регистр).
 

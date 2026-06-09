@@ -1,4 +1,4 @@
-﻿# form-compile v1.96 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.97 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2616,6 +2616,8 @@ function Emit-Element {
 		"pointerType"=1;"drawingSelectionShowMode"=1;"warningOnEditRepresentation"=1;"markingAppearance"=1
 		# report-form контекст (generic-скаляры элементов)
 		"horizontalSpacing"=1;"representationInContextMenu"=1;"settingsNamedItemDetailedRepresentation"=1
+		# хвост: высота элемента списка / ширина выпадающего списка / картинка кнопки выбора / прозрачный пиксель
+		"itemHeight"=1;"dropListWidth"=1;"choiceButtonPicture"=1;"transparentPixel"=1
 		# columnGroup-specific
 		"showInHeader"=1
 		# radio-specific
@@ -2920,6 +2922,9 @@ $script:genericScalars = @(
 	@{ Tag='HorizontalSpacing';   Key='horizontalSpacing';   Kind='value' }
 	@{ Tag='RepresentationInContextMenu'; Key='representationInContextMenu'; Kind='value' }
 	@{ Tag='SettingsNamedItemDetailedRepresentation'; Key='settingsNamedItemDetailedRepresentation'; Kind='bool' }
+	# Хвост: высота элемента списка (radio) / ширина выпадающего списка (input)
+	@{ Tag='ItemHeight';          Key='itemHeight';          Kind='value' }
+	@{ Tag='DropListWidth';       Key='dropListWidth';       Kind='value' }
 )
 
 function Emit-GenericScalars {
@@ -3259,6 +3264,7 @@ function Emit-Input {
 		}
 	}
 	if ($el.choiceButtonRepresentation) { X "$inner<ChoiceButtonRepresentation>$($el.choiceButtonRepresentation)</ChoiceButtonRepresentation>" }
+	Emit-PictureRef -val $el.choiceButtonPicture -picTag 'ChoiceButtonPicture' -indent $inner
 	Emit-Layout -el $el -indent $inner -multiLineDefault ([bool]($el.multiLine -eq $true))
 
 	if ($el.inputHint) {
@@ -3625,11 +3631,23 @@ function Emit-ChoiceParameters {
 	foreach ($item in @($cp)) {
 		if ($item -is [string]) { $item = ConvertFrom-ChoiceParamShorthand $item }
 		$name = Get-ElProp $item @('name','имя')
+		# Наличие ключа value (≠ значения): hashtable (shorthand) vs PSCustomObject (JSON-объект)
+		if ($item -is [System.Collections.IDictionary]) {
+			$hasVal = $item.Contains('value') -or $item.Contains('значение')
+		} else {
+			$hasVal = ($null -ne $item.PSObject.Properties['value']) -or ($null -ne $item.PSObject.Properties['значение'])
+		}
 		$val = Get-ElProp $item @('value','значение')
 		X "$indent`t<app:item name=`"$(Esc-Xml "$name")`">"
-		X "$indent`t`t<app:value xsi:type=`"FormChoiceListDesTimeValue`">"
-		Emit-ChoiceParamValue -value $val -indent "$indent`t`t`t"
-		X "$indent`t`t</app:value>"
+		# Параметр выбора без значения → <app:value xsi:nil="true"/> (платформа, 13 в корпусе);
+		# со значением (в т.ч. пустой строкой) → FormChoiceListDesTimeValue.
+		if (-not $hasVal) {
+			X "$indent`t`t<app:value xsi:nil=`"true`"/>"
+		} else {
+			X "$indent`t`t<app:value xsi:type=`"FormChoiceListDesTimeValue`">"
+			Emit-ChoiceParamValue -value $val -indent "$indent`t`t`t"
+			X "$indent`t`t</app:value>"
+		}
 		X "$indent`t</app:item>"
 	}
 	X "$indent</ChoiceParameters>"
@@ -3777,6 +3795,8 @@ function Emit-LabelField {
 
 	if ($el.titleLocation) { X "$inner<TitleLocation>$(Map-TitleLoc "$($el.titleLocation)")</TitleLocation>" }
 	if ($el.editMode) { X "$inner<EditMode>$($el.editMode)</EditMode>" }
+	# PasswordMode на LabelField — платформа эмитит явный false (редко); факт. значение
+	if ($null -ne $el.passwordMode) { X "$inner<PasswordMode>$(if ($el.passwordMode){'true'}else{'false'})</PasswordMode>" }
 	Emit-ColumnPics -el $el -indent $inner
 	# ВНИМАНИЕ: у LabelField платформенный тег именно <Hiperlink> (опечатка 1С), не <Hyperlink>.
 	if ($el.hyperlink -eq $true) { X "$inner<Hiperlink>true</Hiperlink>" }
@@ -4125,6 +4145,7 @@ function Emit-PictureDecoration {
 		if ($srcStr -match '^abs:(.*)$') { X "$inner`t<xr:Abs>$(Esc-Xml $matches[1])</xr:Abs>" }
 		else { X "$inner`t<xr:Ref>$(Esc-Xml $srcStr)</xr:Ref>" }
 		X "$inner`t<xr:LoadTransparent>$lt</xr:LoadTransparent>"
+		if ($el.transparentPixel) { X "$inner`t<xr:TransparentPixel x=`"$($el.transparentPixel.x)`" y=`"$($el.transparentPixel.y)`"/>" }
 		X "$inner</Picture>"
 	}
 

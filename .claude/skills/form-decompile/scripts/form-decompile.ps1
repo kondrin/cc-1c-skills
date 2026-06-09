@@ -1,4 +1,4 @@
-﻿# form-decompile v0.72 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.73 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1192,6 +1192,9 @@ $GENERIC_SCALARS = @(
 	@{ Tag='HorizontalSpacing'; Key='horizontalSpacing'; Kind='value' }
 	@{ Tag='RepresentationInContextMenu'; Key='representationInContextMenu'; Kind='value' }
 	@{ Tag='SettingsNamedItemDetailedRepresentation'; Key='settingsNamedItemDetailedRepresentation'; Kind='bool' }
+	# Хвост: высота элемента списка (radio) / ширина выпадающего списка (input)
+	@{ Tag='ItemHeight'; Key='itemHeight'; Kind='value' }
+	@{ Tag='DropListWidth'; Key='dropListWidth'; Kind='value' }
 )
 
 # Захват generic-скаляров. Специфичная обработка (если ключ уже задан) — побеждает.
@@ -1479,6 +1482,7 @@ function Decompile-Element {
 				}
 			}
 			$cbr = Get-Child $node 'ChoiceButtonRepresentation'; if ($cbr) { $obj['choiceButtonRepresentation'] = $cbr }
+			$cbp = Get-PictureRef $node 'ChoiceButtonPicture'; if ($null -ne $cbp) { $obj['choiceButtonPicture'] = $cbp }
 			if ((Get-Child $node 'TextEdit') -eq 'false') { $obj['textEdit'] = $false }
 			$cl = Decompile-ChoiceList $node; if ($cl) { $obj['choiceList'] = $cl }
 			Add-FormatProps $obj $node
@@ -1524,6 +1528,8 @@ function Decompile-Element {
 			$em = Get-Child $node 'EditMode'; if ($em) { $obj['editMode'] = $em }
 			# LabelField: тег <Hiperlink> (опечатка платформы), не <Hyperlink>
 			if ((Get-Child $node 'Hiperlink') -eq 'true') { $obj['hyperlink'] = $true }
+			# PasswordMode на LabelField — платформа эмитит явный false (редко); захват факт. значения
+			$pm = Get-Child $node 'PasswordMode'; if ($null -ne $pm) { $obj['passwordMode'] = ($pm -eq 'true') }
 			Add-FormatProps $obj $node
 		}
 		'PictureDecoration' {
@@ -1536,6 +1542,9 @@ function Decompile-Element {
 			$abs = $node.SelectSingleNode("lf:Picture/xr:Abs", $ns)
 			if ($ref) { $obj['src'] = $ref.InnerText } elseif ($abs) { $obj['src'] = "abs:$($abs.InnerText)" }  # встроенная картинка → префикс abs:
 			$lt = $node.SelectSingleNode("lf:Picture/xr:LoadTransparent", $ns); if ($lt -and $lt.InnerText -eq 'true') { $obj['loadTransparent'] = $true }
+			# Прозрачный пиксель картинки (<xr:TransparentPixel x y/>) — координаты фона прозрачности
+			$tpx = $node.SelectSingleNode("lf:Picture/xr:TransparentPixel", $ns)
+			if ($tpx) { $obj['transparentPixel'] = [ordered]@{ x = [int]$tpx.GetAttribute('x'); y = [int]$tpx.GetAttribute('y') } }
 			if ((Get-Child $node 'Hyperlink') -eq 'true') { $obj['hyperlink'] = $true }
 		}
 		'PictureField' {
@@ -1762,7 +1771,7 @@ $titleNode = $root.SelectSingleNode("lf:Title", $ns)
 if ($titleNode) { $t = Get-LangText $titleNode; if ($null -ne $t) { $dsl['title'] = $t } }
 
 # properties (прямые скаляры под <Form>, PascalCase → camelCase)
-$KNOWN_FORM_PROPS = @('AutoTitle','ReportResult','DetailsData','ReportFormType','AutoShowState','ReportResultViewMode','ViewModeApplicationOnSetReportResult','WindowOpeningMode','CommandBarLocation','SaveDataInSettings','AutoSaveDataInSettings','AutoTime','UsePostingMode','RepostOnWrite','AutoURL','AutoFillCheck','Customizable','EnterKeyBehavior','VerticalScroll','Width','Height','Group','UseForFoldersAndItems','SaveWindowSettings','ScalingMode','VerticalSpacing')
+$KNOWN_FORM_PROPS = @('AutoTitle','ReportResult','DetailsData','ReportFormType','AutoShowState','ReportResultViewMode','ViewModeApplicationOnSetReportResult','WindowOpeningMode','CommandBarLocation','SaveDataInSettings','AutoSaveDataInSettings','AutoTime','UsePostingMode','RepostOnWrite','AutoURL','AutoFillCheck','Customizable','EnterKeyBehavior','VerticalScroll','Width','Height','Group','UseForFoldersAndItems','SaveWindowSettings','ScalingMode','VerticalSpacing','VariantAppearance')
 $props = [ordered]@{}
 foreach ($pn in $KNOWN_FORM_PROPS) {
 	$v = Get-Child $root $pn
