@@ -44,6 +44,7 @@
 						</v8:item>
 					</ToolTip>
 					<Group>Horizontal</Group>
+					<TitleDataPath>Итог</TitleDataPath>
 					<ExtendedTooltip name="Шаг2РасширеннаяПодсказка" id="9"/>
 					<ChildItems>
 						<InputField name="Итог" id="10">

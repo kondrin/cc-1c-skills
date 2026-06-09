@@ -22,6 +22,9 @@
 			<SearchControlLocation>None</SearchControlLocation>
 			<Height>80</Height>
 			<SettingsNamedItemDetailedRepresentation>false</SettingsNamedItemDetailedRepresentation>
+			<MaxRowsCount>5</MaxRowsCount>
+			<AutoMaxRowsCount>false</AutoMaxRowsCount>
+			<HeightControlVariant>UseHeightInTableRows</HeightControlVariant>
 			<CommandSet>
 				<ExcludedCommand>Add</ExcludedCommand>
 				<ExcludedCommand>Delete</ExcludedCommand>

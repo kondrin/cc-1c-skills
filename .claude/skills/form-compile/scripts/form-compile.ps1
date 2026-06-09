@@ -1,4 +1,4 @@
-﻿# form-compile v1.98 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.99 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2618,6 +2618,9 @@ function Emit-Element {
 		"horizontalSpacing"=1;"representationInContextMenu"=1;"settingsNamedItemDetailedRepresentation"=1
 		# хвост: высота элемента списка / ширина выпадающего списка / картинка кнопки выбора / прозрачный пиксель
 		"itemHeight"=1;"dropListWidth"=1;"choiceButtonPicture"=1;"transparentPixel"=1
+		# хвост CI-форм: динамический заголовок / расширенное редактирование / высота таблицы
+		"titleDataPath"=1;"extendedEdit"=1;"maxRowsCount"=1;"autoMaxRowsCount"=1;"heightControlVariant"=1
+		"warningOnEdit"=1;"nonselectedPictureText"=1;"editTextUpdate"=1;"footerText"=1
 		# columnGroup-specific
 		"showInHeader"=1
 		# radio-specific
@@ -2925,6 +2928,13 @@ $script:genericScalars = @(
 	# Хвост: высота элемента списка (radio) / ширина выпадающего списка (input)
 	@{ Tag='ItemHeight';          Key='itemHeight';          Kind='value' }
 	@{ Tag='DropListWidth';       Key='dropListWidth';       Kind='value' }
+	# Хвост CI-форм: динамический заголовок (Page/Group) / расширенное ред. (input) / высота таблицы по строкам
+	@{ Tag='TitleDataPath';       Key='titleDataPath';       Kind='value' }
+	@{ Tag='ExtendedEdit';        Key='extendedEdit';        Kind='bool'  }
+	@{ Tag='MaxRowsCount';        Key='maxRowsCount';        Kind='value' }
+	@{ Tag='AutoMaxRowsCount';    Key='autoMaxRowsCount';    Kind='bool'  }
+	@{ Tag='HeightControlVariant'; Key='heightControlVariant'; Kind='value' }
+	@{ Tag='EditTextUpdate';      Key='editTextUpdate';      Kind='value' }
 )
 
 function Emit-GenericScalars {
@@ -3237,7 +3247,7 @@ function Emit-Input {
 	if ($null -ne $el.spinButton)     { X "$inner<SpinButton>$(if ($el.spinButton){'true'}else{'false'})</SpinButton>" }
 	if ($null -ne $el.dropListButton) { X "$inner<DropListButton>$(if ($el.dropListButton){'true'}else{'false'})</DropListButton>" }
 	if ($null -ne $el.choiceListButton) { X "$inner<ChoiceListButton>$(if ($el.choiceListButton){'true'}else{'false'})</ChoiceListButton>" }
-	if ($el.markIncomplete -eq $true) { X "$inner<AutoMarkIncomplete>true</AutoMarkIncomplete>" }
+	if ($null -ne $el.markIncomplete) { X "$inner<AutoMarkIncomplete>$(if ($el.markIncomplete){'true'}else{'false'})</AutoMarkIncomplete>" }
 	if ($el.editMode) { X "$inner<EditMode>$($el.editMode)</EditMode>" }
 	Emit-ColumnPics -el $el -indent $inner
 	if ($el.textEdit -eq $false) { X "$inner<TextEdit>false</TextEdit>" }
@@ -3270,6 +3280,8 @@ function Emit-Input {
 	if ($el.inputHint) {
 		Emit-MLText -tag "InputHint" -text $el.inputHint -indent $inner
 	}
+	if ($null -ne $el.warningOnEdit) { Emit-MLText -tag "WarningOnEdit" -text $el.warningOnEdit -indent $inner }
+	if ($null -ne $el.footerText) { Emit-MLText -tag "FooterText" -text $el.footerText -indent $inner }
 
 	# Формат / формат редактирования (LocalStringType — строка или {ru,en})
 	if ($el.format)     { Emit-MLText -tag "Format" -text $el.format -indent $inner }
@@ -3893,7 +3905,7 @@ function Emit-Table {
 	if ($null -ne $el.autofill) { X "$inner<Autofill>$(if ($el.autofill){'true'}else{'false'})</Autofill>" }
 	if ($el.multipleChoice -eq $true) { X "$inner<MultipleChoice>true</MultipleChoice>" }
 	if ($el.searchOnInput) { X "$inner<SearchOnInput>$($el.searchOnInput)</SearchOnInput>" }
-	if ($el.markIncomplete -eq $true) { X "$inner<AutoMarkIncomplete>true</AutoMarkIncomplete>" }
+	if ($null -ne $el.markIncomplete) { X "$inner<AutoMarkIncomplete>$(if ($el.markIncomplete){'true'}else{'false'})</AutoMarkIncomplete>" }
 	if ($el.useAlternationRowColor -eq $true) { X "$inner<UseAlternationRowColor>true</UseAlternationRowColor>" }
 	if ($el.selectionMode) { X "$inner<SelectionMode>$($el.selectionMode)</SelectionMode>" }
 	if ($el.rowSelectionMode) { X "$inner<RowSelectionMode>$($el.rowSelectionMode)</RowSelectionMode>" }
@@ -4187,6 +4199,7 @@ function Emit-PictureField {
 	# Required for a Boolean-bound PictureField to actually show an icon.
 	# Скаляр (Ref) или объект {src, loadTransparent}; LoadTransparent эмитится всегда.
 	Emit-PictureRef -val $el.valuesPicture -picTag 'ValuesPicture' -indent $inner
+	if ($null -ne $el.nonselectedPictureText) { Emit-MLText -tag "NonselectedPictureText" -text $el.nonselectedPictureText -indent $inner }
 
 	# Оформление (цвета/шрифты/граница) — перед компаньонами
 	Emit-Appearance -el $el -indent $inner -profile 'field'

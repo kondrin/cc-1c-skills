@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.98 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.99 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1839,6 +1839,9 @@ KNOWN_KEYS = {
     "horizontalSpacing", "representationInContextMenu", "settingsNamedItemDetailedRepresentation",
     # хвост: высота элемента списка / ширина выпадающего списка / картинка кнопки выбора / прозрачный пиксель
     "itemHeight", "dropListWidth", "choiceButtonPicture", "transparentPixel",
+    # хвост CI-форм: динамический заголовок / расширенное редактирование / высота таблицы
+    "titleDataPath", "extendedEdit", "maxRowsCount", "autoMaxRowsCount", "heightControlVariant",
+    "warningOnEdit", "nonselectedPictureText", "editTextUpdate", "footerText",
 }
 
 # picture/picField — НИЗКИЙ приоритет: 'picture' это и тип (PictureDecoration), и свойство-иконка
@@ -2752,6 +2755,13 @@ GENERIC_SCALARS = [
     # Хвост: высота элемента списка (radio) / ширина выпадающего списка (input)
     ('ItemHeight', 'itemHeight', 'value'),
     ('DropListWidth', 'dropListWidth', 'value'),
+    # Хвост CI-форм: динамический заголовок (Page/Group) / расширенное ред. (input) / высота таблицы по строкам
+    ('TitleDataPath', 'titleDataPath', 'value'),
+    ('ExtendedEdit', 'extendedEdit', 'bool'),
+    ('MaxRowsCount', 'maxRowsCount', 'value'),
+    ('AutoMaxRowsCount', 'autoMaxRowsCount', 'bool'),
+    ('HeightControlVariant', 'heightControlVariant', 'value'),
+    ('EditTextUpdate', 'editTextUpdate', 'value'),
 ]
 
 
@@ -3299,8 +3309,8 @@ def emit_input(lines, el, name, eid, indent):
         lines.append(f'{inner}<DropListButton>{"true" if el["dropListButton"] else "false"}</DropListButton>')
     if el.get('choiceListButton') is not None:
         lines.append(f'{inner}<ChoiceListButton>{"true" if el["choiceListButton"] else "false"}</ChoiceListButton>')
-    if el.get('markIncomplete') is True:
-        lines.append(f'{inner}<AutoMarkIncomplete>true</AutoMarkIncomplete>')
+    if el.get('markIncomplete') is not None:
+        lines.append(f'{inner}<AutoMarkIncomplete>{"true" if el["markIncomplete"] else "false"}</AutoMarkIncomplete>')
     if el.get('editMode'):
         lines.append(f'{inner}<EditMode>{el["editMode"]}</EditMode>')
     emit_column_pics(lines, el, inner)
@@ -3329,6 +3339,10 @@ def emit_input(lines, el, name, eid, indent):
 
     if el.get('inputHint'):
         emit_mltext(lines, inner, 'InputHint', el['inputHint'])
+    if el.get('warningOnEdit') is not None:
+        emit_mltext(lines, inner, 'WarningOnEdit', el['warningOnEdit'])
+    if el.get('footerText') is not None:
+        emit_mltext(lines, inner, 'FooterText', el['footerText'])
 
     # Формат / формат редактирования (LocalStringType — строка или {ru,en})
     if el.get('format'):
@@ -3591,8 +3605,8 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<MultipleChoice>true</MultipleChoice>')
     if el.get('searchOnInput'):
         lines.append(f'{inner}<SearchOnInput>{el["searchOnInput"]}</SearchOnInput>')
-    if el.get('markIncomplete') is True:
-        lines.append(f'{inner}<AutoMarkIncomplete>true</AutoMarkIncomplete>')
+    if el.get('markIncomplete') is not None:
+        lines.append(f'{inner}<AutoMarkIncomplete>{"true" if el["markIncomplete"] else "false"}</AutoMarkIncomplete>')
     if el.get('useAlternationRowColor') is True:
         lines.append(f'{inner}<UseAlternationRowColor>true</UseAlternationRowColor>')
     if el.get('selectionMode'):
@@ -3881,6 +3895,8 @@ def emit_picture_field(lines, el, name, eid, indent):
     # Required for a Boolean-bound PictureField to actually show an icon.
     # Скаляр (Ref) или объект {src, loadTransparent}; LoadTransparent эмитится всегда.
     emit_picture_ref(lines, el.get('valuesPicture'), 'ValuesPicture', inner)
+    if el.get('nonselectedPictureText') is not None:
+        emit_mltext(lines, inner, 'NonselectedPictureText', el['nonselectedPictureText'])
 
     # Оформление (цвета/шрифты/граница) — перед компаньонами
     emit_appearance(lines, el, inner, 'field')

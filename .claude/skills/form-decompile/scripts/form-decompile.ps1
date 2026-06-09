@@ -1,4 +1,4 @@
-﻿# form-decompile v0.74 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.75 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1226,6 +1226,13 @@ $GENERIC_SCALARS = @(
 	# Хвост: высота элемента списка (radio) / ширина выпадающего списка (input)
 	@{ Tag='ItemHeight'; Key='itemHeight'; Kind='value' }
 	@{ Tag='DropListWidth'; Key='dropListWidth'; Kind='value' }
+	# Хвост CI-форм: динамический заголовок (Page/Group) / расширенное ред. (input) / высота таблицы по строкам
+	@{ Tag='TitleDataPath'; Key='titleDataPath'; Kind='value' }
+	@{ Tag='ExtendedEdit'; Key='extendedEdit'; Kind='bool' }
+	@{ Tag='MaxRowsCount'; Key='maxRowsCount'; Kind='value' }
+	@{ Tag='AutoMaxRowsCount'; Key='autoMaxRowsCount'; Kind='bool' }
+	@{ Tag='HeightControlVariant'; Key='heightControlVariant'; Kind='value' }
+	@{ Tag='EditTextUpdate'; Key='editTextUpdate'; Kind='value' }
 )
 
 # Захват generic-скаляров. Специфичная обработка (если ключ уже задан) — побеждает.
@@ -1485,10 +1492,12 @@ function Decompile-Element {
 			Add-CommonProps $obj $node $name
 			if ((Get-Child $node 'MultiLine') -eq 'true') { $obj['multiLine'] = $true }
 			if ((Get-Child $node 'PasswordMode') -eq 'true') { $obj['passwordMode'] = $true }
-			if ((Get-Child $node 'AutoMarkIncomplete') -eq 'true') { $obj['markIncomplete'] = $true }
+			$mi = Get-Child $node 'AutoMarkIncomplete'; if ($null -ne $mi) { $obj['markIncomplete'] = ($mi -eq 'true') }
 			$em = Get-Child $node 'EditMode'; if ($em) { $obj['editMode'] = $em }
 			$tl = Get-Child $node 'TitleLocation'; if ($tl) { $obj['titleLocation'] = $tl.ToLower() }
 			$ih = $node.SelectSingleNode("lf:InputHint", $ns); if ($ih) { $t = Get-LangText $ih; if ($t) { $obj['inputHint'] = $t } }
+			$woe = $node.SelectSingleNode("lf:WarningOnEdit", $ns); if ($woe) { $t = Get-LangText $woe; if ($null -ne $t) { $obj['warningOnEdit'] = $t } }
+			$ftxt = $node.SelectSingleNode("lf:FooterText", $ns); if ($ftxt) { $t = Get-LangText $ftxt; if ($null -ne $t) { $obj['footerText'] = $t } }
 			foreach ($p in @('ChoiceButton','ClearButton','SpinButton','DropListButton','ChoiceListButton')) {
 				$v = Get-Child $node $p; if ($null -ne $v) { $obj[($p.Substring(0,1).ToLower()+$p.Substring(1))] = (To-Bool $v) }
 			}
@@ -1587,6 +1596,7 @@ function Decompile-Element {
 			if ((Get-Child $node 'Hyperlink') -eq 'true') { $obj['hyperlink'] = $true }
 			$sct = Get-Child $node 'Shortcut'; if ($sct) { $obj['shortcut'] = $sct }
 			$vp = Get-PictureRef $node 'ValuesPicture'; if ($null -ne $vp) { $obj['valuesPicture'] = $vp }
+			$npt = $node.SelectSingleNode("lf:NonselectedPictureText", $ns); if ($npt) { $t = Get-LangText $npt; if ($null -ne $t) { $obj['nonselectedPictureText'] = $t } }
 		}
 		'CalendarField' {
 			$obj[$key] = $name
@@ -1635,7 +1645,7 @@ function Decompile-Element {
 			$taf = Get-Child $node 'Autofill'; if ($null -ne $taf) { $obj['autofill'] = ($taf -eq 'true') }
 			if ((Get-Child $node 'MultipleChoice') -eq 'true') { $obj['multipleChoice'] = $true }
 			$soin = Get-Child $node 'SearchOnInput'; if ($soin) { $obj['searchOnInput'] = $soin }
-			if ((Get-Child $node 'AutoMarkIncomplete') -eq 'true') { $obj['markIncomplete'] = $true }
+			$mi = Get-Child $node 'AutoMarkIncomplete'; if ($null -ne $mi) { $obj['markIncomplete'] = ($mi -eq 'true') }
 			$itv = Get-Child $node 'InitialTreeView'; if ($itv) { $obj['initialTreeView'] = $itv }
 			# RowsPicture: src (xr:Ref) + LoadTransparent (дефолт false). При true → объектная форма.
 			$rpRef = $node.SelectSingleNode("lf:RowsPicture/xr:Ref", $ns)

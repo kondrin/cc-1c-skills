@@ -194,12 +194,27 @@
 					<v8:content>Подсказка</v8:content>
 				</v8:item>
 			</Title>
+			<AutoMarkIncomplete>false</AutoMarkIncomplete>
+			<ExtendedEdit>true</ExtendedEdit>
+			<EditTextUpdate>OnValueChange</EditTextUpdate>
 			<InputHint>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
 					<v8:content>Введите значение...</v8:content>
 				</v8:item>
 			</InputHint>
+			<WarningOnEdit>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Изменение запрещено</v8:content>
+				</v8:item>
+			</WarningOnEdit>
+			<FooterText>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>итого</v8:content>
+				</v8:item>
+			</FooterText>
 			<ContextMenu name="ПолеПодсказкаКонтекстноеМеню" id="23"/>
 			<ExtendedTooltip name="ПолеПодсказкаРасширеннаяПодсказка" id="24"/>
 		</InputField>

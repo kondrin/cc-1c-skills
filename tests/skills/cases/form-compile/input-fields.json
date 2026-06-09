@@ -27,7 +27,7 @@
         { "value": "Первый" },
         { "value": "Второй", "presentation": "Второй вариант" }
       ]},
-      { "input": "ПолеПодсказка", "path": "ПолеПодсказка", "inputHint": "Введите значение...", "title": "Подсказка" },
+      { "input": "ПолеПодсказка", "path": "ПолеПодсказка", "inputHint": "Введите значение...", "warningOnEdit": "Изменение запрещено", "footerText": "итого", "extendedEdit": true, "editTextUpdate": "OnValueChange", "markIncomplete": false, "title": "Подсказка" },
       { "input": "ПолеСвязи", "path": "ПолеСвязи", "title": "Поле со связями",
         "choiceParameters": [
           { "name": "Отбор.Активный", "value": true },

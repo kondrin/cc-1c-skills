@@ -120,6 +120,7 @@
 |----------|-----|----------|
 | `name` | string | Имя элемента (по умолчанию — из значения ключа типа) |
 | `title` | string/object | Заголовок. **Нет ключа** → авто-вывод из имени (для page/popup/label и непривязанных полей/кнопок). **`""`** → подавить (заголовок не выводится). Строка → ru. Объект `{ "ru": "…", "en": "…" }` → мультиязычный (по `<v8:item>` на язык). Так же `tooltip`/`inputHint`/`title` команд/реквизитов/колонок |
+| `titleDataPath` | string | Путь данных динамического заголовка (`<TitleDataPath>`) — у Page/UsualGroup (напр. `Объект.Товары.RowsCount` в заголовке страницы). Парный к `footerDataPath` (путь данных подвала поля) |
 | `hidden` | bool | `true` → `<Visible>false</Visible>` |
 | `disabled` | bool | `true` → `<Enabled>false</Enabled>` |
 | `readOnly` | bool | `true` → `<ReadOnly>true</ReadOnly>` |
@@ -375,7 +376,11 @@ companion-панели с собственным контентом. Оба не
 | `clearButton` | bool | Показывать кнопку очистки |
 | `spinButton` | bool | Показывать кнопку прокрутки |
 | `dropListButton` | bool | Показывать кнопку раскрытия |
-| `markIncomplete` | bool | Автопометка незаполненных |
+| `markIncomplete` | bool | Автопометка незаполненных (`<AutoMarkIncomplete>`, факт. значение true/false) |
+| `extendedEdit` | bool | Расширенное редактирование (`<ExtendedEdit>`) |
+| `editTextUpdate` | string | Обновление текста при редактировании: `Always`, `OnValueChange`, `DontUse` |
+| `warningOnEdit` | string/object | Предупреждение при редактировании (`<WarningOnEdit>`, мультиязычный текст) |
+| `footerText` | string/object | Текст подвала поля (`<FooterText>`, мультиязычный) |
 | `editMode` | string | Режим редактирования: `EnterOnInput`, `Directly` |
 | `skipOnInput` | bool | Пропускать при вводе |
 | `inputHint` | string | Подсказка ввода (placeholder) |
