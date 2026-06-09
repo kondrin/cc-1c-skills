@@ -1,4 +1,4 @@
-﻿# form-compile v1.101 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.103 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2564,6 +2564,18 @@ function Emit-Element {
 		"ПолеИндикатора"             = "progressBar"
 		"TrackBarField"              = "trackBar"
 		"ПолеПолосыРегулирования"    = "trackBar"
+		"ChartField"                 = "chart"
+		"ПолеДиаграммы"              = "chart"
+		"GanttChartField"            = "ganttChart"
+		"ПолеДиаграммыГанта"         = "ganttChart"
+		"GraphicalSchemaField"       = "graphicalSchema"
+		"ПолеГрафическойСхемы"       = "graphicalSchema"
+		"PlannerField"               = "planner"
+		"ПолеПланировщика"           = "planner"
+		"PeriodField"                = "periodField"
+		"ПолеПериода"                = "periodField"
+		"DendrogramField"            = "dendrogram"
+		"ПолеДендрограммы"           = "dendrogram"
 	}
 	foreach ($pair in $synonyms.GetEnumerator()) {
 		if ($null -ne $el.PSObject.Properties[$pair.Key] -and $null -eq $el.PSObject.Properties[$pair.Value]) {
@@ -2596,7 +2608,7 @@ function Emit-Element {
 	# у popup/button/cmdBar. Тип-ключ владельца (popup/button/…) должен выиграть.
 	# pages/page ПЕРЕД group: у Page/Pages ключ 'group' — это направление раскладки детей
 	# (<Group>Horizontal</Group>), а не тип UsualGroup. Реальная UsualGroup ключа page/pages не несёт.
-	foreach ($key in @("columnGroup","buttonGroup","pages","page","group","input","check","radio","label","labelField","table","button","calendar","cmdBar","popup","searchString","viewStatus","searchControl","picField","picture","spreadsheet","html","textDoc","formattedDoc","progressBar","trackBar")) {
+	foreach ($key in @("columnGroup","buttonGroup","pages","page","group","input","check","radio","label","labelField","table","button","calendar","cmdBar","popup","searchString","viewStatus","searchControl","picField","picture","spreadsheet","html","textDoc","formattedDoc","progressBar","trackBar","chart","ganttChart","graphicalSchema","planner","periodField","dendrogram")) {
 		if ($el.$key -ne $null) {
 			$typeKey = $key
 			break
@@ -2613,8 +2625,9 @@ function Emit-Element {
 		# type keys
 		"group"=1;"columnGroup"=1;"buttonGroup"=1;"input"=1;"check"=1;"radio"=1;"label"=1;"labelField"=1;"table"=1;"pages"=1;"page"=1
 		"button"=1;"picture"=1;"picField"=1;"calendar"=1;"cmdBar"=1;"popup"=1
-		# спец-поля (документ/датчик) — тип-ключи + типоспец. скаляры
+		# спец-поля (документ/датчик/диаграмма) — тип-ключи + типоспец. скаляры
 		"spreadsheet"=1;"html"=1;"textDoc"=1;"formattedDoc"=1;"progressBar"=1;"trackBar"=1
+		"chart"=1;"ganttChart"=1;"graphicalSchema"=1;"planner"=1;"periodField"=1;"dendrogram"=1;"ganttTable"=1
 		"showPercent"=1;"largeStep"=1;"markingStep"=1;"step"=1
 		"horizontalScrollBar"=1;"viewScalingMode"=1;"output"=1;"selectionShowMode"=1;"protection"=1
 		"edit"=1;"showGrid"=1;"showGroups"=1;"showHeaders"=1;"showRowAndColumnNames"=1;"showCellNames"=1
@@ -2739,6 +2752,12 @@ function Emit-Element {
 		"formattedDoc" { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "FormattedDocumentField" -typeKey "formattedDoc" }
 		"progressBar"  { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "ProgressBarField" -typeKey "progressBar" }
 		"trackBar"     { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "TrackBarField" -typeKey "trackBar" }
+		"chart"           { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "ChartField" -typeKey "chart" }
+		"graphicalSchema" { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "GraphicalSchemaField" -typeKey "graphicalSchema" }
+		"planner"         { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "PlannerField" -typeKey "planner" }
+		"periodField"     { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "PeriodField" -typeKey "periodField" }
+		"dendrogram"      { Emit-SimpleField -el $el -name $name -id $id -indent $indent -xmlTag "DendrogramField" -typeKey "dendrogram" }
+		"ganttChart"      { Emit-GanttChart -el $el -name $name -id $id -indent $indent }
 	}
 }
 
@@ -4300,6 +4319,26 @@ function Emit-SimpleField {
 	Emit-Events -el $el -elementName $name -indent $inner -typeKey $typeKey
 
 	X "$indent</$xmlTag>"
+}
+
+# GanttChartField — скелет поля + вложенная <Table> (полноценная таблица, через Emit-Element).
+# Порядок (по корпусу): path/title/flags/titleLocation/layout/appearance, companions, Table, events.
+function Emit-GanttChart {
+	param($el, [string]$name, [int]$id, [string]$indent)
+	X "$indent<GanttChartField name=`"$name`" id=`"$id`"$(DI-Attr $el)>"
+	$inner = "$indent`t"
+	if ($el.path) { X "$inner<DataPath>$($el.path)</DataPath>" }
+	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
+	Emit-CommonFlags -el $el -indent $inner
+	if ($el.titleLocation) { X "$inner<TitleLocation>$(Map-TitleLoc "$($el.titleLocation)")</TitleLocation>" }
+	Emit-Layout -el $el -indent $inner
+	Emit-Appearance -el $el -indent $inner -profile 'field'
+	Emit-CompanionPanel -tag "ContextMenu" -name "${name}КонтекстноеМеню" -indent $inner -panel $el.contextMenu
+	Emit-Companion -tag "ExtendedTooltip" -name "${name}РасширеннаяПодсказка" -indent $inner -content $el.extendedTooltip
+	# Вложенная таблица диаграммы Ганта (стандартный Table — переиспользуем Emit-Element)
+	if ($el.ganttTable) { Emit-Element -el $el.ganttTable -indent $inner }
+	Emit-Events -el $el -elementName $name -indent $inner -typeKey "ganttChart"
+	X "$indent</GanttChartField>"
 }
 
 function Emit-CommandBar {

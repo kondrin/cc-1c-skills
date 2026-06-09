@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.101 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.103 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1832,8 +1832,9 @@ KNOWN_KEYS = {
     "choiceForm", "choiceHistoryOnInput", "footerDataPath", "minValue", "maxValue",
     # Button — пометка toggle-кнопки
     "checked",
-    # спец-поля (документ/датчик) — тип-ключи + типоспец. скаляры
+    # спец-поля (документ/датчик/диаграмма) — тип-ключи + типоспец. скаляры
     "spreadsheet", "html", "textDoc", "formattedDoc", "progressBar", "trackBar",
+    "chart", "ganttChart", "graphicalSchema", "planner", "periodField", "dendrogram", "ganttTable",
     "showPercent", "largeStep", "markingStep", "step",
     "horizontalScrollBar", "viewScalingMode", "output", "selectionShowMode", "protection",
     "edit", "showGrid", "showGroups", "showHeaders", "showRowAndColumnNames", "showCellNames",
@@ -1853,7 +1854,8 @@ KNOWN_KEYS = {
 # (<Group>Horizontal</Group>), а не тип UsualGroup. Реальная UsualGroup ключа page/pages не несёт.
 TYPE_KEYS = ["columnGroup", "buttonGroup", "pages", "page", "group", "input", "check", "radio", "label", "labelField", "table",
              "button", "calendar", "cmdBar", "popup", "searchString", "viewStatus", "searchControl", "picField", "picture",
-             "spreadsheet", "html", "textDoc", "formattedDoc", "progressBar", "trackBar"]
+             "spreadsheet", "html", "textDoc", "formattedDoc", "progressBar", "trackBar",
+             "chart", "ganttChart", "graphicalSchema", "planner", "periodField", "dendrogram"]
 
 # Synonyms: model often writes XML name or Russian (ПолеПереключателя/RadioButtonField → radio)
 ELEMENT_TYPE_SYNONYMS = {
@@ -1919,6 +1921,18 @@ ELEMENT_TYPE_SYNONYMS = {
     "ПолеИндикатора": "progressBar",
     "TrackBarField": "trackBar",
     "ПолеПолосыРегулирования": "trackBar",
+    "ChartField": "chart",
+    "ПолеДиаграммы": "chart",
+    "GanttChartField": "ganttChart",
+    "ПолеДиаграммыГанта": "ganttChart",
+    "GraphicalSchemaField": "graphicalSchema",
+    "ПолеГрафическойСхемы": "graphicalSchema",
+    "PlannerField": "planner",
+    "ПолеПланировщика": "planner",
+    "PeriodField": "periodField",
+    "ПолеПериода": "periodField",
+    "DendrogramField": "dendrogram",
+    "ПолеДендрограммы": "dendrogram",
 }
 
 # Тип-синонимы, применяемые ТОЛЬКО к строковому значению (имя элемента); объект/массив
@@ -3163,6 +3177,12 @@ def emit_element(lines, el, indent, in_cmd_bar=False):
         'formattedDoc':  lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'FormattedDocumentField', 'formattedDoc'),
         'progressBar':   lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'ProgressBarField', 'progressBar'),
         'trackBar':      lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'TrackBarField', 'trackBar'),
+        'chart':           lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'ChartField', 'chart'),
+        'graphicalSchema': lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'GraphicalSchemaField', 'graphicalSchema'),
+        'planner':         lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'PlannerField', 'planner'),
+        'periodField':     lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'PeriodField', 'periodField'),
+        'dendrogram':      lambda lines, el, name, eid, indent: emit_simple_field(lines, el, name, eid, indent, 'DendrogramField', 'dendrogram'),
+        'ganttChart':      emit_gantt_chart,
     }
 
     emitter = emitters.get(type_key)
@@ -3950,6 +3970,27 @@ def emit_simple_field(lines, el, name, eid, indent, xml_tag, type_key):
     emit_events(lines, el, name, inner, type_key)
 
     lines.append(f'{indent}</{xml_tag}>')
+
+
+def emit_gantt_chart(lines, el, name, eid, indent):
+    # GanttChartField — скелет поля + вложенная <Table> (полноценная таблица, через emit_element).
+    lines.append(f'{indent}<GanttChartField name="{name}" id="{eid}"{di_attr(el)}>')
+    inner = f'{indent}\t'
+    if el.get('path'):
+        lines.append(f'{inner}<DataPath>{el["path"]}</DataPath>')
+    emit_title(lines, el, name, inner, auto=not el.get('path'))
+    emit_common_flags(lines, el, inner)
+    if el.get('titleLocation'):
+        lines.append(f'{inner}<TitleLocation>{map_title_loc(el["titleLocation"])}</TitleLocation>')
+    emit_layout(lines, el, inner)
+    emit_appearance(lines, el, inner, 'field')
+    emit_companion_panel(lines, 'ContextMenu', f'{name}КонтекстноеМеню', inner, el.get('contextMenu'))
+    emit_companion(lines, 'ExtendedTooltip', f'{name}РасширеннаяПодсказка', inner, el.get('extendedTooltip'))
+    # Вложенная таблица диаграммы Ганта (стандартный Table — переиспользуем emit_element)
+    if el.get('ganttTable'):
+        emit_element(lines, el['ganttTable'], inner)
+    emit_events(lines, el, name, inner, 'ganttChart')
+    lines.append(f'{indent}</GanttChartField>')
 
 
 def emit_calendar(lines, el, name, eid, indent):

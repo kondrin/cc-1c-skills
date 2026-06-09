@@ -1,4 +1,4 @@
-﻿# form-decompile v0.77 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.79 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -147,6 +147,15 @@ function Fail-Ring3 {
 }
 # ConditionalAppearance со scope (привязка к области) пока не воспроизводим — fail-ring3 только в этом случае.
 foreach ($el in $xmlDoc.SelectNodes("//*[local-name()='ConditionalAppearance']/*[local-name()='item']/*[local-name()='scope'][node()]")) { Fail-Ring3 -kind "ConditionalAppearance со scope" -loc "form/ConditionalAppearance/item/scope" }
+# Реквизит с design-time конфигурацией (<Settings> chart-типа: Диаграмма/ДиаграммаГанта/… —
+# d4p1:GanttChart и т.п.). Поддержаны только TypeDescription (valueType) и DynamicList; прочие
+# (встроенная конфигурация диаграммы) пока НЕ воспроизводим → честный скип, чтобы не потерять молча.
+foreach ($s in $xmlDoc.SelectNodes("//*[local-name()='Attribute']/*[local-name()='Settings']")) {
+	$st = $s.GetAttribute("type", $NS_XSI)
+	if ($st -and $st -notmatch 'TypeDescription$' -and $st -notmatch 'DynamicList$') {
+		Fail-Ring3 -kind "Attribute>Settings типа '$st' (design-time конфигурация, напр. диаграмма)" -loc "Attribute/Settings"
+	}
+}
 
 # --- 1c. Compact JSON serializer (созвучно skd-decompile: 2-проб. indent, inline в пределах lineLimit) ---
 function Convert-StringToJsonLiteral {
@@ -1187,7 +1196,9 @@ $ELEMENT_KEY = @{
 	'Table'='table'; 'Pages'='pages'; 'Page'='page'; 'Button'='button'; 'CommandBar'='cmdBar'; 'Popup'='popup';
 	'SearchStringAddition'='searchString'; 'ViewStatusAddition'='viewStatus'; 'SearchControlAddition'='searchControl';
 	'SpreadSheetDocumentField'='spreadsheet'; 'HTMLDocumentField'='html'; 'TextDocumentField'='textDoc';
-	'FormattedDocumentField'='formattedDoc'; 'ProgressBarField'='progressBar'; 'TrackBarField'='trackBar'
+	'FormattedDocumentField'='formattedDoc'; 'ProgressBarField'='progressBar'; 'TrackBarField'='trackBar';
+	'ChartField'='chart'; 'GraphicalSchemaField'='graphicalSchema'; 'PlannerField'='planner';
+	'PeriodField'='periodField'; 'DendrogramField'='dendrogram'; 'GanttChartField'='ganttChart'
 }
 
 # Простые скаляры элемента (pass-through, зеркало $script:genericScalars компилятора). kind bool/value.
@@ -1761,6 +1772,18 @@ function Decompile-Element {
 		'FormattedDocumentField'   { Decompile-SimpleField $obj $node $name $key }
 		'ProgressBarField'         { Decompile-SimpleField $obj $node $name $key; Add-GaugeScalars $obj $node @('MinValue','MaxValue') }
 		'TrackBarField'            { Decompile-SimpleField $obj $node $name $key; Add-GaugeScalars $obj $node @('MinValue','MaxValue','LargeStep','MarkingStep','Step') }
+		'ChartField'               { Decompile-SimpleField $obj $node $name $key }
+		'GraphicalSchemaField'     { Decompile-SimpleField $obj $node $name $key }
+		'PlannerField'             { Decompile-SimpleField $obj $node $name $key }
+		'PeriodField'              { Decompile-SimpleField $obj $node $name $key }
+		'DendrogramField'          { Decompile-SimpleField $obj $node $name $key }
+		'GanttChartField' {
+			Decompile-SimpleField $obj $node $name $key
+			# Вложенная <Table> (полноценная таблица) — переиспользуем общий Decompile-Element.
+			# Ключ ganttTable (не 'table' — во избежание коллизии с тип-ключом таблицы в диспетчере).
+			$tblNode = $node.SelectSingleNode("lf:Table", $ns)
+			if ($tblNode) { $obj['ganttTable'] = Decompile-Element $tblNode }
+		}
 	}
 	# DisplayImportance — атрибут открывающего тега (адаптивная важность отображения), захват «как есть».
 	$di = $node.GetAttribute("DisplayImportance"); if ($di) { $obj['displayImportance'] = $di }
