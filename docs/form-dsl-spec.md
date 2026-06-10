@@ -557,7 +557,7 @@ companion-панели с собственным контентом. Оба не
 | `searchStringLocation` | string | `None`, `Top`, `Bottom`, `CommandBar`, `Auto` |
 | `viewStatusLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
 | `searchControlLocation` | string | `None`, `Top`, `Bottom`, `Auto` |
-| `excludedCommands` | string[] | Исключённые стандартные команды таблицы (`Add`, `Delete`, `MoveUp`, `SortListAsc`, …) → `<CommandSet>` |
+| `excludedCommands` | string[] | Исключённые стандартные команды редактора → `<CommandSet><ExcludedCommand>X</ExcludedCommand>…`. **Общее свойство поля** — работает на любом поле (`input`/`label`/`check`/`spreadsheet`/`html`/`formattedDoc`/`picField`/таблица) и на форм-уровне. Значения зависят от типа поля: таблица — `Add`/`Delete`/`MoveUp`/`SortListAsc`; табличный документ — `AlignCenter`/`Bold`/`BorderAll`/`BackColor`… |
 | `additions` | object | Отклонения стандартных дополнений командной панели (см. ниже) |
 
 > `commandBarLocation` у **дин-список-таблицы** компилятор авто-подставляет `None`. Чтобы оставить тег пустым (платформа не написала его) — задайте `commandBarLocation: ""` (суппресс-маркер); декомпилятор так и делает.
