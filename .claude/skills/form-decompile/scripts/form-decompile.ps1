@@ -1,4 +1,4 @@
-﻿# form-decompile v0.81 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.82 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -152,8 +152,14 @@ foreach ($el in $xmlDoc.SelectNodes("//*[local-name()='ConditionalAppearance']/*
 # (встроенная конфигурация диаграммы) пока НЕ воспроизводим → честный скип, чтобы не потерять молча.
 foreach ($s in $xmlDoc.SelectNodes("//*[local-name()='Attribute']/*[local-name()='Settings']")) {
 	$st = $s.GetAttribute("type", $NS_XSI)
-	if ($st -and $st -notmatch 'TypeDescription$' -and $st -notmatch 'DynamicList$' -and $st -notmatch 'Planner$') {
+	if ($st -and $st -notmatch 'TypeDescription$' -and $st -notmatch 'DynamicList$' -and $st -notmatch 'Planner$' -and $st -notmatch 'd4p1:Chart$') {
 		Fail-Ring3 -kind "Attribute>Settings типа '$st' (design-time конфигурация, напр. диаграмма)" -loc "Attribute/Settings"
+	}
+	# Chart с точками/осями (realPointData/realDataItems): типизированные значения (xsi:type),
+	# xsi:nil и ML с префиксом d4p1: (а не v8:) генерик-движок не сохраняет → честный скип.
+	# Частые дашборд-диаграммы (серии/легенда/оформление) поддержаны.
+	elseif ($st -match 'd4p1:Chart$' -and ($s.OuterXml -match '<d4p1:\w+ xsi:type=' -or $s.OuterXml -match '<d4p1:\w+ xsi:nil=' -or $s.OuterXml -match '<d4p1:item[ >]')) {
+		Fail-Ring3 -kind "Attribute>Settings d4p1:Chart с точками/осями (типизированные значения/d4p1-ML)" -loc "Attribute/Settings"
 	}
 }
 
@@ -2002,6 +2008,69 @@ function Build-PlannerSettings {
 	return $pl
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Chart design-time <Settings xsi:type="d4p1:Chart"> → объект chart. Генерик-движок:
+# рекурсивный захват поддерева d4p1; структуры (line/border/font/ML/области/серии)
+# детектируются по форме узла. Малые name-set'ы: ML-поля (даже ru-only/пустые → ML),
+# серии (всегда массив), attrs-узлы. Порядок ключей JSON = порядок XML (раундтрип).
+$CHART_ML_FIELDS = @{ 'title'=1;'lbFormat'=1;'lbpFormat'=1;'vsFormat'=1;'dtFormat'=1;'dataSourceDescription'=1;'labelFormat'=1;'text'=1 }
+$CHART_SERIES_FIELDS = @{ 'realSeriesData'=1;'realExSeriesData'=1;'realPointData'=1;'realDataItems'=1 }
+$CHART_ATTR_FIELDS = @{ 'gaugeQualityBands'=1 }
+function Conv-ChartScalar {
+	param([string]$v)
+	if ($v -eq 'true') { return $true }
+	if ($v -eq 'false') { return $false }
+	return $v
+}
+function Build-ChartNode {
+	param($n, [string]$name)
+	# ML-поле → строка/мапа/"" (даже ru-only форсим в ML на эмите по имени)
+	if ($CHART_ML_FIELDS.Contains($name)) {
+		$ml = Get-LangText $n
+		if ($null -eq $ml) { return '' } else { return $ml }
+	}
+	$kids = @($n.SelectNodes("*"))
+	if ($kids.Count -eq 0) {
+		# лист: attrs-only (шрифт/gaugeQualityBands) или текст
+		$attrs = @($n.Attributes | Where-Object { $_.Name -ne 'xmlns' -and -not $_.Name.StartsWith('xmlns:') -and $_.Name -ne 'xsi:type' -and $_.Name -ne 'xsi:nil' })
+		if ($attrs.Count -gt 0) {
+			$o = [ordered]@{}; foreach ($a in $attrs) { $o[$a.Name] = (Conv-ChartScalar $a.Value) }; return $o
+		}
+		return (Conv-ChartScalar $n.InnerText)
+	}
+	# line/border: дочерний v8ui:style (+ width[/gap])
+	$styleChild = $n.SelectSingleNode("*[local-name()='style']")
+	if ($styleChild) {
+		$o = [ordered]@{}
+		$w = $n.GetAttribute('width'); if ($w -ne '') { $o['width'] = [int]$w }
+		$g = $n.GetAttribute('gap'); if ($g -ne '') { $o['gap'] = ($g -eq 'true') }
+		$o['style'] = $styleChild.InnerText
+		return $o
+	}
+	# вложенный объект d4p1 (область/шкала/titleArea/серия): группируем детей по имени
+	$o = [ordered]@{}
+	foreach ($c in $kids) {
+		$ln = $c.LocalName
+		$val = Build-ChartNode $c $ln
+		if ($CHART_SERIES_FIELDS.Contains($ln)) {
+			if (-not $o.Contains($ln)) { $o[$ln] = New-Object System.Collections.ArrayList }
+			[void]$o[$ln].Add($val)
+		} elseif ($o.Contains($ln)) {
+			if ($o[$ln] -isnot [System.Collections.IList]) { $tmp = New-Object System.Collections.ArrayList; [void]$tmp.Add($o[$ln]); $o[$ln] = $tmp }
+			[void]$o[$ln].Add($val)
+		} else {
+			$o[$ln] = $val
+		}
+	}
+	# нормализуем ArrayList → @() для сериализации
+	foreach ($k in @($o.Keys)) { if ($o[$k] -is [System.Collections.ArrayList]) { $o[$k] = @($o[$k]) } }
+	return $o
+}
+function Build-ChartSettings {
+	param($setNode)
+	return (Build-ChartNode $setNode '')
+}
+
 # --- 5. Form-level assembly ---
 $dsl = [ordered]@{}
 
@@ -2136,6 +2205,10 @@ if ($attrsNode) {
 		# Planner design-time <Settings xsi:type="pl:Planner"> → объект planner (полный захват).
 		elseif ($setNode -and $setNode.GetAttribute("type", $NS_XSI) -match 'Planner$') {
 			$ao['planner'] = Build-PlannerSettings $setNode
+		}
+		# Chart design-time <Settings xsi:type="d4p1:Chart"> → объект chart (генерик-захват).
+		elseif ($setNode -and $setNode.GetAttribute("type", $NS_XSI) -match 'd4p1:Chart$') {
+			$ao['chart'] = Build-ChartSettings $setNode
 		}
 		if ((Get-Child $a 'MainAttribute') -eq 'true') { $ao['main'] = $true }
 		elseif ($suppressMainName -and $ao['name'] -eq $suppressMainName) { $ao['main'] = $false }

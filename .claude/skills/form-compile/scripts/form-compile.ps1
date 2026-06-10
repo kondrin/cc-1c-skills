@@ -1,4 +1,4 @@
-﻿# form-compile v1.105 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.106 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -3233,6 +3233,66 @@ function Emit-PlannerSettings {
 	X "$ind</Settings>"
 }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Chart design-time <Settings xsi:type="d4p1:Chart"> — генерик-эмиттер (зеркало
+# Build-ChartNode декомпилятора). Тип узла → форма XML: ML-поля (по имени), серии
+# (массив, повтор тега), line/border/font (по ключам), attrs-узлы (gaugeQualityBands),
+# иначе вложенный объект/скаляр. Порядок ключей = порядок эмиссии (раундтрип).
+$script:CHART_ML_FIELDS = @{ 'title'=1;'lbFormat'=1;'lbpFormat'=1;'vsFormat'=1;'dtFormat'=1;'dataSourceDescription'=1;'labelFormat'=1;'text'=1 }
+$script:CHART_ATTR_FIELDS = @{ 'gaugeQualityBands'=1 }
+$script:CHART_FONT_KEYS = @('ref','faceName','height','bold','italic','underline','strikeout','kind','scale')
+function Get-Keys { param($o) if ($o -is [System.Collections.IDictionary]) { return @($o.Keys) } else { return @($o.PSObject.Properties.Name) } }
+function Get-Prop { param($o, [string]$k) if ($o -is [System.Collections.IDictionary]) { return $o[$k] } else { $p = $o.PSObject.Properties[$k]; if ($p) { return $p.Value } else { return $null } } }
+function Emit-ChartNode {
+	param([string]$name, $val, [string]$ind)
+	if ($script:CHART_ML_FIELDS.Contains($name)) {
+		if ($null -eq $val -or "$val" -eq '') { X "$ind<d4p1:$name/>"; return }
+		X "$ind<d4p1:$name>"; Emit-MLItems -val $val -indent "$ind`t"; X "$ind</d4p1:$name>"; return
+	}
+	if (($val -is [System.Collections.IList]) -and ($val -isnot [string])) {
+		foreach ($e in $val) { Emit-ChartNode $name $e $ind }
+		return
+	}
+	if (($val -is [System.Management.Automation.PSCustomObject]) -or ($val -is [System.Collections.IDictionary])) {
+		$keys = Get-Keys $val
+		if ($script:CHART_ATTR_FIELDS.Contains($name)) {
+			$attrs = @(); foreach ($k in $keys) { $v = Get-Prop $val $k; if ($v -is [bool]) { $v = PL-Bool $v }; $attrs += "$k=`"$(Esc-Xml "$v")`"" }
+			X "$ind<d4p1:$name $($attrs -join ' ')/>"; return
+		}
+		if ($keys -contains 'gap') {
+			$w = Get-Prop $val 'width'; $g = Get-Prop $val 'gap'; $st = Get-Prop $val 'style'
+			X "$ind<d4p1:$name width=`"$w`" gap=`"$(PL-Bool $g)`">"
+			X "$ind`t<v8ui:style xsi:type=`"v8ui:ChartLineType`">$(Esc-Xml "$st")</v8ui:style>"
+			X "$ind</d4p1:$name>"; return
+		}
+		if (($keys -contains 'style') -and ($keys -contains 'width')) {
+			$w = Get-Prop $val 'width'; $st = Get-Prop $val 'style'
+			X "$ind<d4p1:$name width=`"$w`">"
+			X "$ind`t<v8ui:style xsi:type=`"v8ui:ControlBorderType`">$(Esc-Xml "$st")</v8ui:style>"
+			X "$ind</d4p1:$name>"; return
+		}
+		$isFont = $false; foreach ($fk in $script:CHART_FONT_KEYS) { if ($keys -contains $fk) { $isFont = $true; break } }
+		if ($isFont) {
+			$attrs = @(); foreach ($fk in $script:CHART_FONT_KEYS) { if ($keys -contains $fk) { $v = Get-Prop $val $fk; if ($v -is [bool]) { $v = PL-Bool $v }; $attrs += "$fk=`"$(Esc-Xml "$v")`"" } }
+			X "$ind<d4p1:$name $($attrs -join ' ')/>"; return
+		}
+		if (@($keys).Count -eq 0) { X "$ind<d4p1:$name/>"; return }
+		X "$ind<d4p1:$name>"
+		foreach ($k in $keys) { Emit-ChartNode $k (Get-Prop $val $k) "$ind`t" }
+		X "$ind</d4p1:$name>"
+		return
+	}
+	if ($null -eq $val -or "$val" -eq '') { X "$ind<d4p1:$name/>"; return }
+	if ($val -is [bool]) { X "$ind<d4p1:$name>$(PL-Bool $val)</d4p1:$name>"; return }
+	X "$ind<d4p1:$name>$(Esc-Xml "$val")</d4p1:$name>"
+}
+function Emit-ChartSettings {
+	param($chart, [string]$ind)
+	X "$ind<Settings xmlns:d4p1=`"$($script:CHART_NS)`" xsi:type=`"d4p1:Chart`">"
+	foreach ($k in (Get-Keys $chart)) { Emit-ChartNode $k (Get-Prop $chart $k) "$ind`t" }
+	X "$ind</Settings>"
+}
+
 function Emit-Appearance {
 	param($el, [string]$indent, [string]$profile = 'field')
 	if ($null -eq $el) { return }
@@ -4981,6 +5041,10 @@ function Emit-Attributes {
 		# Идёт сразу после <Type> (как valueType/DynamicList Settings — взаимоисключающи).
 		if ($attr.PSObject.Properties['planner'] -and $null -ne $attr.planner) {
 			Emit-PlannerSettings -pl $attr.planner -ind $inner
+		}
+		# Chart design-time <Settings xsi:type="d4p1:Chart"> (встроенный конфиг диаграммы).
+		if ($attr.PSObject.Properties['chart'] -and $null -ne $attr.chart) {
+			Emit-ChartSettings -chart $attr.chart -ind $inner
 		}
 
 		if ($attr.main -eq $true) {

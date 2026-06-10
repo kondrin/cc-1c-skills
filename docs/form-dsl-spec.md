@@ -834,6 +834,31 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `additionalColumns` | array | Доп. колонки табличных частей объекта: `[{ table: "Объект.ТабЧасть", columns: [<col>] }]`. У главного реквизита-объекта; `<col>` — та же грамматика, что у `columns`. Эмитятся в `<Columns>` после прямых колонок |
 | `settings` | object | Настройки динамического списка (только `type: "DynamicList"`) |
 | `planner` | object | Design-time конфигурация планировщика (только `type: "pl:Planner"`, `<Settings xsi:type="pl:Planner">`). См. ниже |
+| `chart` | object | Design-time конфигурация диаграммы (`<Settings xsi:type="d4p1:Chart">`). См. ниже |
+
+### chart — design-time конфигурация диаграммы
+
+Объект `chart` описывает встроенный конфиг поля-диаграммы (~127 свойств: тип, серии, легенда, заголовок, шкалы, цвета/шрифты, оси). Движок **генерик** — ключи = локальные имена тегов `d4p1:`, порядок ключей = порядок эмиссии; типы значений распознаются по форме (скаляр/линия/граница/шрифт/ML/область/массив-серий). Раундтрип любой формы **бит-в-бит**.
+
+**Авторинг диаграммы с нуля:** платформа пишет ВСЕ ~127 свойств всегда, поэтому удобнее всего взять рабочую диаграмму за основу — `form-decompile` существующей формы-диаграммы выдаёт готовый `chart`-объект, в котором правишь смысловое ядро: `chartType` (Line/Pie/Bar/Histogram/Column/Area/…), `realSeriesData` (серии: `text`/`color`/`line`/`marker`), `isShowTitle`+`title`, `isShowLegend`+`legendPlacement`, `paletteKind`, базовые цвета (`bkgColor`/`labelsColor`/…). Остальное — оформительские дефолты.
+
+Формы значений: цвета verbatim (`auto`/`style:X`/`#hex`/`web:`); `line` = `{width, gap, style}` (`v8ui:ChartLineType`); `border` = `{width, style}` (`v8ui:ControlBorderType`); `font` = `{kind:"AutoFont"}`/атрибуты; ML-поля (`title`/`vsFormat`/`lbFormat`/`labelFormat`/серия `text`/…) — строка или `{ru,en}`; области (`elementsChart`/`elementsLegend`/`elementsTitle`) = `{left,right,top,bottom}`; серии (`realSeriesData`/`realExSeriesData`) — массивы объектов. **Расширяемость:** любое из ~127 свойств переопределяется по каноничному имени.
+
+```json
+{ "name": "Диаграмма", "type": "d5p1:Chart", "chart": {
+  "chartType": "Line",
+  "isSeriesDesign": true, "realSeriesCount": "2",
+  "realSeriesData": [
+    { "id": "1", "color": "auto", "line": {"width":2,"gap":false,"style":"Solid"},
+      "marker": "Auto", "text": "Серия 1", "strIsChanged": false, "isExpand": false,
+      "isIndicator": false, "colorPriority": false }
+  ],
+  "isShowTitle": true, "title": "Продажи", "isShowLegend": true, "legendPlacement": "Bottom",
+  "paletteKind": "Auto"
+} }
+```
+
+> **Ограничение Phase 2:** диаграммы с **точками/осями** (`realPointData`/`realDataItems`, заполненные `valuesAxis`/`pointsAxis`) несут типизированные значения (`xsi:type`), `xsi:nil` и ML с префиксом `d4p1:` — генерик-движок их не сохраняет → декомпилятор делает честный fail-ring3 на таких формах (редкий вариант). Частые дашборд-диаграммы (серии/легенда/оформление/шкалы) поддержаны полностью. `GanttChart` (`d4p1:GanttChart`) — отдельная фаза.
 
 ### planner — design-time конфигурация планировщика
 

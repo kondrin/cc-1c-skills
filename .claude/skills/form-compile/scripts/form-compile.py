@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.105 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.106 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -2939,6 +2939,71 @@ def emit_planner_settings(lines, pl, ind):
     lines.append(f'{ind}</Settings>')
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Chart design-time <Settings xsi:type="d4p1:Chart"> — генерик-эмиттер (зеркало
+# Build-ChartNode декомпилятора + Emit-ChartNode ps1).
+CHART_ML_FIELDS = {'title', 'lbFormat', 'lbpFormat', 'vsFormat', 'dtFormat', 'dataSourceDescription', 'labelFormat', 'text'}
+CHART_ATTR_FIELDS = {'gaugeQualityBands'}
+CHART_FONT_KEYS = ('ref', 'faceName', 'height', 'bold', 'italic', 'underline', 'strikeout', 'kind', 'scale')
+
+
+def emit_chart_node(lines, name, val, ind):
+    if name in CHART_ML_FIELDS:
+        if val is None or str(val) == '':
+            lines.append(f'{ind}<d4p1:{name}/>')
+            return
+        lines.append(f'{ind}<d4p1:{name}>')
+        emit_ml_items(lines, f'{ind}\t', val)
+        lines.append(f'{ind}</d4p1:{name}>')
+        return
+    if isinstance(val, list):
+        for e in val:
+            emit_chart_node(lines, name, e, ind)
+        return
+    if isinstance(val, dict):
+        keys = list(val.keys())
+        if name in CHART_ATTR_FIELDS:
+            attrs = ' '.join(f'{k}="{esc_xml(_pl_bool(val[k]) if isinstance(val[k], bool) else str(val[k]))}"' for k in keys)
+            lines.append(f'{ind}<d4p1:{name} {attrs}/>')
+            return
+        if 'gap' in val:
+            lines.append(f'{ind}<d4p1:{name} width="{val.get("width")}" gap="{_pl_bool(val.get("gap"))}">')
+            lines.append(f'{ind}\t<v8ui:style xsi:type="v8ui:ChartLineType">{esc_xml(str(val.get("style")))}</v8ui:style>')
+            lines.append(f'{ind}</d4p1:{name}>')
+            return
+        if 'style' in val and 'width' in val:
+            lines.append(f'{ind}<d4p1:{name} width="{val.get("width")}">')
+            lines.append(f'{ind}\t<v8ui:style xsi:type="v8ui:ControlBorderType">{esc_xml(str(val.get("style")))}</v8ui:style>')
+            lines.append(f'{ind}</d4p1:{name}>')
+            return
+        if any(fk in val for fk in CHART_FONT_KEYS):
+            attrs = ' '.join(f'{fk}="{esc_xml(_pl_bool(val[fk]) if isinstance(val[fk], bool) else str(val[fk]))}"' for fk in CHART_FONT_KEYS if fk in val)
+            lines.append(f'{ind}<d4p1:{name} {attrs}/>')
+            return
+        if not keys:
+            lines.append(f'{ind}<d4p1:{name}/>')
+            return
+        lines.append(f'{ind}<d4p1:{name}>')
+        for k in keys:
+            emit_chart_node(lines, k, val[k], f'{ind}\t')
+        lines.append(f'{ind}</d4p1:{name}>')
+        return
+    if val is None or str(val) == '':
+        lines.append(f'{ind}<d4p1:{name}/>')
+        return
+    if isinstance(val, bool):
+        lines.append(f'{ind}<d4p1:{name}>{_pl_bool(val)}</d4p1:{name}>')
+        return
+    lines.append(f'{ind}<d4p1:{name}>{esc_xml(str(val))}</d4p1:{name}>')
+
+
+def emit_chart_settings(lines, chart, ind):
+    lines.append(f'{ind}<Settings xmlns:d4p1="{CHART_NS}" xsi:type="d4p1:Chart">')
+    for k in list(chart.keys()):
+        emit_chart_node(lines, k, chart[k], f'{ind}\t')
+    lines.append(f'{ind}</Settings>')
+
+
 def emit_appearance(lines, el, indent, profile='field'):
     if not isinstance(el, dict):
         return
@@ -4709,6 +4774,9 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
         # Planner design-time <Settings xsi:type="pl:Planner"> (встроенный конфиг планировщика).
         if attr.get('planner') is not None:
             emit_planner_settings(lines, attr['planner'], inner)
+        # Chart design-time <Settings xsi:type="d4p1:Chart"> (встроенный конфиг диаграммы).
+        if attr.get('chart') is not None:
+            emit_chart_settings(lines, attr['chart'], inner)
 
         if attr.get('main') is True:
             lines.append(f'{inner}<MainAttribute>true</MainAttribute>')
