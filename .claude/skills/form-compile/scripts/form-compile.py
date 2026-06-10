@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.104 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.105 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -2740,6 +2740,31 @@ def emit_planner_color(lines, tag, o, key, ind):
     lines.append(f'{ind}<pl:{tag}>{esc_xml(str(_pl_get(o, key, "auto")))}</pl:{tag}>')
 
 
+def emit_planner_text(lines, tag, v, ind):
+    if v is None or str(v) == '':
+        lines.append(f'{ind}<pl:{tag}/>')
+    else:
+        lines.append(f'{ind}<pl:{tag}>{esc_xml(str(v))}</pl:{tag}>')
+
+
+_PLANNER_REF_RE = re.compile(
+    r'^(Enum|Catalog|Document|ChartOfAccounts|ChartOfCalculationTypes|ChartOfCharacteristicTypes|ExchangePlan|BusinessProcess|Task)\.'
+    r'|\.EnumValue\.|EmptyRef$'
+    r'|^(Перечисление|Справочник|Документ|ПланСчетов|ПланВидовХарактеристик|ПланВидовРасчета|ПланОбмена|БизнесПроцесс|Задача)\.')
+
+
+def test_planner_ref(v):
+    return bool(_PLANNER_REF_RE.search(str(v)))
+
+
+def emit_planner_value(lines, v, ind):
+    if v is None or str(v) == '':
+        lines.append(f'{ind}<pl:value xsi:nil="true"/>')
+        return
+    t = 'xr:DesignTimeRef' if test_planner_ref(v) else 'xs:string'
+    lines.append(f'{ind}<pl:value xsi:type="{t}">{esc_xml(str(v))}</pl:value>')
+
+
 def emit_planner_font(lines, o, ind):
     f = _pl_get(o, 'font')
     if f is None:
@@ -2814,17 +2839,9 @@ def emit_planner_timescale(lines, ts, ind):
 def emit_planner_item(lines, it, ind):
     lines.append(f'{ind}<pl:item>')
     ii = f'{ind}\t'
-    val = _pl_get(it, 'value')
-    if val is None:
-        lines.append(f'{ii}<pl:value xsi:nil="true"/>')
-    else:
-        lines.append(f'{ii}<pl:value xsi:type="xs:string">{esc_xml(str(val))}</pl:value>')
-    lines.append(f'{ii}<pl:text>{esc_xml(str(_pl_get(it, "text", "")))}</pl:text>')
-    tt = _pl_get(it, 'tooltip', '')
-    if str(tt) == '':
-        lines.append(f'{ii}<pl:tooltip/>')
-    else:
-        lines.append(f'{ii}<pl:tooltip>{esc_xml(str(tt))}</pl:tooltip>')
+    emit_planner_value(lines, _pl_get(it, 'value'), ii)
+    emit_planner_text(lines, 'text', _pl_get(it, 'text', ''), ii)
+    emit_planner_text(lines, 'tooltip', _pl_get(it, 'tooltip', ''), ii)
     lines.append(f'{ii}<pl:begin>{_pl_get(it, "begin", "0001-01-01T00:00:00")}</pl:begin>')
     lines.append(f'{ii}<pl:end>{_pl_get(it, "end", "0001-01-01T00:00:00")}</pl:end>')
     emit_planner_color(lines, 'borderColor', it, 'borderColor', ii)
@@ -2845,11 +2862,44 @@ def emit_planner_item(lines, it, ind):
     lines.append(f'{ind}</pl:item>')
 
 
+def emit_planner_dim_element(lines, el, ind):
+    lines.append(f'{ind}<pl:item>')
+    ii = f'{ind}\t'
+    emit_planner_value(lines, _pl_get(el, 'value'), ii)
+    emit_planner_text(lines, 'text', _pl_get(el, 'text', ''), ii)
+    emit_planner_color(lines, 'borderColor', el, 'borderColor', ii)
+    emit_planner_color(lines, 'backColor', el, 'backColor', ii)
+    emit_planner_color(lines, 'textColor', el, 'textColor', ii)
+    emit_planner_font(lines, el, ii)
+    for sub in _pl_get(el, 'elements', []):
+        emit_planner_dim_element(lines, sub, ii)
+    lines.append(f'{ii}<pl:showOnlySubordinatesAreas>{_pl_bool(_pl_get(el, "showOnlySubordinatesAreas", True))}</pl:showOnlySubordinatesAreas>')
+    lines.append(f'{ii}<pl:textFormatted>{_pl_bool(_pl_get(el, "textFormatted", False))}</pl:textFormatted>')
+    lines.append(f'{ind}</pl:item>')
+
+
+def emit_planner_dimension(lines, d, ind):
+    lines.append(f'{ind}<pl:dimension>')
+    di = f'{ind}\t'
+    emit_planner_value(lines, _pl_get(d, 'value'), di)
+    emit_planner_text(lines, 'text', _pl_get(d, 'text', ''), di)
+    emit_planner_color(lines, 'borderColor', d, 'borderColor', di)
+    emit_planner_color(lines, 'backColor', d, 'backColor', di)
+    emit_planner_color(lines, 'textColor', d, 'textColor', di)
+    emit_planner_font(lines, d, di)
+    for el in _pl_get(d, 'elements', []):
+        emit_planner_dim_element(lines, el, di)
+    lines.append(f'{di}<pl:textFormatted>{_pl_bool(_pl_get(d, "textFormatted", False))}</pl:textFormatted>')
+    lines.append(f'{ind}</pl:dimension>')
+
+
 def emit_planner_settings(lines, pl, ind):
     lines.append(f'{ind}<Settings xmlns:pl="{PLANNER_NS}" xsi:type="pl:Planner">')
     si = f'{ind}\t'
     for it in _pl_get(pl, 'items', []):
         emit_planner_item(lines, it, si)
+    for d in _pl_get(pl, 'dimensions', []):
+        emit_planner_dimension(lines, d, si)
     emit_planner_color(lines, 'borderColor', pl, 'borderColor', si)
     emit_planner_color(lines, 'backColor', pl, 'backColor', si)
     emit_planner_color(lines, 'textColor', pl, 'textColor', si)

@@ -1,4 +1,4 @@
-﻿# form-compile v1.104 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.105 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -3048,6 +3048,27 @@ function Emit-PlannerColor {
 	param([string]$tag, $o, [string]$key, [string]$ind)
 	X "$ind<pl:$tag>$(Esc-Xml "$(PL-Get $o $key 'auto')")</pl:$tag>"
 }
+# <pl:text>/<pl:tooltip>… — пустое → самозакрывающийся тег (как в выгрузке платформы).
+function Emit-PlannerText {
+	param([string]$tag, $v, [string]$ind)
+	if ([string]::IsNullOrEmpty("$v")) { X "$ind<pl:$tag/>" }
+	else { X "$ind<pl:$tag>$(Esc-Xml "$v")</pl:$tag>" }
+}
+# Признак ссылочного значения (объект разреза/элемент-ссылка) → xsi:type="xr:DesignTimeRef";
+# иначе xs:string. Покрывает англ. (Enum.X.EnumValue.Y) и рус. (Справочник.X) метатипы.
+function Test-PlannerRef {
+	param([string]$v)
+	return ($v -match '^(Enum|Catalog|Document|ChartOfAccounts|ChartOfCalculationTypes|ChartOfCharacteristicTypes|ExchangePlan|BusinessProcess|Task)\.' -or `
+		$v -match '\.EnumValue\.' -or $v -match 'EmptyRef$' -or `
+		$v -match '^(Перечисление|Справочник|Документ|ПланСчетов|ПланВидовХарактеристик|ПланВидовРасчета|ПланОбмена|БизнесПроцесс|Задача)\.')
+}
+# <pl:value> — nil (нет значения) / xr:DesignTimeRef (ссылка) / xs:string (строка/прочее).
+function Emit-PlannerValue {
+	param($v, [string]$ind)
+	if ($null -eq $v -or "$v" -eq '') { X "$ind<pl:value xsi:nil=`"true`"/>"; return }
+	$t = if (Test-PlannerRef "$v") { 'xr:DesignTimeRef' } else { 'xs:string' }
+	X "$ind<pl:value xsi:type=`"$t`">$(Esc-Xml "$v")</pl:value>"
+}
 function Emit-PlannerFont {
 	param($o, [string]$ind)
 	$f = PL-Get $o 'font' $null
@@ -3114,12 +3135,9 @@ function Emit-PlannerItem {
 	param($it, [string]$ind)
 	X "$ind<pl:item>"
 	$ii = "$ind`t"
-	$val = PL-Get $it 'value' $null
-	if ($null -eq $val) { X "$ii<pl:value xsi:nil=`"true`"/>" }
-	else { X "$ii<pl:value xsi:type=`"xs:string`">$(Esc-Xml "$val")</pl:value>" }
-	X "$ii<pl:text>$(Esc-Xml "$(PL-Get $it 'text' '')")</pl:text>"
-	$tt = PL-Get $it 'tooltip' ''
-	if ("$tt" -eq '') { X "$ii<pl:tooltip/>" } else { X "$ii<pl:tooltip>$(Esc-Xml "$tt")</pl:tooltip>" }
+	Emit-PlannerValue (PL-Get $it 'value' $null) $ii
+	Emit-PlannerText 'text' (PL-Get $it 'text' '') $ii
+	Emit-PlannerText 'tooltip' (PL-Get $it 'tooltip' '') $ii
 	X "$ii<pl:begin>$(PL-Get $it 'begin' '0001-01-01T00:00:00')</pl:begin>"
 	X "$ii<pl:end>$(PL-Get $it 'end' '0001-01-01T00:00:00')</pl:end>"
 	Emit-PlannerColor 'borderColor' $it 'borderColor' $ii
@@ -3137,11 +3155,45 @@ function Emit-PlannerItem {
 	X "$ii<pl:editMode>$(Esc-Xml "$(PL-Get $it 'editMode' 'EnableEdit')")</pl:editMode>"
 	X "$ind</pl:item>"
 }
+# Элемент измерения (<pl:item> внутри <pl:dimension>) — рекурсивен: может нести вложенные
+# элементы (UI: колонка «Элементы» у элемента). Порядок: value, text, цвета, font,
+# вложенные элементы, showOnlySubordinatesAreas, textFormatted.
+function Emit-PlannerDimElement {
+	param($el, [string]$ind)
+	X "$ind<pl:item>"
+	$ii = "$ind`t"
+	Emit-PlannerValue (PL-Get $el 'value' $null) $ii
+	Emit-PlannerText 'text' (PL-Get $el 'text' '') $ii
+	Emit-PlannerColor 'borderColor' $el 'borderColor' $ii
+	Emit-PlannerColor 'backColor'   $el 'backColor'   $ii
+	Emit-PlannerColor 'textColor'   $el 'textColor'   $ii
+	Emit-PlannerFont $el $ii
+	foreach ($sub in @(PL-Get $el 'elements' @())) { Emit-PlannerDimElement $sub $ii }
+	X "$ii<pl:showOnlySubordinatesAreas>$(PL-Bool (PL-Get $el 'showOnlySubordinatesAreas' $true))</pl:showOnlySubordinatesAreas>"
+	X "$ii<pl:textFormatted>$(PL-Bool (PL-Get $el 'textFormatted' $false))</pl:textFormatted>"
+	X "$ind</pl:item>"
+}
+# Измерение планировщика (<pl:dimension>) — объект разреза + его элементы.
+function Emit-PlannerDimension {
+	param($d, [string]$ind)
+	X "$ind<pl:dimension>"
+	$di = "$ind`t"
+	Emit-PlannerValue (PL-Get $d 'value' $null) $di
+	Emit-PlannerText 'text' (PL-Get $d 'text' '') $di
+	Emit-PlannerColor 'borderColor' $d 'borderColor' $di
+	Emit-PlannerColor 'backColor'   $d 'backColor'   $di
+	Emit-PlannerColor 'textColor'   $d 'textColor'   $di
+	Emit-PlannerFont $d $di
+	foreach ($el in @(PL-Get $d 'elements' @())) { Emit-PlannerDimElement $el $di }
+	X "$di<pl:textFormatted>$(PL-Bool (PL-Get $d 'textFormatted' $false))</pl:textFormatted>"
+	X "$ind</pl:dimension>"
+}
 function Emit-PlannerSettings {
 	param($pl, [string]$ind)
 	X "$ind<Settings xmlns:pl=`"$($script:PLANNER_NS)`" xsi:type=`"pl:Planner`">"
 	$si = "$ind`t"
 	foreach ($it in @(PL-Get $pl 'items' @())) { Emit-PlannerItem $it $si }
+	foreach ($d in @(PL-Get $pl 'dimensions' @())) { Emit-PlannerDimension $d $si }
 	Emit-PlannerColor 'borderColor' $pl 'borderColor' $si
 	Emit-PlannerColor 'backColor'   $pl 'backColor'   $si
 	Emit-PlannerColor 'textColor'   $pl 'textColor'   $si

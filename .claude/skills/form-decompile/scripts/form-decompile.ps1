@@ -1,4 +1,4 @@
-﻿# form-decompile v0.80 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.81 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1838,6 +1838,13 @@ function Decompile-Element {
 # Полный захват каждого поля (раундтрип бит-в-бит); зеркало Emit-PlannerSettings.
 function PLD-Bool { param($v) if ($null -eq $v) { return $null } return ($v -eq 'true') }
 function PLD-Int  { param($v) if ($null -eq $v) { return $null } return [int]$v }
+# <pl:value> → текст (тип xr:DesignTimeRef/xs:string выводится компилятором из вида значения); nil → $null.
+function Get-PlannerValue {
+	param($node)
+	if (-not $node) { return $null }
+	if ($node.GetAttribute('nil', $NS_XSI) -eq 'true') { return $null }
+	if ($node.InnerText) { return $node.InnerText } else { return $null }
+}
 function Build-PlannerFont {
 	param($node)
 	if (-not $node) { return $null }
@@ -1875,6 +1882,37 @@ function Build-PlannerItem {
 	$o['textFormatted'] = (PLD-Bool (Get-Child $itn 'textFormatted'))
 	$brd = Build-PlannerBorder ($itn.SelectSingleNode("*[local-name()='border']")); if ($brd) { $o['border'] = $brd }
 	$o['editMode'] = (Get-Child $itn 'editMode')
+	return $o
+}
+function Build-PlannerDimElement {
+	param($eln)
+	$o = [ordered]@{}
+	$v = Get-PlannerValue ($eln.SelectSingleNode("*[local-name()='value']")); if ($null -ne $v) { $o['value'] = $v }
+	$o['text'] = (Get-Child $eln 'text')
+	$o['borderColor'] = (Get-Child $eln 'borderColor')
+	$o['backColor'] = (Get-Child $eln 'backColor')
+	$o['textColor'] = (Get-Child $eln 'textColor')
+	$fnt = Build-PlannerFont ($eln.SelectSingleNode("*[local-name()='font']")); if ($fnt) { $o['font'] = $fnt }
+	$subs = New-Object System.Collections.ArrayList
+	foreach ($s in @($eln.SelectNodes("*[local-name()='item']"))) { [void]$subs.Add((Build-PlannerDimElement $s)) }
+	if ($subs.Count -gt 0) { $o['elements'] = @($subs) }
+	$sos = Get-Child $eln 'showOnlySubordinatesAreas'; if ($null -ne $sos) { $o['showOnlySubordinatesAreas'] = ($sos -eq 'true') }
+	$o['textFormatted'] = (PLD-Bool (Get-Child $eln 'textFormatted'))
+	return $o
+}
+function Build-PlannerDimension {
+	param($dn)
+	$o = [ordered]@{}
+	$v = Get-PlannerValue ($dn.SelectSingleNode("*[local-name()='value']")); if ($null -ne $v) { $o['value'] = $v }
+	$o['text'] = (Get-Child $dn 'text')
+	$o['borderColor'] = (Get-Child $dn 'borderColor')
+	$o['backColor'] = (Get-Child $dn 'backColor')
+	$o['textColor'] = (Get-Child $dn 'textColor')
+	$fnt = Build-PlannerFont ($dn.SelectSingleNode("*[local-name()='font']")); if ($fnt) { $o['font'] = $fnt }
+	$els = New-Object System.Collections.ArrayList
+	foreach ($e in @($dn.SelectNodes("*[local-name()='item']"))) { [void]$els.Add((Build-PlannerDimElement $e)) }
+	if ($els.Count -gt 0) { $o['elements'] = @($els) }
+	$o['textFormatted'] = (PLD-Bool (Get-Child $dn 'textFormatted'))
 	return $o
 }
 function Build-PlannerLevel {
@@ -1923,6 +1961,12 @@ function Build-PlannerSettings {
 		$items = New-Object System.Collections.ArrayList
 		foreach ($itn in $itemNodes) { [void]$items.Add((Build-PlannerItem $itn)) }
 		$pl['items'] = @($items)
+	}
+	$dimNodes = @($setNode.SelectNodes("*[local-name()='dimension']"))
+	if ($dimNodes.Count -gt 0) {
+		$dims = New-Object System.Collections.ArrayList
+		foreach ($dn in $dimNodes) { [void]$dims.Add((Build-PlannerDimension $dn)) }
+		$pl['dimensions'] = @($dims)
 	}
 	$pl['borderColor'] = (Get-Child $setNode 'borderColor')
 	$pl['backColor'] = (Get-Child $setNode 'backColor')

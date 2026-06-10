@@ -171,6 +171,25 @@
 					</pl:border>
 					<pl:editMode>EnableEdit</pl:editMode>
 				</pl:item>
+				<pl:dimension>
+					<pl:value xsi:nil="true"/>
+					<pl:text>Измерение</pl:text>
+					<pl:borderColor>auto</pl:borderColor>
+					<pl:backColor>auto</pl:backColor>
+					<pl:textColor>auto</pl:textColor>
+					<pl:font kind="AutoFont"/>
+					<pl:item>
+						<pl:value xsi:type="xs:string">А</pl:value>
+						<pl:text>Элемент А</pl:text>
+						<pl:borderColor>auto</pl:borderColor>
+						<pl:backColor>auto</pl:backColor>
+						<pl:textColor>auto</pl:textColor>
+						<pl:font kind="AutoFont"/>
+						<pl:showOnlySubordinatesAreas>true</pl:showOnlySubordinatesAreas>
+						<pl:textFormatted>false</pl:textFormatted>
+					</pl:item>
+					<pl:textFormatted>false</pl:textFormatted>
+				</pl:dimension>
 				<pl:borderColor>auto</pl:borderColor>
 				<pl:backColor>auto</pl:backColor>
 				<pl:textColor>auto</pl:textColor>

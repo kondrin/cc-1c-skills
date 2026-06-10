@@ -852,6 +852,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | Ключ planner | Тип | Назначение |
 |---|---|---|
 | `items` | array | Элементы планировщика (`<pl:item>`): `value`(nil по умолч.)/`text`/`tooltip`/`begin`/`end`/`borderColor`/`backColor`/`textColor`/`font`/`replacementDate`/`deleted`/`id`(авто-GUID)/`textFormatted`/`border`/`editMode` |
+| `dimensions` | array | Измерения планировщика (`<pl:dimension>`, «Измерения» в конфигураторе): `value` (объект разреза — ссылка `Enum.X.EnumValue.Y`/`Справочник.X`, опускается → nil)/`text` (заголовок)/`borderColor`/`backColor`/`textColor`/`font`/`elements`/`textFormatted`. `elements` — элементы измерения (рекурсивны, могут нести вложенные `elements`): `value`/`text`/цвета/`font`/`showOnlySubordinatesAreas`(bool)/`textFormatted`. Тип `value` авто: ссылочный вид → `xsi:type="xr:DesignTimeRef"`, иначе `xs:string` |
 | `borderColor`/`backColor`/`textColor`/`lineColor` | color | Цвета планировщика (умолч. `auto`) |
 | `font` | font | Шрифт (умолч. `{kind:"AutoFont"}`) |
 | `beginOfRepresentationPeriod`/`endOfRepresentationPeriod` | dateTime | Период представления |
@@ -866,7 +867,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `minColumnWidth`/`minRowHeight` | int | Минимальные размеры |
 | `border` | border | Рамка планировщика (`{ width, style }`) |
 
-> **Ограничение Phase 1:** `dimensions` (измерения планировщика) и `item.dimensionValues` пока всегда пустые (захват только пустого блока). Конфиг Chart/GanttChart (`d4p1:*`) — отдельная фаза.
+> **Ограничение Phase 1:** `item.dimensionValues` (привязка элемента расписания к элементам измерений) пока всегда пустой (захват только пустого блока). Сами измерения (`dimensions`) поддержаны. Конфиг Chart/GanttChart (`d4p1:*`) — отдельная фаза.
 
 ### settings — динамический список
 
