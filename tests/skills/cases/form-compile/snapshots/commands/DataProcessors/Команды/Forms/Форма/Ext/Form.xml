@@ -88,6 +88,11 @@
 			<Action>ВыполнитьОбработка</Action>
 			<ModifiesSavedData>true</ModifiesSavedData>
 			<Shortcut>Ctrl+Enter</Shortcut>
+			<Picture>
+				<xr:Ref>StdPicture.ExecuteTask</xr:Ref>
+				<xr:LoadTransparent>true</xr:LoadTransparent>
+				<xr:TransparentPixel x="1" y="1"/>
+			</Picture>
 		</Command>
 	</Commands>
 	<CommandInterface>

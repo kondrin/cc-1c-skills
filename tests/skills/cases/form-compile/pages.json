@@ -18,10 +18,10 @@
     "properties": { "autoTitle": false },
     "elements": [
       { "pages": "СтраницыМастера", "pagesRepresentation": "None", "tooltip": "Страницы мастера настройки", "children": [
-        { "page": "Шаг1", "title": "", "showTitle": false, "children": [
+        { "page": "Шаг1", "title": "", "showTitle": false, "picture": "StdPicture.ExecuteTask", "children": [
           { "input": "Параметр1", "path": "Параметр1" }
         ]},
-        { "page": "Шаг2", "title": "Результат", "titleDataPath": "Итог", "tooltip": "Шаг \"Результат\"", "group": "horizontalIfPossible", "children": [
+        { "page": "Шаг2", "title": "Результат", "titleDataPath": "Итог", "tooltip": "Шаг \"Результат\"", "group": "horizontalIfPossible", "picture": { "src": "StdPicture.FilterCriterion", "loadTransparent": true, "transparentPixel": { "x": 2, "y": 4 } }, "children": [
           { "input": "Итог", "path": "Итог", "readOnly": true }
         ]}
       ]},

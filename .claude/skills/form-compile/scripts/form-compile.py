@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.111 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.112 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -2577,21 +2577,30 @@ def emit_common_element_props(lines, el, indent):
 
 
 def emit_picture_ref(lines, val, pic_tag, indent):
-    """Картинка-ссылка с прозрачностью (HeaderPicture/FooterPicture/ValuesPicture).
+    """Картинка-ссылка с прозрачностью (HeaderPicture/FooterPicture/ValuesPicture/Page Picture).
     Платформа ВСЕГДА эмитит <xr:LoadTransparent> → пишем всегда (false по умолчанию).
-    Значение: скаляр (Ref) ИЛИ объект {src, loadTransparent}."""
+    Значение: скаляр (Ref) ИЛИ объект {src, loadTransparent, transparentPixel}.
+    src с префиксом "abs:" → встроенная картинка <xr:Abs>; иначе <xr:Ref>."""
     if not val:
         return
+    tpx = None
     if isinstance(val, str):
         src, lt = val, False
     else:
         src = val.get('src')
         lt = val.get('loadTransparent') is True
+        tpx = val.get('transparentPixel')
     if not src:
         return
+    src_str = str(src)
     lines.append(f"{indent}<{pic_tag}>")
-    lines.append(f"{indent}\t<xr:Ref>{src}</xr:Ref>")
+    if src_str.startswith('abs:'):
+        lines.append(f"{indent}\t<xr:Abs>{esc_xml(src_str[4:])}</xr:Abs>")
+    else:
+        lines.append(f"{indent}\t<xr:Ref>{esc_xml(src_str)}</xr:Ref>")
     lines.append(f'{indent}\t<xr:LoadTransparent>{"true" if lt else "false"}</xr:LoadTransparent>')
+    if tpx:
+        lines.append(f'{indent}\t<xr:TransparentPixel x="{tpx.get("x")}" y="{tpx.get("y")}"/>')
     lines.append(f"{indent}</{pic_tag}>")
 
 
@@ -2611,19 +2620,27 @@ def emit_command_picture(lines, pic, elem_lt, indent):
     if not pic:
         return
     lt = None
+    tpx = None
     if isinstance(pic, str):
         src = pic
     else:
         src = pic.get('src')
         if pic.get('loadTransparent') is not None:
             lt = bool(pic.get('loadTransparent'))
+        tpx = pic.get('transparentPixel')
     if not src:
         return
     if lt is None and elem_lt is not None:
         lt = bool(elem_lt)
+    src_str = str(src)
     lines.append(f'{indent}<Picture>')
-    lines.append(f'{indent}\t<xr:Ref>{src}</xr:Ref>')
+    if src_str.startswith('abs:'):
+        lines.append(f'{indent}\t<xr:Abs>{esc_xml(src_str[4:])}</xr:Abs>')
+    else:
+        lines.append(f'{indent}\t<xr:Ref>{esc_xml(src_str)}</xr:Ref>')
     lines.append(f'{indent}\t<xr:LoadTransparent>{"false" if lt is False else "true"}</xr:LoadTransparent>')
+    if tpx:
+        lines.append(f'{indent}\t<xr:TransparentPixel x="{tpx.get("x")}" y="{tpx.get("y")}"/>')
     lines.append(f'{indent}</Picture>')
 
 
@@ -3954,15 +3971,8 @@ def emit_table(lines, el, name, eid, indent):
         lines.append(f'{inner}<EnableDrag>{"true" if el["enableDrag"] else "false"}</EnableDrag>')
     if el.get('rowPictureDataPath'):
         lines.append(f'{inner}<RowPictureDataPath>{el["rowPictureDataPath"]}</RowPictureDataPath>')
-    if el.get('rowsPicture'):
-        # Строка = Ref (LoadTransparent дефолт false); объект {src, loadTransparent} → факт. значение
-        rp = el['rowsPicture']
-        rp_src = rp if isinstance(rp, str) else rp.get('src')
-        rp_lt = 'true' if (not isinstance(rp, str) and rp.get('loadTransparent') is True) else 'false'
-        lines.append(f'{inner}<RowsPicture>')
-        lines.append(f'{inner}\t<xr:Ref>{rp_src}</xr:Ref>')
-        lines.append(f'{inner}\t<xr:LoadTransparent>{rp_lt}</xr:LoadTransparent>')
-        lines.append(f'{inner}</RowsPicture>')
+    # RowsPicture — та же конвенция, что ValuesPicture (дефолт LoadTransparent=false; abs/TransparentPixel)
+    emit_picture_ref(lines, el.get('rowsPicture'), 'RowsPicture', inner)
     # Блок свойств дин-список-таблицы (помечена эвристикой)
     if el.get('_dynList'):
         emit_dynlist_table_block(lines, el, inner)
@@ -4042,6 +4052,10 @@ def emit_page(lines, el, name, eid, indent):
 
     emit_title(lines, el, name, inner, auto=True)
     emit_common_flags(lines, el, inner)
+
+    # Картинка страницы (иконка вкладки): после Title/флагов, перед Group (порядок XSD).
+    # Конвенция как у ValuesPicture (дефолт LoadTransparent=false): скаляр-Ref/'abs:X' или объект.
+    emit_picture_ref(lines, el.get('picture'), 'Picture', inner)
 
     if el.get('group'):
         orientation_map = {

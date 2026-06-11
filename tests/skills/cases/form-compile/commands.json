@@ -28,7 +28,7 @@
       { "name": "Результат", "type": "string" }
     ],
     "commands": [
-      { "name": "Выполнить", "action": "ВыполнитьОбработка", "shortcut": "Ctrl+Enter", "use": false, "modifiesSavedData": true }
+      { "name": "Выполнить", "action": "ВыполнитьОбработка", "shortcut": "Ctrl+Enter", "use": false, "modifiesSavedData": true, "picture": { "src": "StdPicture.ExecuteTask", "transparentPixel": { "x": 1, "y": 1 } } }
     ],
     "commandInterface": {
       "commandBar": {

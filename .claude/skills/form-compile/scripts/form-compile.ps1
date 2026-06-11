@@ -1,4 +1,4 @@
-﻿# form-compile v1.111 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.112 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2822,19 +2822,23 @@ function Emit-CommonElementProps {
 	if ($el.headerHorizontalAlign) { X "$indent<HeaderHorizontalAlign>$($el.headerHorizontalAlign)</HeaderHorizontalAlign>" }
 }
 
-# Картинка-ссылка с прозрачностью (HeaderPicture/FooterPicture/ValuesPicture).
+# Картинка-ссылка с прозрачностью (HeaderPicture/FooterPicture/ValuesPicture/Page Picture).
 # Платформа ВСЕГДА эмитит <xr:LoadTransparent> → пишем всегда (false по умолчанию).
-# Значение: скаляр (Ref) ИЛИ объект {src, loadTransparent}.
+# Значение: скаляр (Ref) ИЛИ объект {src, loadTransparent, transparentPixel}.
+# src с префиксом "abs:" → встроенная картинка <xr:Abs>; иначе именованная/стилевая <xr:Ref>.
 function Emit-PictureRef {
 	param($val, [string]$picTag, [string]$indent)
 	if (-not $val) { return }
-	$src = $null; $lt = $false
+	$src = $null; $lt = $false; $tpx = $null
 	if ($val -is [string]) { $src = $val }
-	else { $src = $val.src; if ($val.loadTransparent -eq $true) { $lt = $true } }
+	else { $src = $val.src; if ($val.loadTransparent -eq $true) { $lt = $true }; $tpx = $val.transparentPixel }
 	if (-not $src) { return }
+	$srcStr = "$src"
 	X "$indent<$picTag>"
-	X "$indent`t<xr:Ref>$src</xr:Ref>"
+	if ($srcStr -match '^abs:(.*)$') { X "$indent`t<xr:Abs>$(Esc-Xml $matches[1])</xr:Abs>" }
+	else { X "$indent`t<xr:Ref>$(Esc-Xml $srcStr)</xr:Ref>" }
 	X "$indent`t<xr:LoadTransparent>$(if ($lt) { 'true' } else { 'false' })</xr:LoadTransparent>"
+	if ($tpx) { X "$indent`t<xr:TransparentPixel x=`"$($tpx.x)`" y=`"$($tpx.y)`"/>" }
 	X "$indent</$picTag>"
 }
 
@@ -2854,14 +2858,17 @@ function Emit-ColumnPics {
 function Emit-CommandPicture {
 	param($pic, $elemLt, [string]$indent)
 	if (-not $pic) { return }
-	$src = $null; $lt = $null
+	$src = $null; $lt = $null; $tpx = $null
 	if ($pic -is [string]) { $src = $pic }
-	else { $src = $pic.src; if ($null -ne $pic.loadTransparent) { $lt = [bool]$pic.loadTransparent } }
+	else { $src = $pic.src; if ($null -ne $pic.loadTransparent) { $lt = [bool]$pic.loadTransparent }; $tpx = $pic.transparentPixel }
 	if (-not $src) { return }
 	if ($null -eq $lt -and $null -ne $elemLt) { $lt = [bool]$elemLt }
+	$srcStr = "$src"
 	X "$indent<Picture>"
-	X "$indent`t<xr:Ref>$src</xr:Ref>"
+	if ($srcStr -match '^abs:(.*)$') { X "$indent`t<xr:Abs>$(Esc-Xml $matches[1])</xr:Abs>" }
+	else { X "$indent`t<xr:Ref>$(Esc-Xml $srcStr)</xr:Ref>" }
 	X "$indent`t<xr:LoadTransparent>$(if ($lt -eq $false) { 'false' } else { 'true' })</xr:LoadTransparent>"
+	if ($tpx) { X "$indent`t<xr:TransparentPixel x=`"$($tpx.x)`" y=`"$($tpx.y)`"/>" }
 	X "$indent</Picture>"
 }
 
@@ -4228,15 +4235,8 @@ function Emit-Table {
 	if ($el.initialTreeView) { X "$inner<InitialTreeView>$($el.initialTreeView)</InitialTreeView>" }
 	if ($null -ne $el.enableDrag) { X "$inner<EnableDrag>$(if ($el.enableDrag){'true'}else{'false'})</EnableDrag>" }
 	if ($el.rowPictureDataPath) { X "$inner<RowPictureDataPath>$($el.rowPictureDataPath)</RowPictureDataPath>" }
-	if ($el.rowsPicture) {
-		# Строка = Ref (LoadTransparent дефолт false); объект {src, loadTransparent} → факт. значение
-		$rpSrc = if ($el.rowsPicture -is [string]) { $el.rowsPicture } else { $el.rowsPicture.src }
-		$rpLt = if ($el.rowsPicture -isnot [string] -and $el.rowsPicture.loadTransparent -eq $true) { 'true' } else { 'false' }
-		X "$inner<RowsPicture>"
-		X "$inner`t<xr:Ref>$rpSrc</xr:Ref>"
-		X "$inner`t<xr:LoadTransparent>$rpLt</xr:LoadTransparent>"
-		X "$inner</RowsPicture>"
-	}
+	# RowsPicture — та же конвенция, что ValuesPicture (дефолт LoadTransparent=false; abs/TransparentPixel)
+	Emit-PictureRef -val $el.rowsPicture -picTag 'RowsPicture' -indent $inner
 	# Блок свойств дин-список-таблицы (помечена эвристикой 11b.4)
 	if ($el.PSObject.Properties["_dynList"] -and $el._dynList) { Emit-DynListTableBlock -el $el -indent $inner }
 	if ($el.viewStatusLocation) { X "$inner<ViewStatusLocation>$($el.viewStatusLocation)</ViewStatusLocation>" }
@@ -4322,6 +4322,10 @@ function Emit-Page {
 
 	Emit-Title -el $el -name $name -indent $inner -auto
 	Emit-CommonFlags -el $el -indent $inner
+
+	# Картинка страницы (иконка вкладки): после Title/флагов, перед Group (порядок XSD).
+	# Конвенция как у ValuesPicture (дефолт LoadTransparent=false): скаляр-Ref/'abs:X' или объект.
+	Emit-PictureRef -val $el.picture -picTag 'Picture' -indent $inner
 
 	if ($el.group) {
 		# Доступные значения страницы/обычной группы: Vertical / HorizontalIfPossible / AlwaysHorizontal

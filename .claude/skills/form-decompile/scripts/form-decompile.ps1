@@ -1,4 +1,4 @@
-﻿# form-decompile v0.87 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.88 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -940,18 +940,49 @@ function Decompile-AttrColumn {
 }
 
 # Общие свойства элемента (visible/enabled/readonly/title/events) → в hash
-# Картинка-ссылка с прозрачностью (HeaderPicture/FooterPicture/ValuesPicture).
+# Картинка-ссылка с прозрачностью (HeaderPicture/FooterPicture/ValuesPicture/Page Picture).
 # Платформа ВСЕГДА эмитит <xr:LoadTransparent> (и true, и false) → дефолт DSL = false.
-# Скаляр (Ref) при loadTransparent=false; объект {src,loadTransparent:true} при true.
+# Источник: <xr:Ref> (именованная/стилевая) ИЛИ <xr:Abs> (встроенная → префикс "abs:").
+# Скаляр (src) при loadTransparent=false и без TransparentPixel; иначе объект
+# {src, loadTransparent?, transparentPixel?}.
 function Get-PictureRef {
 	param($node, [string]$picTag)
 	$ref = $node.SelectSingleNode("lf:$picTag/xr:Ref", $ns)
-	if (-not $ref) { return $null }
+	$abs = $node.SelectSingleNode("lf:$picTag/xr:Abs", $ns)
+	if (-not $ref -and -not $abs) { return $null }
+	$src = if ($ref) { $ref.InnerText } else { "abs:$($abs.InnerText)" }
 	$lt = $node.SelectSingleNode("lf:$picTag/xr:LoadTransparent", $ns)
-	if ($lt -and $lt.InnerText -eq 'true') {
-		return [ordered]@{ src = $ref.InnerText; loadTransparent = $true }
+	$ltTrue = ($lt -and $lt.InnerText -eq 'true')
+	$tpx = $node.SelectSingleNode("lf:$picTag/xr:TransparentPixel", $ns)
+	if (-not $ltTrue -and -not $tpx) { return $src }
+	$o = [ordered]@{ src = $src }
+	if ($ltTrue) { $o['loadTransparent'] = $true }
+	if ($tpx) { $o['transparentPixel'] = [ordered]@{ x = [int]$tpx.GetAttribute('x'); y = [int]$tpx.GetAttribute('y') } }
+	return $o
+}
+
+# <Picture> кнопки/попапа/команды. Дефолт LoadTransparent=true (обратная конвенция к header/values):
+# фиксируем только отклонение false. Источник <xr:Ref> или <xr:Abs> (→ "abs:"). При наличии
+# <xr:TransparentPixel> → объектная форма {src, loadTransparent?, transparentPixel}, иначе скаляр picture
+# + отдельный loadTransparent:false.
+function Set-CommandPicture {
+	param($obj, $node)
+	$ref = $node.SelectSingleNode("lf:Picture/xr:Ref", $ns)
+	$abs = $node.SelectSingleNode("lf:Picture/xr:Abs", $ns)
+	if (-not $ref -and -not $abs) { return }
+	$src = if ($ref) { $ref.InnerText } else { "abs:$($abs.InnerText)" }
+	$lt = $node.SelectSingleNode("lf:Picture/xr:LoadTransparent", $ns)
+	$ltFalse = ($lt -and $lt.InnerText -eq 'false')
+	$tpx = $node.SelectSingleNode("lf:Picture/xr:TransparentPixel", $ns)
+	if ($tpx) {
+		$o = [ordered]@{ src = $src }
+		if ($ltFalse) { $o['loadTransparent'] = $false }
+		$o['transparentPixel'] = [ordered]@{ x = [int]$tpx.GetAttribute('x'); y = [int]$tpx.GetAttribute('y') }
+		$obj['picture'] = $o
+	} else {
+		$obj['picture'] = $src
+		if ($ltFalse) { $obj['loadTransparent'] = $false }
 	}
-	return $ref.InnerText
 }
 
 # Шрифт <Font ...> → строка-ref (если только ref+kind=StyleItem) или объект-атрибуты.
@@ -1688,13 +1719,8 @@ function Decompile-Element {
 			$soin = Get-Child $node 'SearchOnInput'; if ($soin) { $obj['searchOnInput'] = $soin }
 			$mi = Get-Child $node 'AutoMarkIncomplete'; if ($null -ne $mi) { $obj['markIncomplete'] = ($mi -eq 'true') }
 			$itv = Get-Child $node 'InitialTreeView'; if ($itv) { $obj['initialTreeView'] = $itv }
-			# RowsPicture: src (xr:Ref) + LoadTransparent (дефолт false). При true → объектная форма.
-			$rpRef = $node.SelectSingleNode("lf:RowsPicture/xr:Ref", $ns)
-			if ($rpRef) {
-				$rpLt = $node.SelectSingleNode("lf:RowsPicture/xr:LoadTransparent", $ns)
-				if ($rpLt -and $rpLt.InnerText -eq 'true') { $obj['rowsPicture'] = [ordered]@{ src = $rpRef.InnerText; loadTransparent = $true } }
-				else { $obj['rowsPicture'] = $rpRef.InnerText }
-			}
+			# RowsPicture — конвенция ValuesPicture (Ref/Abs + LoadTransparent дефолт false + TransparentPixel)
+			$rp = Get-PictureRef $node 'RowsPicture'; if ($null -ne $rp) { $obj['rowsPicture'] = $rp }
 			$rpdp = Get-Child $node 'RowPictureDataPath'
 			# --- Блок дин-список-таблицы (признак: дочерний <UpdateOnDataChange>) ---
 			if (Has-Child $node 'UpdateOnDataChange') {
@@ -1736,6 +1762,8 @@ function Decompile-Element {
 			$g = Get-Child $node 'Group'
 			$gmap = @{ 'Horizontal'='horizontal'; 'Vertical'='vertical'; 'AlwaysHorizontal'='alwaysHorizontal'; 'AlwaysVertical'='alwaysVertical'; 'HorizontalIfPossible'='horizontalIfPossible' }
 			if ($g -and $gmap.ContainsKey($g)) { $obj['group'] = $gmap[$g] }
+			# Картинка страницы (иконка вкладки) — конвенция ValuesPicture (дефолт LoadTransparent=false)
+			$pp = Get-PictureRef $node 'Picture'; if ($null -ne $pp) { $obj['picture'] = $pp }
 			if ((Get-Child $node 'ShowTitle') -eq 'false') { $obj['showTitle'] = $false }
 			$kids = Decompile-Children $node
 			if ($kids) { $obj['children'] = $kids }
@@ -1755,9 +1783,7 @@ function Decompile-Element {
 			if ($type) { $tmap=@{'CommandBarButton'='commandBar';'UsualButton'='usual';'Hyperlink'='hyperlink';'CommandBarHyperlink'='hyperlink'}; if ($tmap.ContainsKey($type)) { $obj['type']=$tmap[$type] } else { $obj['type']=$type } }
 			if ((Get-Child $node 'DefaultButton') -eq 'true') { $obj['defaultButton'] = $true }
 			if ((Get-Child $node 'Check') -eq 'true') { $obj['checked'] = $true }
-			$ref = $node.SelectSingleNode("lf:Picture/xr:Ref", $ns); if ($ref) { $obj['picture'] = $ref.InnerText }
-			# Дефолт у picture кнопки/попапа = true → фиксируем только отклонение false (true опускаем)
-			$lt = $node.SelectSingleNode("lf:Picture/xr:LoadTransparent", $ns); if ($lt -and $lt.InnerText -eq 'false') { $obj['loadTransparent'] = $false }
+			Set-CommandPicture $obj $node
 			$rep = Get-Child $node 'Representation'; if ($rep) { $obj['representation'] = $rep }
 			$lic = Get-Child $node 'LocationInCommandBar'; if ($lic) { $obj['locationInCommandBar'] = $lic }
 		}
@@ -1781,9 +1807,7 @@ function Decompile-Element {
 		'Popup' {
 			$obj[$key] = $name
 			Add-CommonProps $obj $node $name
-			$ref = $node.SelectSingleNode("lf:Picture/xr:Ref", $ns); if ($ref) { $obj['picture'] = $ref.InnerText }
-			# Дефолт у picture кнопки/попапа = true → фиксируем только отклонение false (true опускаем)
-			$lt = $node.SelectSingleNode("lf:Picture/xr:LoadTransparent", $ns); if ($lt -and $lt.InnerText -eq 'false') { $obj['loadTransparent'] = $false }
+			Set-CommandPicture $obj $node
 			$rep = Get-Child $node 'Representation'; if ($rep) { $obj['representation'] = $rep }
 			$kids = Decompile-Children $node
 			if ($kids) { $obj['children'] = $kids }
@@ -2430,9 +2454,7 @@ if ($cmdsNode) {
 		# Используемая таблица — ссылка по имени элемента-таблицы (<AssociatedTableElementId xsi:type="xs:string">Имя</…>)
 		$ate = Get-Child $c 'AssociatedTableElementId'; if ($ate) { $co['table'] = $ate }
 		$sc = Get-Child $c 'Shortcut'; if ($sc) { $co['shortcut'] = $sc }
-		$ref = $c.SelectSingleNode("lf:Picture/xr:Ref", $ns); if ($ref) { $co['picture'] = $ref.InnerText }
-		# Дефолт у picture команды = true → фиксируем только отклонение false (true опускаем)
-		$lt = $c.SelectSingleNode("lf:Picture/xr:LoadTransparent", $ns); if ($lt -and $lt.InnerText -eq 'false') { $co['loadTransparent'] = $false }
+		Set-CommandPicture $co $c
 		$rep = Get-Child $c 'Representation'; if ($rep) { $co['representation'] = $rep }
 		[void]$cmds.Add($co)
 	}

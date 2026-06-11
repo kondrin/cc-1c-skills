@@ -20,6 +20,10 @@
 			<ExtendedTooltip name="СтраницыМастераРасширеннаяПодсказка" id="2"/>
 			<ChildItems>
 				<Page name="Шаг1" id="3">
+					<Picture>
+						<xr:Ref>StdPicture.ExecuteTask</xr:Ref>
+						<xr:LoadTransparent>false</xr:LoadTransparent>
+					</Picture>
 					<ShowTitle>false</ShowTitle>
 					<ExtendedTooltip name="Шаг1РасширеннаяПодсказка" id="4"/>
 					<ChildItems>
@@ -43,6 +47,11 @@
 							<v8:content>Шаг "Результат"</v8:content>
 						</v8:item>
 					</ToolTip>
+					<Picture>
+						<xr:Ref>StdPicture.FilterCriterion</xr:Ref>
+						<xr:LoadTransparent>true</xr:LoadTransparent>
+						<xr:TransparentPixel x="2" y="4"/>
+					</Picture>
 					<Group>HorizontalIfPossible</Group>
 					<TitleDataPath>Итог</TitleDataPath>
 					<ExtendedTooltip name="Шаг2РасширеннаяПодсказка" id="9"/>

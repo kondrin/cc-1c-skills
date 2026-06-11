@@ -57,6 +57,7 @@
 					<ValuesPicture>
 						<xr:Ref>StdPicture.FilterCriterion</xr:Ref>
 						<xr:LoadTransparent>true</xr:LoadTransparent>
+						<xr:TransparentPixel x="7" y="3"/>
 					</ValuesPicture>
 					<ContextMenu name="ТаблицаДанныхКартинкаКонтекстноеМеню" id="18"/>
 					<ExtendedTooltip name="ТаблицаДанныхКартинкаРасширеннаяПодсказка" id="19"/>

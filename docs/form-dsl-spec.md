@@ -284,17 +284,19 @@ companion-панели с собственным контентом. Оба не
 > Эти простые скаляры — pass-through (captured/emitted «как есть»), применимы там, где платформа их пишет.
 > `defaultItem`/`enableStartDrag`/`fileDragMode`/`skipOnInput` + cell-свойства (`showInHeader`/`showInFooter`/`autoCellHeight`/`footerHorizontalAlign`/`headerHorizontalAlign`/`headerPicture`/`footerPicture`) — общие для любого поля-колонки (input, label, picField, check).
 
-#### Картинка-ссылка (`headerPicture`/`footerPicture`/`valuesPicture`)
+#### Картинка-ссылка (`headerPicture`/`footerPicture`/`valuesPicture`/`rowsPicture`/Page `picture`)
 
 Картинка с флагом прозрачности. Два формата:
 
 ```json
 "headerPicture": "CommonPicture.Важность"                       // loadTransparent = false (частый случай)
 "headerPicture": { "src": "StdPicture.ExecuteTask", "loadTransparent": true }   // отклонение
+"valuesPicture": { "src": "abs:Picture.png", "transparentPixel": { "x": 7, "y": 3 } }  // встроенная + прозрачный пиксель
 ```
 
 - скаляр-строка — ссылка `StdPicture.*`/`CommonPicture.*`, `loadTransparent=false` (дефолт по корпусу: ~64% картинок);
-- объект `{ src, loadTransparent: true }` — только когда нужен `true` (объектная форма существует ровно ради этого отклонения; флаг привязан к конкретной картинке, т.к. на одном поле их бывает несколько).
+- префикс `abs:` в `src` (напр. `"abs:Picture.png"`) → встроенная картинка `<xr:Abs>` (бинарь хранится в самой форме);
+- объект `{ src, loadTransparent?, transparentPixel? }` — когда нужен `loadTransparent: true` и/или `transparentPixel: { x, y }` (координаты пикселя фона прозрачности).
 
 > Не путать с `loadTransparent` у `<Picture>` кнопки/команды/попапа (§«button»/§7) — там обратная конвенция (дефолт `true`, отдельный скаляр-ключ на элементе).
 
@@ -548,7 +550,7 @@ companion-панели с собственным контентом. Оба не
 | `rowSelectionMode` | string | Режим выделения строки (`Row`, …) |
 | `verticalLines` / `horizontalLines` | bool | Линии сетки (эмитится явное `false`) |
 | `initialTreeView` | string | `ExpandTopLevel`, `ExpandAllLevels`, `NoExpand` |
-| `rowsPicture` | string \| object | Картинка строк (`<RowsPicture>`). Строка = `CommonPicture.X` (LoadTransparent дефолт `false`); объект `{ src, loadTransparent }` — для явной прозрачности (`loadTransparent: true`) |
+| `rowsPicture` | string \| object | Картинка строк (`<RowsPicture>`). Формат «картинка-ссылка» из §4.1 (скаляр-Ref/`abs:X` или объект `{ src, loadTransparent?, transparentPixel? }`, дефолт `loadTransparent=false`) |
 | `height` | int | Высота элемента таблицы (`<Height>`, как у прочих элементов) |
 | `heightInTableRows` | int | Высота в строках (`<HeightInTableRows>`) — отдельное свойство от `height`; таблица может нести оба |
 | `header` | bool | Показывать шапку |
@@ -640,6 +642,7 @@ companion-панели с собственным контентом. Оба не
 ```
 
 Page поддерживает `group` для задания ориентации содержимого и `children` для вложенных элементов.
+Также `picture` — картинка-иконка вкладки (формат «картинка-ссылка» из §4.1: скаляр-Ref/`abs:X` или объект `{src, loadTransparent?, transparentPixel?}`, дефолт `loadTransparent=false`).
 
 Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `TabsOnBottom`, `TabsOnLeft`, `TabsOnRight`.
 
@@ -657,7 +660,7 @@ Pages поддерживает `pagesRepresentation`: `None`, `TabsOnTop`, `Tabs
 | `type` | string | `usual`, `hyperlink`, `commandBar` |
 | `defaultButton` | bool | Кнопка по умолчанию |
 | `checked` | bool | Пометка (нажатое состояние toggle-кнопки командной панели) → `<Check>true</Check>`. Платформа эмитит только `true`. Ключ `checked` (не `check` — `check` — тип-ключ ПоляФлажка) |
-| `picture` | string \| object | Ссылка на картинку (`StdPicture.Name`). Скаляр-строка ИЛИ объект `{src, loadTransparent}` (прощающий ввод — флаг можно задать прямо в объекте) |
+| `picture` | string \| object | Ссылка на картинку (`StdPicture.Name`; префикс `abs:` → встроенная `<xr:Abs>`). Скаляр-строка ИЛИ объект `{src, loadTransparent?, transparentPixel?}` (флаг и прозрачный пиксель `{x,y}` можно задать прямо в объекте) |
 | `loadTransparent` | bool | Загружать картинку прозрачной (у `<Picture>` кнопки/команды/попапа). **Дефолт `true`** (эмитится всегда; `false` — явно). Элемент-уровневый ключ ИЛИ поле объекта `picture`. Также у `command` (§7) и `popup`. ⚠️ Полярность обратна `headerPicture`/`valuesPicture` (там дефолт `false`, см. §4.1) |
 | `path` | string | DataPath кнопки общей команды (`Объект.Ref`, `Items.X.CurrentData.Поле`) — привязка к контексту |
 | `representation` | string | `Auto`, `Picture`, `Text`, `PictureAndText` |
@@ -1016,7 +1019,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `table` | string | Используемая таблица — имя элемента-таблицы формы (`<AssociatedTableElementId xsi:type="xs:string">Имя</…>`). Команда работает в контексте этой таблицы (текущая строка). Forgiving-синонимы: `associatedTableElementId` (XML-тег), `ИспользуемаяТаблица` (рус., регистро-/пробело-независимо) |
 | `modifiesSavedData` | bool | Команда изменяет сохраняемые данные (`<ModifiesSavedData>`); эмитится только `true` |
 | `shortcut` | string | Клавиатурное сочетание |
-| `picture` | string | Ссылка на картинку |
+| `picture` | string \| object | Ссылка на картинку (`StdPicture.Name`; `abs:X` → `<xr:Abs>`). Скаляр ИЛИ объект `{src, loadTransparent?, transparentPixel?}` (как у `button`, §«button») |
 | `representation` | string | `Auto`, `Picture`, `Text`, `PictureAndText` |
 
 ---
