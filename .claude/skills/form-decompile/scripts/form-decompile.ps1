@@ -1,4 +1,4 @@
-﻿# form-decompile v0.94 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.95 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -465,15 +465,21 @@ function Get-FilterValueWithType {
 	if ($vType -eq 'LocalStringType') {
 		return @{ value = (Get-MLText $valNode); type = $rawType }
 	}
-	# Стандартная дата начала/окончания. Custom несёт <v8:date> → объект {variant, date};
-	# именованный вариант (BeginningOfThisDay/…) без даты → строка-вариант (short form).
-	# Иначе InnerText склеивал variant+date.
+	# Стандартная дата начала/окончания. Формы (от самой компактной):
+	#   SBD Custom+date → голая ISO-дата без valueType (компилятор выводит SBD Custom — дефолт
+	#     даты в фильтре, корпус 268 vs 2 xs:dateTime); именованный вариант → строка + valueType;
+	#   SED Custom / нетипичное → объект {variant, date} + valueType. Иначе InnerText склеивал.
 	if ($vType -eq 'StandardBeginningDate' -or $vType -eq 'StandardEndDate') {
 		$variantN = $valNode.SelectSingleNode("v8:variant", $ns)
 		$dateN = $valNode.SelectSingleNode("v8:date", $ns)
 		$variantStr = if ($variantN) { $variantN.InnerText } else { '' }
-		if ($dateN) { return @{ value = [ordered]@{ variant = $variantStr; date = $dateN.InnerText }; type = $rawType } }
-		return @{ value = $variantStr; type = $rawType }
+		if ($dateN) {
+			if ($vType -eq 'StandardBeginningDate' -and $variantStr -eq 'Custom') {
+				return @{ value = $dateN.InnerText; type = $null }   # голая дата = SBD Custom шорткат
+			}
+			return @{ value = [ordered]@{ variant = $variantStr; date = $dateN.InnerText }; type = $rawType }
+		}
+		return @{ value = $variantStr; type = $rawType }   # именованный вариант
 	}
 	$txt = $valNode.InnerText
 	if (-not $txt) { return @{ value = '_'; type = $rawType } }

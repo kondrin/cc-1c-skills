@@ -1,4 +1,4 @@
-﻿# form-compile v1.118 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.119 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1650,7 +1650,7 @@ function Parse-FilterShorthand {
 		$valPart = if ($Matches[3]) { $Matches[3].Trim() } else { "" }
 		if ($valPart -and $valPart -ne "_") {
 			if ($valPart -eq "true" -or $valPart -eq "false") { $result.value = [bool]($valPart -eq "true"); $result["valueType"] = "xs:boolean" }
-			elseif ($valPart -match '^\d{4}-\d{2}-\d{2}T') { $result.value = $valPart; $result["valueType"] = "xs:dateTime" }
+			elseif ($valPart -match '^\d{4}-\d{2}-\d{2}T') { $result.value = $valPart }  # дата без valueType → Emit-FilterItem выведет StandardBeginningDate Custom (дефолт даты в фильтре)
 			elseif ($valPart -match '^\d+(\.\d+)?$') { $result.value = $valPart; $result["valueType"] = "xs:decimal" }
 			elseif ($valPart -match '^(Перечисление|Справочник|ПланСчетов|Документ|ПланВидовХарактеристик|ПланВидовРасчета)\.') { $result.value = $valPart; $result["valueType"] = "dcscor:DesignTimeValue" }
 			else { $result.value = $valPart; $result["valueType"] = "xs:string" }
@@ -1718,16 +1718,23 @@ function Emit-FilterItem {
 				X "$indent`t<dcsset:right xsi:type=`"$vt`">$vStr</dcsset:right>"
 			}
 		}
-	} elseif ($null -ne $item.value -and "$($item.valueType)" -match 'Standard(Beginning|End)Date$') {
-		# Стандартная дата начала/окончания. Две формы значения:
+	} elseif ($null -ne $item.value -and (
+			"$($item.valueType)" -match 'Standard(Beginning|End)Date$' -or
+			(-not $item.valueType -and "$($item.value)" -match '^\d{4}-\d{2}-\d{2}T'))) {
+		# Стандартная дата начала/окончания. Формы значения:
 		#   объект {variant, date?} — полная (Custom несёт <v8:date>);
-		#   строка-вариант "BeginningOfThisDay" — short (именованный вариант без даты).
-		$sdType = "$($item.valueType)" -replace '^v8:',''
+		#   строка-вариант "BeginningOfThisDay" — именованный вариант без даты;
+		#   голая ISO-дата без valueType — шорткат для Custom+date (дата в фильтре платформой
+		#   почти всегда хранится как StandardBeginningDate Custom, корпус 268 vs 2 xs:dateTime;
+		#   явный valueType="xs:dateTime" → плоская дата, ветка ниже).
+		$sdType = if ($item.valueType) { "$($item.valueType)" -replace '^v8:','' } else { 'StandardBeginningDate' }
 		$sv = $item.value
 		if (($sv -is [PSCustomObject]) -or ($sv -is [System.Collections.IDictionary])) {
 			$variant = if ($sv -is [PSCustomObject]) { "$($sv.variant)" } else { "$($sv['variant'])" }
 			$hasDate = if ($sv -is [PSCustomObject]) { [bool]$sv.PSObject.Properties['date'] } else { $sv.Contains('date') }
 			$dateV = if ($hasDate) { if ($sv -is [PSCustomObject]) { "$($sv.date)" } else { "$($sv['date'])" } } else { $null }
+		} elseif ("$sv" -match '^\d{4}-\d{2}-\d{2}T') {
+			$variant = 'Custom'; $hasDate = $true; $dateV = "$sv"
 		} else {
 			$variant = "$sv"; $hasDate = $false; $dateV = $null
 		}

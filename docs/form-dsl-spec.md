@@ -975,7 +975,12 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 
 - **order** — строка `"Поле"` (asc) / `"Поле desc"` (синонимы `убыв`/`desc`, `возр`/`asc`) / `"Auto"`, либо объект `{ field, direction?, use?, viewMode? }`.
 - **filter** — shorthand `"Поле оператор значение @флаги"` (`@off`, `@user`, `@quickAccess`, `@normal`, `@inaccessible`; `_` = пусто) или объект `{ field, op, value?, use?, userSettingID? }` или группа `{ group: "And"|"Or"|"Not", items: [...] }`.
-  - **Стандартная дата** (`valueType: "v8:StandardBeginningDate"`): значение — объект `{ variant, date? }` ИЛИ короткая форма — строка-вариант. `Custom` несёт `date` (ISO) → объект `{ variant: "Custom", date: "…" }`; именованные варианты (`BeginningOfThisDay`/`BeginningOfThisWeek`/`BeginningOfThisYear`/…) — без даты → просто строка `"BeginningOfThisDay"`. Эмитится структурно (`<v8:variant>`+`<v8:date>`). Декомпилятор: Custom → объект, именованный → строка.
+  - **Дата в фильтре = `StandardBeginningDate`** (так платформа хранит дату-значение почти всегда — корпус 268 vs 2 `xs:dateTime`). Формы значения (от компактной к полной):
+    - **голая ISO-дата** `"2020-01-01T00:00:00"` (без `valueType`) → `Custom` + эта дата. Работает и в shorthand: `"ДатаЗаказа > 2020-01-01T00:00:00"`. Это дефолт даты в фильтре.
+    - **строка-вариант** `"BeginningOfThisDay"` + `valueType: "v8:StandardBeginningDate"` — именованный вариант без даты (`BeginningOfThisWeek`/`BeginningOfThisYear`/…; имя ≠ дата, нужен `valueType`).
+    - **объект** `{ variant, date? }` + `valueType` — полная форма.
+    - **escape** для плоской `xs:dateTime`: явный `valueType: "xs:dateTime"`.
+    Эмитится структурно (`<v8:variant>`+`<v8:date>`). Декомпилятор: Custom+date → голая дата; именованный → строка+valueType.
 - **conditionalAppearance** — объект `{ selection?, filter?, appearance?, presentation?, viewMode?, userSettingID?, use? }`. `appearance` — словарь «параметр: значение» платформы (`ЦветТекста`, `ЦветФона`, `Шрифт` и т.п.).
   - Значение текстовых параметров (`Текст`/`Заголовок`/`Формат`) ведётся **по форме значения**: голая строка → плоский `xs:string` (нелокализованный литерал; `""` → самозакрывающийся тег); объект `{ru,en}` → локализуемый `LocalStringType`; объект `{field:"путь"}` → ссылка на поле компоновки (`dcscor:Field`). (В отличие от `title`/`tooltip`, где голая строка = `LocalStringType` — здесь это намеренное scoped-различие: платформа хранит обе формы, и их надо различать.)
 

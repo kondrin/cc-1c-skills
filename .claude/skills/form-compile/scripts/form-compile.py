@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.118 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.119 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1377,8 +1377,8 @@ def parse_filter_shorthand(s):
                 result['value'] = (val_part == 'true')
                 result['valueType'] = 'xs:boolean'
             elif re.match(r'^\d{4}-\d{2}-\d{2}T', val_part):
+                # дата без valueType → emit_filter_item выведет StandardBeginningDate Custom (дефолт даты в фильтре)
                 result['value'] = val_part
-                result['valueType'] = 'xs:dateTime'
             elif re.match(r'^\d+(\.\d+)?$', val_part):
                 result['value'] = val_part
                 result['valueType'] = 'xs:decimal'
@@ -1465,12 +1465,17 @@ def emit_filter_item(lines, item, indent):
                 vt = _value_type_for(v, item.get('valueType'))
                 v_str = str(v).lower() if isinstance(v, bool) else esc_xml(str(v))
                 lines.append(f'{indent}\t<dcsset:right xsi:type="{vt}">{v_str}</dcsset:right>')
-    elif val is not None and re.search(r'Standard(Beginning|End)Date$', str(item.get('valueType') or '')):
-        # Стандартная дата начала/окончания. Две формы: объект {variant, date?} (Custom несёт
-        # <v8:date>) или строка-вариант "BeginningOfThisDay" (short, именованный без даты).
-        sd_type = re.sub(r'^v8:', '', str(item['valueType']))
+    elif val is not None and (
+            re.search(r'Standard(Beginning|End)Date$', str(item.get('valueType') or '')) or
+            (not item.get('valueType') and isinstance(val, str) and re.match(r'^\d{4}-\d{2}-\d{2}T', val))):
+        # Стандартная дата начала/окончания. Формы: объект {variant, date?} (Custom несёт <v8:date>);
+        # строка-вариант "BeginningOfThisDay" (именованный без даты); голая ISO-дата без valueType —
+        # шорткат для Custom+date (дата в фильтре почти всегда SBD Custom, корпус 268 vs 2 xs:dateTime).
+        sd_type = re.sub(r'^v8:', '', str(item['valueType'])) if item.get('valueType') else 'StandardBeginningDate'
         if isinstance(val, dict):
             variant = str(val.get('variant', '')); date_v = val.get('date')
+        elif isinstance(val, str) and re.match(r'^\d{4}-\d{2}-\d{2}T', val):
+            variant = 'Custom'; date_v = val
         else:
             variant = str(val); date_v = None
         lines.append(f'{indent}\t<dcsset:right xsi:type="v8:{sd_type}">')
