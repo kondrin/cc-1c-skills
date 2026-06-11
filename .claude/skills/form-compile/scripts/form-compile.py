@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.114 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.115 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -3307,14 +3307,15 @@ def emit_single_type(lines, type_str, indent):
         lines.append(f'{indent}<v8:Type>xs:boolean</v8:Type>')
         return
 
-    # string or string(N)
-    m = re.match(r'^string(\((\d+)\))?$', type_str)
+    # string or string(N) or string(N,fixed) (AllowedLength: Variable дефолт / Fixed)
+    m = re.match(r'^string(\((\d+)(\s*,\s*(fixed|variable))?\))?$', type_str, re.IGNORECASE)
     if m:
         length = m.group(2) if m.group(2) else '0'
+        al = 'Fixed' if (m.group(4) and m.group(4).lower() == 'fixed') else 'Variable'
         lines.append(f'{indent}<v8:Type>xs:string</v8:Type>')
         lines.append(f'{indent}<v8:StringQualifiers>')
         lines.append(f'{indent}\t<v8:Length>{length}</v8:Length>')
-        lines.append(f'{indent}\t<v8:AllowedLength>Variable</v8:AllowedLength>')
+        lines.append(f'{indent}\t<v8:AllowedLength>{al}</v8:AllowedLength>')
         lines.append(f'{indent}</v8:StringQualifiers>')
         return
 

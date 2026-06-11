@@ -1,4 +1,4 @@
-﻿# form-compile v1.114 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.115 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2056,13 +2056,14 @@ function Emit-SingleType {
 		return
 	}
 
-	# string or string(N)
-	if ($typeStr -match '^string(\((\d+)\))?$') {
+	# string or string(N) or string(N,fixed) (AllowedLength: Variable дефолт / Fixed)
+	if ($typeStr -match '^string(\((\d+)(\s*,\s*(fixed|variable))?\))?$') {
 		$len = if ($Matches[2]) { $Matches[2] } else { "0" }
+		$al = if ($Matches[4] -and $Matches[4].ToLower() -eq 'fixed') { 'Fixed' } else { 'Variable' }
 		X "$indent<v8:Type>xs:string</v8:Type>"
 		X "$indent<v8:StringQualifiers>"
 		X "$indent`t<v8:Length>$len</v8:Length>"
-		X "$indent`t<v8:AllowedLength>Variable</v8:AllowedLength>"
+		X "$indent`t<v8:AllowedLength>$al</v8:AllowedLength>"
 		X "$indent</v8:StringQualifiers>"
 		return
 	}

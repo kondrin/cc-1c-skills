@@ -1,4 +1,4 @@
-﻿# form-decompile v0.90 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.91 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1080,7 +1080,11 @@ function Decompile-Type {
 		switch -regex ($raw) {
 			'^xs:string$' {
 				$len = $typeNode.SelectSingleNode("v8:StringQualifiers/v8:Length", $ns)
-				if ($len -and [int]$len.InnerText -gt 0) { $short = "string($($len.InnerText))" } else { $short = "string" }
+				$al = $typeNode.SelectSingleNode("v8:StringQualifiers/v8:AllowedLength", $ns)
+				$fixed = ($al -and $al.InnerText -eq 'Fixed')   # Variable = дефолт (опускаем); Fixed — явно
+				if ($len -and [int]$len.InnerText -gt 0) {
+					$short = if ($fixed) { "string($($len.InnerText),fixed)" } else { "string($($len.InnerText))" }
+				} else { $short = "string" }   # Length=0 → всегда Variable (корпус)
 				break
 			}
 			'^xs:decimal$' {

@@ -30,7 +30,12 @@
       { "name": "Период", "type": "СтандартныйПериод", "save": ["Период", "EndDate", "StartDate", "Variant"] },
       { "name": "СписокЗначений", "type": "ValueList", "valueType": "string(50) | decimal(10,2)" },
       { "name": "СписокЛюбой", "type": "ValueList", "valueType": "" },
-      { "name": "Идентификатор", "type": "v8:UUID" }
+      { "name": "Идентификатор", "type": "v8:UUID" },
+      { "name": "Таблица", "type": "ValueTable", "title": "Таблица", "columns": [
+        { "name": "ИНН", "type": "string(12,fixed)" },
+        { "name": "Код", "type": "string(9,fixed)" },
+        { "name": "Имя", "type": "string(100)" }
+      ]}
     ]
   }
 }

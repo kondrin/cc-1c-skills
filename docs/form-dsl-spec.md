@@ -1095,8 +1095,9 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 
 | DSL | XML |
 |-----|-----|
-| `"string"` | `xs:string` (неограниченная) |
-| `"string(100)"` | `xs:string` + Length=100 |
+| `"string"` | `xs:string` (неограниченная, AllowedLength=Variable) |
+| `"string(100)"` | `xs:string` + Length=100 (AllowedLength=Variable, дефолт) |
+| `"string(12,fixed)"` | `xs:string` + Length=12, AllowedLength=Fixed (строка фиксированной длины, напр. ИНН/КПП). Только с длиной > 0; `variable` принимается forgiving (= дефолт) |
 | `"decimal(15,2)"` | `xs:decimal` + Digits=15, FractionDigits=2, AllowedSign=Any |
 | `"decimal(10,0,nonneg)"` | `xs:decimal` + AllowedSign=Nonnegative |
 | `"boolean"` | `xs:boolean` |
