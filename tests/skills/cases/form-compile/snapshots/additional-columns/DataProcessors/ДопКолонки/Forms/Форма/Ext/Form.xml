@@ -43,6 +43,7 @@
 						</Type>
 					</Column>
 				</AdditionalColumns>
+				<AdditionalColumns table="Объект.ЕщёТаблица"/>
 			</Columns>
 		</Attribute>
 	</Attributes>

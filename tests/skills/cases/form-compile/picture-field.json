@@ -21,7 +21,8 @@
         "columns": [
           { "input": "ТаблицаДанныхНоменклатура", "path": "ТаблицаДанных.Номенклатура" },
           { "picField": "ТаблицаДанныхКартинка", "path": "ТаблицаДанных.Картинка", "titleLocation": "none", "editMode": "EnterOnInput", "hyperlink": true, "shortcut": "Ctrl+S", "headerPicture": "StdPicture.ExecuteTask", "valuesPicture": { "src": "StdPicture.FilterCriterion", "loadTransparent": true, "transparentPixel": { "x": 7, "y": 3 } } },
-          { "check": "ТаблицаДанныхКартинкаФлаг", "path": "ТаблицаДанных.Картинка", "title": "Флаг", "headerPicture": { "src": "StdPicture.ClearFilter", "loadTransparent": true } }
+          { "check": "ТаблицаДанныхКартинкаФлаг", "path": "ТаблицаДанных.Картинка", "title": "Флаг", "headerPicture": { "src": "StdPicture.ClearFilter", "loadTransparent": true } },
+          { "labelField": "ТаблицаДанныхИтог", "path": "ТаблицаДанных.Номенклатура", "editMode": "EnterOnInput", "footerDataPath": "ТаблицаДанных.Номенклатура", "footerText": "Итого" }
         ]}
     ],
     "attributes": [

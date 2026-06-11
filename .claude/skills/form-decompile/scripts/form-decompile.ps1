@@ -1,4 +1,4 @@
-﻿# form-decompile v0.97 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.98 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1416,6 +1416,11 @@ function Decompile-ChoiceList {
 		if ($valNode) {
 			$xsiType = $valNode.GetAttribute("type", $NS_XSI)
 			$ci['value'] = Convert-TypedValue $valNode.InnerText $xsiType
+			# Системное перечисление (ent:*) / иной не-примитивный, не-DesignTimeRef тип → сохраняем
+			# valueType (Normalize-ChoiceValue в компиляторе вывела бы xs:string и потеряла тип).
+			if ($xsiType -and $xsiType -notmatch '^xs:(string|decimal|boolean|dateTime)$' -and $xsiType -ne 'xr:DesignTimeRef') {
+				$ci['valueType'] = $xsiType
+			}
 		}
 		# Presentation: непустой → текст/мультиязык; пустой <Presentation/> → "" — суппресс-маркер,
 		# подавляет авто-вывод компилятора (иначе компилятор додумает presentation из значения).
@@ -1666,6 +1671,7 @@ function Decompile-Element {
 			$dp = Get-Child $node 'DataPath'; if ($dp) { $obj['path'] = $dp }
 			Add-CommonProps $obj $node $name
 			Add-TitleLocation $obj $node 'None'
+			$em = Get-Child $node 'EditMode'; if ($em) { $obj['editMode'] = $em }
 			$rbt = Get-Child $node 'RadioButtonType'; if ($rbt) { $obj['radioButtonType'] = $rbt }
 			$cc = Get-Child $node 'ColumnsCount'; if ($cc) { $obj['columnsCount'] = [int]$cc }
 			$woe = $node.SelectSingleNode("lf:WarningOnEdit", $ns); if ($woe) { $t = Get-LangText $woe; if ($null -ne $t) { $obj['warningOnEdit'] = $t } }
@@ -1690,6 +1696,9 @@ function Decompile-Element {
 			# PasswordMode на LabelField — платформа эмитит явный false (редко); захват факт. значения
 			$pm = Get-Child $node 'PasswordMode'; if ($null -ne $pm) { $obj['passwordMode'] = ($pm -eq 'true') }
 			$woe = $node.SelectSingleNode("lf:WarningOnEdit", $ns); if ($woe) { $t = Get-LangText $woe; if ($null -ne $t) { $obj['warningOnEdit'] = $t } }
+			# FooterDataPath / FooterText — общие cell-свойства колонки (как у input), не только input
+			$fdp = Get-Child $node 'FooterDataPath'; if ($fdp) { $obj['footerDataPath'] = $fdp }
+			$ftxt = $node.SelectSingleNode("lf:FooterText", $ns); if ($ftxt) { $t = Get-LangText $ftxt; if ($null -ne $t) { $obj['footerText'] = $t } }
 			Add-FormatProps $obj $node
 		}
 		'PictureDecoration' {

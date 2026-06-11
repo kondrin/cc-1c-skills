@@ -11,6 +11,7 @@
 	<ChildItems>
 		<RadioButtonField name="ОтборСтрок" id="1">
 			<DataPath>ОтборСтрок</DataPath>
+			<EditMode>EnterOnInput</EditMode>
 			<TitleLocation>None</TitleLocation>
 			<RadioButtonType>Tumbler</RadioButtonType>
 			<ChoiceList>
@@ -50,15 +51,68 @@
 			<ContextMenu name="ОтборСтрокКонтекстноеМеню" id="2"/>
 			<ExtendedTooltip name="ОтборСтрокРасширеннаяПодсказка" id="3"/>
 		</RadioButtonField>
+		<RadioButtonField name="ВидСчета" id="4">
+			<Title>
+				<v8:item>
+					<v8:lang>ru</v8:lang>
+					<v8:content>Вид счета</v8:content>
+				</v8:item>
+			</Title>
+			<TitleLocation>None</TitleLocation>
+			<RadioButtonType>Auto</RadioButtonType>
+			<ChoiceList>
+				<xr:Item>
+					<xr:Presentation/>
+					<xr:CheckState>0</xr:CheckState>
+					<xr:Value xsi:type="FormChoiceListDesTimeValue">
+						<Presentation>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>Активный</v8:content>
+							</v8:item>
+						</Presentation>
+						<Value xsi:type="ent:AccountType">Active</Value>
+					</xr:Value>
+				</xr:Item>
+				<xr:Item>
+					<xr:Presentation/>
+					<xr:CheckState>0</xr:CheckState>
+					<xr:Value xsi:type="FormChoiceListDesTimeValue">
+						<Presentation>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>Пассивный</v8:content>
+							</v8:item>
+						</Presentation>
+						<Value xsi:type="ent:AccountType">Passive</Value>
+					</xr:Value>
+				</xr:Item>
+				<xr:Item>
+					<xr:Presentation/>
+					<xr:CheckState>0</xr:CheckState>
+					<xr:Value xsi:type="FormChoiceListDesTimeValue">
+						<Presentation>
+							<v8:item>
+								<v8:lang>ru</v8:lang>
+								<v8:content>Активный/Пассивный</v8:content>
+							</v8:item>
+						</Presentation>
+						<Value xsi:type="ent:AccountType">ActivePassive</Value>
+					</xr:Value>
+				</xr:Item>
+			</ChoiceList>
+			<ContextMenu name="ВидСчетаКонтекстноеМеню" id="5"/>
+			<ExtendedTooltip name="ВидСчетаРасширеннаяПодсказка" id="6"/>
+		</RadioButtonField>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Объект" id="4">
+		<Attribute name="Объект" id="7">
 			<Type>
 				<v8:Type>cfg:DataProcessorObject.ТестТумблер</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
-		<Attribute name="ОтборСтрок" id="5">
+		<Attribute name="ОтборСтрок" id="8">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>

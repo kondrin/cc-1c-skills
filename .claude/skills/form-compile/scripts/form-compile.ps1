@@ -1,4 +1,4 @@
-﻿# form-compile v1.123 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.124 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -3895,7 +3895,15 @@ function Emit-ChoiceList {
 			elseif ($item.PSObject.Properties["title"]) { $presRaw = $item.title; $hasPres = $true }
 		}
 
-		$norm = Normalize-ChoiceValue -value $valRaw
+		# valueType: явный xsi:type значения (системное перечисление ent:*, иной не-примитив) —
+		# переопределяет авто-детект (Normalize-ChoiceValue вывела бы xs:string).
+		$vtRaw = $null
+		if ($item -is [hashtable] -or $item -is [System.Collections.IDictionary]) {
+			if ($item.Contains("valueType")) { $vtRaw = "$($item["valueType"])" }
+		} elseif ($item.PSObject.Properties["valueType"]) { $vtRaw = "$($item.valueType)" }
+
+		if ($vtRaw) { $norm = @{ XsiType = $vtRaw; Text = "$valRaw" } }
+		else { $norm = Normalize-ChoiceValue -value $valRaw }
 
 		# авто-вывод presentation, если не задан
 		if (-not $hasPres) {
@@ -4092,6 +4100,7 @@ function Emit-Radio {
 	Emit-Title -el $el -name $name -indent $inner -auto:(-not $el.path)
 	Emit-CommonFlags -el $el -indent $inner
 
+	if ($el.editMode) { X "$inner<EditMode>$($el.editMode)</EditMode>" }
 	Emit-TitleLocation -el $el -indent $inner -smartDefault "None"
 
 	# RadioButtonType: Auto | RadioButtons | Tumbler. Accept synonyms.
@@ -4181,6 +4190,8 @@ function Emit-LabelField {
 
 	if ($el.titleLocation) { X "$inner<TitleLocation>$(Map-TitleLoc "$($el.titleLocation)")</TitleLocation>" }
 	if ($el.editMode) { X "$inner<EditMode>$($el.editMode)</EditMode>" }
+	# FooterDataPath — путь данных подвала колонки (общий cell-prop, как у input); после EditMode
+	if ($el.footerDataPath) { X "$inner<FooterDataPath>$(Esc-Xml "$($el.footerDataPath)")</FooterDataPath>" }
 	# PasswordMode на LabelField — платформа эмитит явный false (редко); факт. значение
 	if ($null -ne $el.passwordMode) { X "$inner<PasswordMode>$(if ($el.passwordMode){'true'}else{'false'})</PasswordMode>" }
 	Emit-ColumnPics -el $el -indent $inner
@@ -4189,6 +4200,7 @@ function Emit-LabelField {
 	Emit-Layout -el $el -indent $inner
 
 	if ($null -ne $el.warningOnEdit) { Emit-MLText -tag "WarningOnEdit" -text $el.warningOnEdit -indent $inner }
+	if ($null -ne $el.footerText) { Emit-MLText -tag "FooterText" -text $el.footerText -indent $inner }
 
 	# Формат / формат редактирования (LocalStringType — строка или {ru,en})
 	if ($el.format)     { Emit-MLText -tag "Format" -text $el.format -indent $inner }
@@ -5227,9 +5239,15 @@ function Emit-Attributes {
 			}
 			if ($hasAddCols) {
 				foreach ($ac in @($attr.additionalColumns)) {
+					$acCols = @($ac.columns)
+					if ($acCols.Count -eq 0) {
+						# Пустая группа доп.колонок (table-ref без колонок) → self-closing (как платформа)
+						X "$inner`t<AdditionalColumns table=`"$($ac.table)`"/>"
+						continue
+					}
 					X "$inner`t<AdditionalColumns table=`"$($ac.table)`">"
 					$seenAcCols = @{}  # уникальность в пределах группы AdditionalColumns
-					foreach ($col in @($ac.columns)) {
+					foreach ($col in $acCols) {
 						Assert-UniqueName -name "$($col.name)" -seen $seenAcCols -kind "column of '$attrName'"
 						Emit-AttrColumn -col $col -indent "$inner`t`t"
 					}

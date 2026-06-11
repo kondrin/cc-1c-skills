@@ -79,6 +79,19 @@
 					<ContextMenu name="ТаблицаДанныхКартинкаФлагКонтекстноеМеню" id="21"/>
 					<ExtendedTooltip name="ТаблицаДанныхКартинкаФлагРасширеннаяПодсказка" id="22"/>
 				</CheckBoxField>
+				<LabelField name="ТаблицаДанныхИтог" id="23">
+					<DataPath>ТаблицаДанных.Номенклатура</DataPath>
+					<EditMode>EnterOnInput</EditMode>
+					<FooterDataPath>ТаблицаДанных.Номенклатура</FooterDataPath>
+					<FooterText>
+						<v8:item>
+							<v8:lang>ru</v8:lang>
+							<v8:content>Итого</v8:content>
+						</v8:item>
+					</FooterText>
+					<ContextMenu name="ТаблицаДанныхИтогКонтекстноеМеню" id="24"/>
+					<ExtendedTooltip name="ТаблицаДанныхИтогРасширеннаяПодсказка" id="25"/>
+				</LabelField>
 			</ChildItems>
 			<Events>
 				<Event name="Selection">ТаблицаДанныхВыбор</Event>
@@ -86,13 +99,13 @@
 		</Table>
 	</ChildItems>
 	<Attributes>
-		<Attribute name="Объект" id="23">
+		<Attribute name="Объект" id="26">
 			<Type>
 				<v8:Type>cfg:DataProcessorObject.КартинкаВСтроке</v8:Type>
 			</Type>
 			<MainAttribute>true</MainAttribute>
 		</Attribute>
-		<Attribute name="ТаблицаДанных" id="24">
+		<Attribute name="ТаблицаДанных" id="27">
 			<Title>
 				<v8:item>
 					<v8:lang>ru</v8:lang>
@@ -103,7 +116,7 @@
 				<v8:Type>v8:ValueTable</v8:Type>
 			</Type>
 			<Columns>
-				<Column name="Номенклатура" id="25">
+				<Column name="Номенклатура" id="28">
 					<Type>
 						<v8:Type>xs:string</v8:Type>
 						<v8:StringQualifiers>
@@ -112,7 +125,7 @@
 						</v8:StringQualifiers>
 					</Type>
 				</Column>
-				<Column name="Картинка" id="26">
+				<Column name="Картинка" id="29">
 					<Type>
 						<v8:Type>xs:boolean</v8:Type>
 					</Type>

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.123 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.124 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -2120,7 +2120,13 @@ def emit_choice_list(lines, el, indent):
         has_pres = any(k in item for k in ('presentation', 'представление', 'title'))
         pres_raw = item.get('presentation', item.get('представление', item.get('title')))
 
-        norm = normalize_choice_value(val_raw)
+        # valueType: явный xsi:type значения (системное перечисление ent:*, иной не-примитив) —
+        # переопределяет авто-детект (normalize_choice_value вывела бы xs:string).
+        vt_raw = item.get('valueType')
+        if vt_raw:
+            norm = {'xsi_type': str(vt_raw), 'text': '' if val_raw is None else str(val_raw)}
+        else:
+            norm = normalize_choice_value(val_raw)
 
         if not has_pres:
             if norm['xsi_type'] == 'xr:DesignTimeRef':
@@ -3817,6 +3823,8 @@ def emit_radio_button_field(lines, el, name, eid, indent):
     emit_title(lines, el, name, inner, auto=not el.get('path'))
     emit_common_flags(lines, el, inner)
 
+    if el.get('editMode'):
+        lines.append(f'{inner}<EditMode>{el["editMode"]}</EditMode>')
     emit_title_location(lines, el, inner, 'None')
 
     rbt = normalize_radio_button_type(el.get('radioButtonType'))
@@ -3898,6 +3906,9 @@ def emit_label_field(lines, el, name, eid, indent):
         lines.append(f'{inner}<TitleLocation>{map_title_loc(el["titleLocation"])}</TitleLocation>')
     if el.get('editMode'):
         lines.append(f'{inner}<EditMode>{el["editMode"]}</EditMode>')
+    # FooterDataPath — путь данных подвала колонки (общий cell-prop, как у input); после EditMode
+    if el.get('footerDataPath'):
+        lines.append(f'{inner}<FooterDataPath>{esc_xml(str(el["footerDataPath"]))}</FooterDataPath>')
     # PasswordMode на LabelField — платформа эмитит явный false (редко); факт. значение
     if el.get('passwordMode') is not None:
         lines.append(f'{inner}<PasswordMode>{"true" if el["passwordMode"] else "false"}</PasswordMode>')
@@ -3909,6 +3920,8 @@ def emit_label_field(lines, el, name, eid, indent):
 
     if el.get('warningOnEdit') is not None:
         emit_mltext(lines, inner, 'WarningOnEdit', el['warningOnEdit'])
+    if el.get('footerText') is not None:
+        emit_mltext(lines, inner, 'FooterText', el['footerText'])
 
     # Формат / формат редактирования (LocalStringType — строка или {ru,en})
     if el.get('format'):
@@ -4953,9 +4966,14 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                     emit_attr_column(lines, col, f'{inner}\t')
             if has_add_cols:
                 for ac in attr['additionalColumns']:
+                    ac_cols = ac.get('columns') or []
+                    if not ac_cols:
+                        # Пустая группа доп.колонок (table-ref без колонок) → self-closing (как платформа)
+                        lines.append(f'{inner}\t<AdditionalColumns table="{ac["table"]}"/>')
+                        continue
                     lines.append(f'{inner}\t<AdditionalColumns table="{ac["table"]}">')
                     seen_ac_cols = set()  # уникальность в пределах группы AdditionalColumns
-                    for col in (ac.get('columns') or []):
+                    for col in ac_cols:
                         _ensure_unique(str(col['name']), seen_ac_cols, f"column of '{attr_name}'")
                         emit_attr_column(lines, col, f'{inner}\t\t')
                     lines.append(f'{inner}\t</AdditionalColumns>')

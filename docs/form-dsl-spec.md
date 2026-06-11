@@ -489,6 +489,7 @@ companion-панели с собственным контентом. Оба не
 | Свойство | Тип | Описание |
 |----------|-----|----------|
 | `value` | string/number/bool | Значение варианта. Для перечисления — `"Enum.ИмяТипа.EnumValue.ИмяЗначения"` (xsi:type автоматически: `xr:DesignTimeRef` / `xs:string` / `xs:decimal` / `xs:boolean`) |
+| `valueType` | string | Явный xsi:type значения, переопределяет авто-детект. Нужен для **системных перечислений** (`ent:` namespace: `ent:AccountType`=ВидСчёта, `ent:AccumulationRecordType`, `ent:HorizontalAlignment`, … — см. «Системные перечисления» в палитре типов) и иных не-примитивных типов. Напр. `{ "value": "Active", "valueType": "ent:AccountType", "presentation": "Активный" }` |
 | `presentation` | string или object | Текст рядом с переключателем. Строка → ru; объект `{ru, en, ...}` → мультиязык. Если не задано — выводится из имени значения |
 
 #### label — LabelDecoration
