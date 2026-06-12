@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.135 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.136 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1310,6 +1310,16 @@ def emit_mltext(lines, indent, tag, text, xsi_type=None):
     lines.append(f"{indent}</{tag}>")
 
 
+def emit_us_presentation(lines, indent, tag, val):
+    # <dcsset:userSettingPresentation>: плоская строка → xsi:type="xs:string"; мультиязычный → v8:LocalStringType
+    if val is None:
+        return
+    if isinstance(val, str):
+        lines.append(f'{indent}<{tag} xsi:type="xs:string">{esc_xml(val)}</{tag}>')
+    else:
+        emit_mltext(lines, indent, tag, val, xsi_type='v8:LocalStringType')
+
+
 # Каноничные GUID пустых контейнеров ListSettings (умолчание платформы, ~90% форм).
 CANON_FILTER_ID = 'dfcece9d-5077-440b-b6b3-45a5cb4538eb'
 CANON_ORDER_ID = '88619765-ccb3-46c6-ac52-38e9c992ebd4'
@@ -1446,7 +1456,7 @@ def emit_filter_item(lines, item, indent):
             guid = new_uuid() if str(item['userSettingID']) == 'auto' else str(item['userSettingID'])
             lines.append(f'{indent}\t<dcsset:userSettingID>{esc_xml(guid)}</dcsset:userSettingID>')
         if item.get('userSettingPresentation'):
-            emit_mltext(lines, f'{indent}\t', 'dcsset:userSettingPresentation', item['userSettingPresentation'])
+            emit_us_presentation(lines, f'{indent}\t', 'dcsset:userSettingPresentation', item['userSettingPresentation'])
         lines.append(f'{indent}</dcsset:item>')
         return
 
@@ -1506,7 +1516,7 @@ def emit_filter_item(lines, item, indent):
         uid = new_uuid() if str(item['userSettingID']) == 'auto' else str(item['userSettingID'])
         lines.append(f'{indent}\t<dcsset:userSettingID>{esc_xml(uid)}</dcsset:userSettingID>')
     if item.get('userSettingPresentation'):
-        emit_mltext(lines, f'{indent}\t', 'dcsset:userSettingPresentation', item['userSettingPresentation'])
+        emit_us_presentation(lines, f'{indent}\t', 'dcsset:userSettingPresentation', item['userSettingPresentation'])
     lines.append(f'{indent}</dcsset:item>')
 
 
@@ -1721,7 +1731,7 @@ def emit_conditional_appearance(lines, items, indent, block_view_mode=None, bloc
             uid = new_uuid() if str(ca['userSettingID']) == 'auto' else str(ca['userSettingID'])
             lines.append(f'{indent}\t\t<dcsset:userSettingID>{esc_xml(uid)}</dcsset:userSettingID>')
         if ca.get('userSettingPresentation'):
-            emit_mltext(lines, f'{indent}\t\t', 'dcsset:userSettingPresentation', ca['userSettingPresentation'])
+            emit_us_presentation(lines, f'{indent}\t\t', 'dcsset:userSettingPresentation', ca['userSettingPresentation'])
         if ca.get('useInDontUse') and len(ca['useInDontUse']) > 0:
             use_in_order = ['group', 'hierarchicalGroup', 'overall', 'fieldsHeader', 'header',
                             'parameters', 'filter', 'resourceFieldsHeader', 'overallHeader',
@@ -4922,7 +4932,7 @@ def emit_data_parameters(lines, items, indent, block_view_mode=None):
             uid = new_uuid() if str(dp['userSettingID']) == 'auto' else str(dp['userSettingID'])
             lines.append(f'{indent}\t\t<dcsset:userSettingID>{esc_xml(uid)}</dcsset:userSettingID>')
         if dp.get('userSettingPresentation'):
-            emit_mltext(lines, f'{indent}\t\t', 'dcsset:userSettingPresentation', dp['userSettingPresentation'])
+            emit_us_presentation(lines, f'{indent}\t\t', 'dcsset:userSettingPresentation', dp['userSettingPresentation'])
         lines.append(f'{indent}\t</dcscor:item>')
     if block_view_mode is not None:
         lines.append(f'{indent}\t<dcsset:viewMode>{esc_xml(str(block_view_mode))}</dcsset:viewMode>')

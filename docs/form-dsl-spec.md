@@ -992,7 +992,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 ```
 
 - **order** — строка `"Поле"` (asc) / `"Поле desc"` (синонимы `убыв`/`desc`, `возр`/`asc`) / `"Auto"`, либо объект `{ field, direction?, use?, viewMode? }`.
-- **filter** — shorthand `"Поле оператор значение @флаги"` (`@off`, `@user`, `@quickAccess`, `@normal`, `@inaccessible`; `_` = пусто) или объект `{ field, op, value?, use?, userSettingID? }` или группа `{ group: "And"|"Or"|"Not", items: [...] }`.
+- **filter** — shorthand `"Поле оператор значение @флаги"` (`@off`, `@user`, `@quickAccess`, `@normal`, `@inaccessible`; `_` = пусто) или объект `{ field, op, value?, use?, userSettingID?, userSettingPresentation? }` или группа `{ group: "And"|"Or"|"Not", items: [...] }`. `userSettingPresentation` (кастомная подпись настройки) ведётся **по форме значения**: голая строка → `xsi:type="xs:string"`; объект `{ru,en}` → `v8:LocalStringType` (так же у `order`/`conditionalAppearance`/`dataParameters`).
   - **Операторы:** `=` `<>` `>` `>=` `<` `<=`, `in`/`notIn`, `inHierarchy`/`inListByHierarchy`, `contains`/`notContains`, `beginsWith`/`notBeginsWith`, `like`/`notLike` (подобно; `%`-шаблон в значении, напр. `"КодВалют like %/ %"`), `filled`/`notFilled`. Регистр оператора не важен; у `like`/`notLike` есть рус. синоним `подобно`/`неподобно`.
   - **Дата в фильтре = `StandardBeginningDate`** (так платформа хранит дату-значение почти всегда — корпус 268 vs 2 `xs:dateTime`). Формы значения (от компактной к полной):
     - **голая ISO-дата** `"2020-01-01T00:00:00"` (без `valueType`) → `Custom` + эта дата. Работает и в shorthand: `"ДатаЗаказа > 2020-01-01T00:00:00"`. Это дефолт даты в фильтре.

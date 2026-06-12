@@ -1,4 +1,4 @@
-﻿# form-decompile v0.108 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.109 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1259,7 +1259,7 @@ function Build-FormDataParameters {
 			if ($use -eq 'false') { $obj['use'] = $false }
 			if ($usidN) { $obj['userSettingID'] = 'auto' }
 			if ($vmN) { $obj['viewMode'] = $vmN.InnerText }
-			if ($uspN) { $usp = Get-MLText $uspN; if ($null -ne $usp) { $obj['userSettingPresentation'] = $usp } }
+			if ($uspN) { $usp = Get-PresText $uspN; if ($null -ne $usp) { $obj['userSettingPresentation'] = $usp } }
 			$entries += $obj
 		} else {
 			$s = $pn; if ($use -eq 'false') { $s += ' @off' }

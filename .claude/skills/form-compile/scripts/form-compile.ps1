@@ -1,4 +1,4 @@
-﻿# form-compile v1.135 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.136 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1577,6 +1577,19 @@ function Emit-MLText {
 	X "$indent</$tag>"
 }
 
+# <dcsset:userSettingPresentation> и подобные DCS-подписи: платформа пишет плоскую строку как
+# xsi:type="xs:string" (скаляр; корпус 26), мультиязычный текст — как xsi:type="v8:LocalStringType"
+# (7). Декомпилятор различает (Get-PresText: строка ИЛИ объект {ru,en}).
+function Emit-USPresentation {
+	param($val, [string]$tag, [string]$indent)
+	if ($null -eq $val) { return }
+	if ($val -is [string]) {
+		X "$indent<$tag xsi:type=`"xs:string`">$(Esc-Xml $val)</$tag>"
+	} else {
+		Emit-MLText -tag $tag -text $val -indent $indent -xsiType "v8:LocalStringType"
+	}
+}
+
 # Детектор «настоящей» inline-разметки форматированного текста (1С: <link>/<b>/<color>/…
 # и закрывающий </>). Плейсхолдеры вида <не заполнен> НЕ срабатывают (нет известного тега/</>).
 # ВАЖНО: regex должен быть идентичен в form-decompile (иначе гибрид-раундтрип поедет).
@@ -1689,7 +1702,7 @@ function Emit-FilterItem {
 			$guid = if ("$($item.userSettingID)" -eq "auto") { New-Guid-String } else { "$($item.userSettingID)" }
 			X "$indent`t<dcsset:userSettingID>$(Esc-Xml $guid)</dcsset:userSettingID>"
 		}
-		if ($item.userSettingPresentation) { Emit-MLText -tag "dcsset:userSettingPresentation" -text $item.userSettingPresentation -indent "$indent`t" }
+		if ($item.userSettingPresentation) { Emit-USPresentation -val $item.userSettingPresentation -tag "dcsset:userSettingPresentation" -indent "$indent`t" }
 		X "$indent</dcsset:item>"
 		return
 	}
@@ -1770,7 +1783,7 @@ function Emit-FilterItem {
 		$uid = if ("$($item.userSettingID)" -eq "auto") { New-Guid-String } else { "$($item.userSettingID)" }
 		X "$indent`t<dcsset:userSettingID>$(Esc-Xml $uid)</dcsset:userSettingID>"
 	}
-	if ($item.userSettingPresentation) { Emit-MLText -tag "dcsset:userSettingPresentation" -text $item.userSettingPresentation -indent "$indent`t" }
+	if ($item.userSettingPresentation) { Emit-USPresentation -val $item.userSettingPresentation -tag "dcsset:userSettingPresentation" -indent "$indent`t" }
 	X "$indent</dcsset:item>"
 }
 
@@ -1971,7 +1984,7 @@ function Emit-ConditionalAppearance {
 			$uid = if ("$($ca.userSettingID)" -eq "auto") { New-Guid-String } else { "$($ca.userSettingID)" }
 			X "$indent`t`t<dcsset:userSettingID>$(Esc-Xml $uid)</dcsset:userSettingID>"
 		}
-		if ($ca.userSettingPresentation) { Emit-MLText -tag "dcsset:userSettingPresentation" -text $ca.userSettingPresentation -indent "$indent`t`t" }
+		if ($ca.userSettingPresentation) { Emit-USPresentation -val $ca.userSettingPresentation -tag "dcsset:userSettingPresentation" -indent "$indent`t`t" }
 		if ($ca.useInDontUse -and $ca.useInDontUse.Count -gt 0) {
 			$useInOrder = @('group','hierarchicalGroup','overall','fieldsHeader','header','parameters','filter','resourceFieldsHeader','overallHeader','overallResourceFieldsHeader')
 			$set = @{}
@@ -5175,7 +5188,7 @@ function Emit-DataParameters {
 		}
 		if ($dp.viewMode) { X "$indent`t`t<dcsset:viewMode>$(Esc-Xml "$($dp.viewMode)")</dcsset:viewMode>" }
 		if ($dp.userSettingID) { $uid = if ("$($dp.userSettingID)" -eq "auto") { New-Guid-String } else { "$($dp.userSettingID)" }; X "$indent`t`t<dcsset:userSettingID>$(Esc-Xml $uid)</dcsset:userSettingID>" }
-		if ($dp.userSettingPresentation) { Emit-MLText -tag "dcsset:userSettingPresentation" -text $dp.userSettingPresentation -indent "$indent`t`t" }
+		if ($dp.userSettingPresentation) { Emit-USPresentation -val $dp.userSettingPresentation -tag "dcsset:userSettingPresentation" -indent "$indent`t`t" }
 		X "$indent`t</dcscor:item>"
 	}
 	if ($null -ne $blockViewMode) { X "$indent`t<dcsset:viewMode>$(Esc-Xml "$blockViewMode")</dcsset:viewMode>" }

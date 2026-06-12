@@ -135,8 +135,29 @@
 							<dcsset:comparisonType>Like</dcsset:comparisonType>
 							<dcsset:right xsi:type="xs:string">%abc%</dcsset:right>
 						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:left xsi:type="dcscor:Field">Code</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:userSettingID>UUID-003</dcsset:userSettingID>
+							<dcsset:userSettingPresentation xsi:type="xs:string">Код товара</dcsset:userSettingPresentation>
+						</dcsset:item>
+						<dcsset:item xsi:type="dcsset:FilterItemComparison">
+							<dcsset:left xsi:type="dcscor:Field">Description</dcsset:left>
+							<dcsset:comparisonType>Equal</dcsset:comparisonType>
+							<dcsset:userSettingID>UUID-004</dcsset:userSettingID>
+							<dcsset:userSettingPresentation xsi:type="v8:LocalStringType">
+								<v8:item>
+									<v8:lang>ru</v8:lang>
+									<v8:content>Наименование</v8:content>
+								</v8:item>
+								<v8:item>
+									<v8:lang>en</v8:lang>
+									<v8:content>Name</v8:content>
+								</v8:item>
+							</dcsset:userSettingPresentation>
+						</dcsset:item>
 						<dcsset:viewMode>Normal</dcsset:viewMode>
-						<dcsset:userSettingID>UUID-003</dcsset:userSettingID>
+						<dcsset:userSettingID>UUID-005</dcsset:userSettingID>
 					</dcsset:filter>
 					<dcsset:dataParameters>
 						<dcscor:item xsi:type="dcsset:SettingsParameterValue">
@@ -154,7 +175,7 @@
 							<dcsset:orderType>Desc</dcsset:orderType>
 						</dcsset:item>
 						<dcsset:viewMode>Normal</dcsset:viewMode>
-						<dcsset:userSettingID>UUID-004</dcsset:userSettingID>
+						<dcsset:userSettingID>UUID-006</dcsset:userSettingID>
 					</dcsset:order>
 					<dcsset:conditionalAppearance>
 						<dcsset:item>
@@ -173,10 +194,10 @@
 							</dcsset:appearance>
 						</dcsset:item>
 						<dcsset:viewMode>Normal</dcsset:viewMode>
-						<dcsset:userSettingID>UUID-005</dcsset:userSettingID>
+						<dcsset:userSettingID>UUID-007</dcsset:userSettingID>
 					</dcsset:conditionalAppearance>
 					<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>
-					<dcsset:itemsUserSettingID>UUID-006</dcsset:itemsUserSettingID>
+					<dcsset:itemsUserSettingID>UUID-008</dcsset:itemsUserSettingID>
 				</ListSettings>
 			</Settings>
 		</Attribute>
