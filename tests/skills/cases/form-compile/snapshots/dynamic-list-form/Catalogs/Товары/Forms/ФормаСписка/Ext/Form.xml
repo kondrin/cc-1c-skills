@@ -109,6 +109,13 @@
 							<v8:content>Код</v8:content>
 						</v8:item>
 					</dcssch:title>
+					<dcssch:useRestriction>
+						<dcssch:condition>true</dcssch:condition>
+						<dcssch:group>true</dcssch:group>
+					</dcssch:useRestriction>
+					<dcssch:attributeUseRestriction>
+						<dcssch:field>true</dcssch:field>
+					</dcssch:attributeUseRestriction>
 					<dcssch:presentationExpression>"№" + Code</dcssch:presentationExpression>
 					<dcssch:appearance>
 						<dcscor:item xsi:type="dcsset:SettingsParameterValue">

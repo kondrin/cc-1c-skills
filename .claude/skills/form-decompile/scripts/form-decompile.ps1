@@ -1,4 +1,4 @@
-﻿# form-decompile v0.114 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.115 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1244,6 +1244,14 @@ function Decompile-Type {
 	if ($parts.Count -eq 0) { return $null }
 	if ($parts.Count -eq 1) { return $parts[0] }
 	return ($parts -join ' | ')
+}
+
+# Ограничения использования (useRestriction/attributeUseRestriction) → объект {field?,condition?,group?,order?}.
+function Build-RestrictObj {
+	param($node)
+	$r = [ordered]@{}
+	foreach ($k in 'field','condition','group','order') { if ((Get-Child $node $k) -eq 'true') { $r[$k] = $true } }
+	return $r
 }
 
 # Вычисляемое поле DataSet динамического списка (<CalculatedField>) → объектная модель.
@@ -2619,6 +2627,12 @@ if ($attrsNode) {
 					if ($null -ne $fpe -and $fpe -ne '') { $fo['presentationExpression'] = $fpe }
 					$fappNode = $fn.SelectSingleNode("dcssch:appearance", $ns)
 					if ($fappNode) { $fap = Get-SettingsAppearance $fappNode; if ($fap -and $fap.Count -gt 0) { $fo['appearance'] = $fap } }
+					$furNode = $fn.SelectSingleNode("dcssch:useRestriction", $ns)
+					if ($furNode) { $fur = Build-RestrictObj $furNode; if ($fur.Count -gt 0) { $fo['useRestriction'] = $fur } }
+					$faurNode = $fn.SelectSingleNode("dcssch:attributeUseRestriction", $ns)
+					if ($faurNode) { $faur = Build-RestrictObj $faurNode; if ($faur.Count -gt 0) { $fo['attributeUseRestriction'] = $faur } }
+					$fipNode = $fn.SelectSingleNode("dcssch:inputParameters", $ns)
+					if ($fipNode) { $fip = Build-DLInputParameters $fipNode; if (@($fip).Count -gt 0) { $fo['inputParameters'] = $fip } }
 					[void]$fields.Add($fo)
 				}
 				$so['fields'] = @($fields)

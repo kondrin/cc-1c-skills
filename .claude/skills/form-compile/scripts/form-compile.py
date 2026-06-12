@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.141 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.142 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1830,6 +1830,31 @@ def emit_calc_fields(lines, calc_fields, indent):
         if type_str:
             emit_dl_value_type(lines, type_str, ci)
         lines.append(f'{indent}</CalculatedField>')
+
+
+# Ограничения использования поля/вычисляемого поля (useRestriction / attributeUseRestriction).
+# Значение: объект {field?,condition?,group?,order?} | флаг-строка "#noField …" | массив.
+def parse_restrict(ur):
+    if not ur:
+        return []
+    if isinstance(ur, dict):
+        return [k for k in ('field', 'condition', 'group', 'order') if ur.get(k)]
+    if isinstance(ur, str):
+        return [_CALC_RESTRICT_MAP.get(t.strip().lstrip('#'), t.strip().lstrip('#')) for t in ur.split() if t.strip()]
+    if isinstance(ur, list):
+        return [_CALC_RESTRICT_MAP.get(str(r), str(r)) for r in ur]
+    return []
+
+
+def emit_restrict_block(lines, tag, ur, indent):
+    r = parse_restrict(ur)
+    if not r:
+        return
+    lines.append(f'{indent}<dcssch:{tag}>')
+    for k in ('field', 'condition', 'group', 'order'):
+        if k in r:
+            lines.append(f'{indent}\t<dcssch:{k}>true</dcssch:{k}>')
+    lines.append(f'{indent}</dcssch:{tag}>')
 
 
 def emit_conditional_appearance(lines, items, indent, block_view_mode=None, block_user_setting_id=None, wrap_tag='dcsset:conditionalAppearance'):
@@ -5373,6 +5398,9 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                         lines.append(f'{si}\t<dcssch:title xsi:type="v8:LocalStringType">')
                         emit_ml_items(lines, f'{si}\t\t', fld['title'])
                         lines.append(f'{si}\t</dcssch:title>')
+                    # Ограничения использования поля — после title, перед presentationExpression
+                    emit_restrict_block(lines, 'useRestriction', fld.get('useRestriction'), f'{si}\t')
+                    emit_restrict_block(lines, 'attributeUseRestriction', fld.get('attributeUseRestriction'), f'{si}\t')
                     # presentationExpression поля — перед valueType (порядок исходника)
                     if fld.get('presentationExpression'):
                         lines.append(f'{si}\t<dcssch:presentationExpression>{esc_xml(str(fld["presentationExpression"]))}</dcssch:presentationExpression>')
@@ -5385,6 +5413,9 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                         for ak, av in fld['appearance'].items():
                             emit_appearance_value(lines, ak, av, f'{si}\t\t')
                         lines.append(f'{si}\t</dcssch:appearance>')
+                    # inputParameters поля (связь по параметрам выбора) — в конце
+                    if fld.get('inputParameters'):
+                        emit_dl_input_parameters(lines, fld['inputParameters'], f'{si}\t')
                     lines.append(f'{si}</Field>')
             # Вычисляемые поля DataSet (<CalculatedField>) — после Field*, до Parameter*.
             emit_calc_fields(lines, s.get('calculatedFields'), si)

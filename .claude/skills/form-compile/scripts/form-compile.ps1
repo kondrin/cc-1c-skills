@@ -1,4 +1,4 @@
-﻿# form-compile v1.141 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.142 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2139,6 +2139,31 @@ function Emit-CalcFields {
 		if ($typeStr) { Emit-DLValueType -typeStr $typeStr -indent $ci }
 		X "$indent</CalculatedField>"
 	}
+}
+
+# Ограничения использования поля/вычисляемого поля (useRestriction / attributeUseRestriction).
+# Значение: объект {field?,condition?,group?,order?} | флаг-строка "#noField #noFilter #noGroup #noOrder" | массив.
+function Get-RestrictList {
+	param($ur)
+	$out = @()
+	if (-not $ur) { return ,$out }
+	if ($ur -is [System.Management.Automation.PSCustomObject] -or $ur -is [hashtable]) {
+		foreach ($k in 'field','condition','group','order') { if ($ur.$k -eq $true) { $out += $k } }
+	} elseif ($ur -is [string]) {
+		foreach ($tok in ($ur -split '\s+')) { $t = $tok.Trim().TrimStart('#'); if ($t) { $out += $(if ($script:calcRestrictMap[$t]) { $script:calcRestrictMap[$t] } else { $t }) } }
+	} else {
+		foreach ($r in $ur) { $rr = "$r"; $out += $(if ($script:calcRestrictMap[$rr]) { $script:calcRestrictMap[$rr] } else { $rr }) }
+	}
+	return ,$out
+}
+
+function Emit-RestrictBlock {
+	param([string]$tag, $ur, [string]$indent)
+	$r = Get-RestrictList $ur
+	if ($r.Count -eq 0) { return }
+	X "$indent<dcssch:$tag>"
+	foreach ($k in @('field','condition','group','order')) { if ($r -contains $k) { X "$indent`t<dcssch:$k>true</dcssch:$k>" } }
+	X "$indent</dcssch:$tag>"
 }
 
 # --- 5. Type emitter ---
@@ -5626,6 +5651,9 @@ function Emit-Attributes {
 						Emit-MLItems -val $fld.title -indent "$si`t`t"
 						X "$si`t</dcssch:title>"
 					}
+					# Ограничения использования поля — после title, перед presentationExpression (порядок исходника)
+					Emit-RestrictBlock 'useRestriction' $fld.useRestriction "$si`t"
+					Emit-RestrictBlock 'attributeUseRestriction' $fld.attributeUseRestriction "$si`t"
 					# presentationExpression поля — перед valueType (порядок исходника)
 					if ($fld.presentationExpression) { X "$si`t<dcssch:presentationExpression>$(Esc-Xml "$($fld.presentationExpression)")</dcssch:presentationExpression>" }
 					# valueType поля набора (тип значения; вычисляемые/кастомные поля)
@@ -5636,6 +5664,8 @@ function Emit-Attributes {
 						foreach ($prop in $fld.appearance.PSObject.Properties) { Emit-AppearanceValue -key $prop.Name -val $prop.Value -indent "$si`t`t" }
 						X "$si`t</dcssch:appearance>"
 					}
+					# inputParameters поля (связь по параметрам выбора) — в конце
+					if ($fld.inputParameters) { Emit-DLInputParameters -ip $fld.inputParameters -indent "$si`t" }
 					X "$si</Field>"
 				}
 			}

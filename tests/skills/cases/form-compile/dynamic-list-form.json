@@ -22,6 +22,8 @@
         "parameters": [ { "name": "ВыборТовара", "type": "CatalogRef.Товары", "valueListAllowed": true, "value": null } ],
         "fields": [
           { "field": "Code", "title": "Код", "presentationExpression": "\"№\" + Code",
+            "useRestriction": { "condition": true, "group": true },
+            "attributeUseRestriction": { "field": true },
             "appearance": { "Формат": "ДЛ=9", "ЦветТекста": "web:Gray" } }
         ],
         "grouping": "Description > Code",
