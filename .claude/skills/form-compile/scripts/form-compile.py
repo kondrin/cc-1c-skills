@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.132 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.133 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1333,8 +1333,12 @@ COMPARISON_TYPES = {
     'inHierarchy': 'InHierarchy', 'inListByHierarchy': 'InListByHierarchy',
     'contains': 'Contains', 'notContains': 'NotContains',
     'beginsWith': 'BeginsWith', 'notBeginsWith': 'NotBeginsWith',
+    'like': 'Like', 'notLike': 'NotLike',
+    'подобно': 'Like', 'неподобно': 'NotLike',  # рус. синоним
     'filled': 'Filled', 'notFilled': 'NotFilled',
 }
+# Регистронезависимый лукап (зеркало PS-хэша): Like/LIKE/ПОДОБНО → канон
+_COMPARISON_TYPES_CI = {k.lower(): v for k, v in COMPARISON_TYPES.items()}
 
 _REF_TYPE_RE = re.compile(
     r'^(Перечисление|Справочник|ПланСчетов|Документ|ПланВидовХарактеристик|ПланВидовРасчета|'
@@ -1365,9 +1369,10 @@ def parse_filter_shorthand(s):
     op_patterns = ['<>', '>=', '<=', '=', '>', '<',
                    r'notIn\b', r'in\b', r'inHierarchy\b', r'inListByHierarchy\b',
                    r'notContains\b', r'contains\b', r'notBeginsWith\b', r'beginsWith\b',
+                   r'notLike\b', r'like\b', r'неподобно\b', r'подобно\b',
                    r'notFilled\b', r'filled\b']
     op_joined = '|'.join(op_patterns)
-    m = re.match(r'^(.+?)\s+(' + op_joined + r')\s*(.*)?$', s)
+    m = re.match(r'^(.+?)\s+(' + op_joined + r')\s*(.*)?$', s, re.IGNORECASE)
     if m:
         result['field'] = m.group(1).strip()
         result['op'] = m.group(2).strip()
@@ -1449,7 +1454,8 @@ def emit_filter_item(lines, item, indent):
     if item.get('use') is False:
         lines.append(f'{indent}\t<dcsset:use>false</dcsset:use>')
     lines.append(f'{indent}\t<dcsset:left xsi:type="dcscor:Field">{esc_xml(str(item.get("field", "")))}</dcsset:left>')
-    comp_type = COMPARISON_TYPES.get(str(item.get('op')))
+    # Регистронезависимый лукап (зеркало PS): Like/LIKE/ПОДОБНО → канон; иначе — как есть
+    comp_type = _COMPARISON_TYPES_CI.get(str(item.get('op')).lower())
     if not comp_type:
         comp_type = str(item.get('op'))
     lines.append(f'{indent}\t<dcsset:comparisonType>{esc_xml(comp_type)}</dcsset:comparisonType>')

@@ -20,7 +20,7 @@
       { "name": "Список", "type": "DynamicList", "useAlways": ["~Артикул", "Список.Code", "Description"], "settings": {
         "mainTable": "Catalog.Товары", "dynamicDataRead": true, "autoSaveUserSettings": false,
         "order": [ "Description", "Code desc" ],
-        "filter": [ "Артикул = _ @off @user" ],
+        "filter": [ "Артикул = _ @off @user", "Артикул like %тест%", "Description подобно %abc%" ],
         "conditionalAppearance": [ { "filter": ["Артикул = _"], "appearance": { "ЦветТекста": "web:Red" } } ]
       } }
     ],

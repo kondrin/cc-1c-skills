@@ -1,4 +1,4 @@
-﻿# form-decompile v0.106 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.107 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -458,6 +458,7 @@ $script:filterOpMap = @{
 	'InHierarchy'='inHierarchy'; 'InListByHierarchy'='inListByHierarchy';
 	'Contains'='contains'; 'NotContains'='notContains';
 	'BeginsWith'='beginsWith'; 'NotBeginsWith'='notBeginsWith';
+	'Like'='like'; 'NotLike'='notLike';
 	'Filled'='filled'; 'NotFilled'='notFilled'
 }
 

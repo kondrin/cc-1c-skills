@@ -1,4 +1,4 @@
-﻿# form-compile v1.132 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.133 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -1627,6 +1627,8 @@ $script:comparisonTypes = @{
 	"inHierarchy" = "InHierarchy"; "inListByHierarchy" = "InListByHierarchy"
 	"contains" = "Contains"; "notContains" = "NotContains"
 	"beginsWith" = "BeginsWith"; "notBeginsWith" = "NotBeginsWith"
+	"like" = "Like"; "notLike" = "NotLike"
+	"подобно" = "Like"; "неподобно" = "NotLike"   # рус. синоним (хэш регистронезависим: ПОДОБНО=подобно)
 	"filled" = "Filled"; "notFilled" = "NotFilled"
 }
 
@@ -1642,6 +1644,7 @@ function Parse-FilterShorthand {
 	$opPatterns = @('<>', '>=', '<=', '=', '>', '<',
 		'notIn\b', 'in\b', 'inHierarchy\b', 'inListByHierarchy\b',
 		'notContains\b', 'contains\b', 'notBeginsWith\b', 'beginsWith\b',
+		'notLike\b', 'like\b', 'неподобно\b', 'подобно\b',
 		'notFilled\b', 'filled\b')
 	$opJoined = $opPatterns -join '|'
 	if ($s -match "^(.+?)\s+($opJoined)\s*(.*)?$") {
