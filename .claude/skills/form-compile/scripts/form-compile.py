@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.137 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.138 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -3373,6 +3373,13 @@ def resolve_type_str(type_str):
 
 def emit_single_type(lines, type_str, indent):
     type_str = resolve_type_str(type_str)
+    # TypeId — тип, заданный глобальным стабильным GUID (<v8:TypeId>, не <v8:Type>). Платформа так
+    # сериализует типы, чьё имя в этом контексте недоступно (определяемые/характеристики). GUID
+    # глобально стабилен → эмитим verbatim (как роль-по-GUID). Маркер декомпилятора: 'typeid:GUID'.
+    m = re.match(r'^typeid:([0-9a-fA-F-]{36})$', type_str)
+    if m:
+        lines.append(f'{indent}<v8:TypeId>{m.group(1)}</v8:TypeId>')
+        return
     # boolean
     if type_str == 'boolean':
         lines.append(f'{indent}<v8:Type>xs:boolean</v8:Type>')
@@ -5212,7 +5219,10 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
             # Явные поля набора (редко): override title/dataPath
             if s.get('fields'):
                 for fld in s['fields']:
-                    lines.append(f'{si}<Field xsi:type="dcssch:DataSetFieldField">')
+                    # Тип поля набора: DataSetFieldField (дефолт) vs DataSetFieldNestedDataSet
+                    # (поле-вложенный набор = реквизит табличной части; маркер nested).
+                    ftype = 'DataSetFieldNestedDataSet' if fld.get('nested') else 'DataSetFieldField'
+                    lines.append(f'{si}<Field xsi:type="dcssch:{ftype}">')
                     dp = fld.get('dataPath') or fld.get('field')
                     lines.append(f'{si}\t<dcssch:dataPath>{esc_xml(str(dp))}</dcssch:dataPath>')
                     lines.append(f'{si}\t<dcssch:field>{esc_xml(str(fld.get("field", "")))}</dcssch:field>')
@@ -5232,6 +5242,7 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
             # Нет items → контейнеры всё равно эмитятся (blockMeta) = каноничный пустой скелет платформы.
             lsi = f'{si}\t'
             lines.append(f'{si}<ListSettings>')
+            ls_open_idx = len(lines) - 1  # для self-closing, если внутри ничего не эмитнётся
             ls_shape = s.get('listSettings')
             if ls_shape is not None:
                 # Частичная/минимальная форма скелета — эмитим ТОЛЬКО указанные части с их блок-метой.
@@ -5261,7 +5272,11 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                 emit_conditional_appearance(lines, s.get('conditionalAppearance'), lsi, block_view_mode='Normal', block_user_setting_id=CANON_CA_ID)
                 lines.append(f'{lsi}<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>')
                 lines.append(f'{lsi}<dcsset:itemsUserSettingID>{CANON_ITEMS_ID}</dcsset:itemsUserSettingID>')
-            lines.append(f'{si}</ListSettings>')
+            if len(lines) - 1 == ls_open_idx:
+                # Пустой дескриптор listSettings:{} (оригинал = <ListSettings/>) → зеркалим self-closing.
+                lines[ls_open_idx] = f'{si}<ListSettings/>'
+            else:
+                lines.append(f'{si}</ListSettings>')
             lines.append(f'{inner}</Settings>')
 
         lines.append(f'{indent}\t</Attribute>')

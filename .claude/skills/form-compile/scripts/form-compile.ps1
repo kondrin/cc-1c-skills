@@ -1,4 +1,4 @@
-﻿# form-compile v1.137 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.138 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2105,6 +2105,14 @@ function Emit-SingleType {
 	param([string]$typeStr, [string]$indent)
 
 	$typeStr = Resolve-TypeStr $typeStr
+
+	# TypeId — тип, заданный глобальным стабильным GUID (<v8:TypeId>, не <v8:Type>). Платформа так
+	# сериализует типы, чьё имя в этом контексте недоступно (определяемые/характеристики). GUID
+	# глобально стабилен → эмитим verbatim (как роль-по-GUID). Маркер декомпилятора: 'typeid:GUID'.
+	if ($typeStr -match '^typeid:([0-9a-fA-F-]{36})$') {
+		X "$indent<v8:TypeId>$($Matches[1])</v8:TypeId>"
+		return
+	}
 
 	# boolean
 	if ($typeStr -eq "boolean") {
@@ -5471,7 +5479,10 @@ function Emit-Attributes {
 			# Явные поля набора (редко): override title/dataPath
 			if ($st.fields) {
 				foreach ($fld in $st.fields) {
-					X "$si<Field xsi:type=`"dcssch:DataSetFieldField`">"
+					# Тип поля набора: DataSetFieldField (дефолт) vs DataSetFieldNestedDataSet
+					# (поле-вложенный набор = реквизит табличной части; маркер nested).
+					$ftype = if ($fld.nested) { "DataSetFieldNestedDataSet" } else { "DataSetFieldField" }
+					X "$si<Field xsi:type=`"dcssch:$ftype`">"
 					$dp = if ($fld.dataPath) { $fld.dataPath } else { $fld.field }
 					X "$si`t<dcssch:dataPath>$(Esc-Xml "$dp")</dcssch:dataPath>"
 					X "$si`t<dcssch:field>$(Esc-Xml "$($fld.field)")</dcssch:field>"
@@ -5491,7 +5502,9 @@ function Emit-Attributes {
 			# ListSettings: filter/order/conditionalAppearance (skd-грамматика) + каноничные блок-GUID.
 			# Нет items → контейнеры всё равно эмитятся (blockMeta) = каноничный пустой скелет платформы.
 			$lsi = "$si`t"
+			$lsOpenLen = $script:xml.Length
 			X "$si<ListSettings>"
+			$lsAfterOpenLen = $script:xml.Length  # для self-closing, если внутри ничего не эмитнётся
 			if ($st.PSObject.Properties['listSettings'] -and $null -ne $st.listSettings) {
 				# Частичная/минимальная форма скелета — эмитим ТОЛЬКО указанные части с их блок-метой.
 				# meta: 'v'=viewMode, 'u'=userSettingID (контейнеры); itemsViewMode/itemsUserSettingID → present.
@@ -5516,7 +5529,13 @@ function Emit-Attributes {
 				X "$lsi<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>"
 				X "$lsi<dcsset:itemsUserSettingID>$($script:CANON_ITEMS_ID)</dcsset:itemsUserSettingID>"
 			}
-			X "$si</ListSettings>"
+			if ($script:xml.Length -eq $lsAfterOpenLen) {
+				# Пустой дескриптор listSettings:{} (оригинал = <ListSettings/>) → зеркалим self-closing.
+				$script:xml.Length = $lsOpenLen
+				X "$si<ListSettings/>"
+			} else {
+				X "$si</ListSettings>"
+			}
 			X "$inner</Settings>"
 		}
 

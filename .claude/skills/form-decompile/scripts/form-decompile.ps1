@@ -1,4 +1,4 @@
-﻿# form-decompile v0.110 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.111 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1179,6 +1179,12 @@ function Decompile-Type {
 		$raw = $ts.InnerText.Trim()
 		$short = $raw -replace '^(v8ui|v8|cfg):', ''
 		[void]$parts.Add($short)
+	}
+	# TypeId — тип, заданный глобальным стабильным GUID (<v8:TypeId>, не <v8:Type>). Платформа так
+	# сериализует типы, чьё имя в этом контексте недоступно (определяемые/характеристики). GUID глобально
+	# стабилен → эмитим verbatim как маркер 'typeid:GUID' (компилятор разворачивает обратно; как роль-по-GUID).
+	foreach ($ti in @($typeNode.SelectNodes("v8:TypeId", $ns))) {
+		[void]$parts.Add("typeid:" + $ti.InnerText.Trim())
 	}
 	if ($parts.Count -eq 0) { return $null }
 	if ($parts.Count -eq 1) { return $parts[0] }
@@ -2507,6 +2513,9 @@ if ($attrsNode) {
 					$dp  = Get-Child $fn 'dataPath'
 					if ($fld) { $fo['field'] = $fld }
 					if ($dp -and $dp -ne $fld) { $fo['dataPath'] = $dp }
+					# Тип поля набора: DataSetFieldField (дефолт, компилятор хардкодит) vs
+					# DataSetFieldNestedDataSet (поле-вложенный набор = реквизит табличной части). Маркер nested.
+					if ($fn.GetAttribute("type", $NS_XSI) -match 'NestedDataSet$') { $fo['nested'] = $true }
 					$ftn = $fn.SelectSingleNode("dcssch:title", $ns)
 					if ($ftn) { $t = Get-LangText $ftn; if ($null -ne $t) { $fo['title'] = $t } }
 					[void]$fields.Add($fo)

@@ -940,7 +940,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `query` | string | Текст запроса (`ManualQuery=true`). Поддерживает `@file.sql` (путь относительно JSON) |
 | `dynamicDataRead` | bool | Динамическое считывание. **Умолчание `true`** — указывать только для отключения (`false`) |
 | `autoFillAvailableFields` | bool | Автозаполнение доступных полей (`<AutoFillAvailableFields>`). **Умолчание `true`** — указывать только для отключения (`false`; тогда поля берутся из явного запроса, не авто). Эмитится первым в `<Settings>` |
-| `fields` | array | Явные поля набора (редко): `{ field, dataPath?, title? }` — для переопределения заголовка. Обычно поля выводятся из запроса автоматически |
+| `fields` | array | Явные поля набора (редко): `{ field, dataPath?, title?, nested? }` — для переопределения заголовка. `nested: true` помечает поле-вложенный набор (`DataSetFieldNestedDataSet` = реквизит табличной части объекта; дефолт — `DataSetFieldField`). Обычно поля выводятся из запроса автоматически |
 | `parameters` | array | Параметры схемы запроса (`DataCompositionSchemaParameter`) — см. ниже |
 | `order` | array | Сортировка списка (см. ниже) |
 | `filter` | array | Отбор списка (грамматика как в СКД) |
@@ -951,7 +951,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 
 Пустой блок настроек компоновщика (`ListSettings`) генерируется автоматически (каноничный полный скелет платформы — filter+order+conditionalAppearance+itemsViewMode+itemsUserSettingID, ~93% форм); указывать ничего не нужно.
 
-| `listSettings` | object | **Дескриптор формы скелета `<ListSettings>`** — только для НЕ-каноничных (частичных/минимальных) форм. Ordered-карта present top-level элементов: контейнеры `filter`/`order`/`conditionalAppearance` → блок-мета (`"vu"`=viewMode+userSettingID, `"u"`=только userSettingID, `"v"`, `""`); `itemsViewMode`/`itemsUserSettingID` → `true`. Компилятор эмитит ТОЛЬКО указанные части (контент берёт из `filter`/`order`/`conditionalAppearance`). Нет ключа → полный каноничный скелет. Декомпилятор пишет дескриптор только для отклонений от канона |
+| `listSettings` | object | **Дескриптор формы скелета `<ListSettings>`** — только для НЕ-каноничных (частичных/минимальных) форм. Ordered-карта present top-level элементов: контейнеры `filter`/`order`/`conditionalAppearance` → блок-мета (`"vu"`=viewMode+userSettingID, `"u"`=только userSettingID, `"v"`, `""`); `itemsViewMode`/`itemsUserSettingID` → `true`. Компилятор эмитит ТОЛЬКО указанные части (контент берёт из `filter`/`order`/`conditionalAppearance`). Нет ключа → полный каноничный скелет. Пустой объект `{}` → self-closing `<ListSettings/>` (оригинал без скелета). Декомпилятор пишет дескриптор только для отклонений от канона |
 
 #### parameters — параметры схемы дин-списка
 
@@ -978,6 +978,8 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `value` | Умолчание — пустое (`xsi:nil`), даже при заданном типе |
 
 Объектные ключи (как в СКД): `name`, `title`, `type`/`valueType`, `value`, `valueListAllowed`, `useRestriction`, `availableAsField`, `expression`, `availableValues` (`[{ value, presentation }]`), `inputParameters`, `denyIncompleteValues`, `use`.
+
+> **Тип-токен `typeid:<GUID>`** (раундтрип, не для ручного авторинга) — тип, заданный глобальным стабильным GUID (`<v8:TypeId>`, не `<v8:Type>`). Платформа так сериализует типы, чьё имя в данном контексте недоступно (определяемые типы / характеристики). GUID глобально стабилен → эмитится verbatim. Применим везде, где принимается `type`/`valueType` (параметры, реквизиты). Декомпилятор ставит его сам; вручную указывают только реальный существующий GUID типа конфигурации.
 
 > **`value: null` при `valueListAllowed: true`** — явный маркер «эмитить `<dcssch:value xsi:nil/>`». Платформа пишет nil-значение для valueListAllowed-параметра не всегда (корпус 27 с / 47 без); по умолчанию (ключ `value` отсутствует) компилятор его НЕ эмитит. Декомпилятор ставит `value: null`, когда оригинал содержит nil-тег.
 
