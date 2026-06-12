@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.138 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.139 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -1687,6 +1687,64 @@ def emit_appearance_value(lines, key, val, indent):
             for nk, nv in nested_items.items():
                 emit_appearance_value(lines, nk, nv, f'{indent}\t')
     lines.append(f'{indent}</dcscor:item>')
+
+
+# === Группировка строк динамического списка (DCS-структура ListSettings) ===
+# Линейная цепочка <dcsset:item StructureItemGroup> (каждый уровень = одно поле в groupItems;
+# вложенность — через дочерний <dcsset:item>). Плоская модель уровней (список всегда линеен).
+def get_list_grouping_value(s):
+    for k in ('grouping', 'structure', 'группировка'):
+        if s.get(k):
+            return s[k]
+    return None
+
+
+def parse_list_grouping(grouping):
+    # Шорткат "A > B > C" → массив имён; массив строк/объектов → как есть.
+    if not grouping:
+        return []
+    if isinstance(grouping, str):
+        return [p.strip() for p in re.split(r'\s*>\s*', grouping) if p.strip()]
+    return list(grouping)
+
+
+def emit_group_item_field(lines, level, indent):
+    if isinstance(level, str):
+        field, gt, pat = level, 'Items', 'None'
+        pab = pae = '0001-01-01T00:00:00'
+    else:
+        field = str(level.get('field', ''))
+        gt = str(level.get('groupType') or 'Items')
+        pat = str(level.get('periodAdditionType') or 'None')
+        pab = str(level.get('periodAdditionBegin') or '0001-01-01T00:00:00')
+        pae = str(level.get('periodAdditionEnd') or '0001-01-01T00:00:00')
+    lines.append(f'{indent}<dcsset:item xsi:type="dcsset:GroupItemField">')
+    lines.append(f'{indent}\t<dcsset:field>{esc_xml(field)}</dcsset:field>')
+    lines.append(f'{indent}\t<dcsset:groupType>{esc_xml(gt)}</dcsset:groupType>')
+    lines.append(f'{indent}\t<dcsset:periodAdditionType>{esc_xml(pat)}</dcsset:periodAdditionType>')
+    # Авто-детект: ISO-дата → xs:dateTime, иначе путь → dcscor:Field.
+    pab_t = 'xs:dateTime' if re.match(r'^\d{4}-\d{2}-\d{2}T', pab) else 'dcscor:Field'
+    pae_t = 'xs:dateTime' if re.match(r'^\d{4}-\d{2}-\d{2}T', pae) else 'dcscor:Field'
+    lines.append(f'{indent}\t<dcsset:periodAdditionBegin xsi:type="{pab_t}">{esc_xml(pab)}</dcsset:periodAdditionBegin>')
+    lines.append(f'{indent}\t<dcsset:periodAdditionEnd xsi:type="{pae_t}">{esc_xml(pae)}</dcsset:periodAdditionEnd>')
+    lines.append(f'{indent}</dcsset:item>')
+
+
+def emit_list_grouping_levels(lines, levels, i, indent):
+    lines.append(f'{indent}<dcsset:item xsi:type="dcsset:StructureItemGroup">')
+    lines.append(f'{indent}\t<dcsset:groupItems>')
+    emit_group_item_field(lines, levels[i], f'{indent}\t\t')
+    lines.append(f'{indent}\t</dcsset:groupItems>')
+    if i < len(levels) - 1:
+        emit_list_grouping_levels(lines, levels, i + 1, f'{indent}\t')
+    lines.append(f'{indent}</dcsset:item>')
+
+
+def emit_list_grouping(lines, grouping, indent):
+    levels = parse_list_grouping(grouping)
+    if not levels:
+        return
+    emit_list_grouping_levels(lines, levels, 0, indent)
 
 
 def emit_conditional_appearance(lines, items, indent, block_view_mode=None, block_user_setting_id=None, wrap_tag='dcsset:conditionalAppearance'):
@@ -5262,6 +5320,8 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                         lines.append(f'{lsi}<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>')
                     elif tag == 'itemsUserSettingID':
                         lines.append(f'{lsi}<dcsset:itemsUserSettingID>{CANON_ITEMS_ID}</dcsset:itemsUserSettingID>')
+                    elif tag == 'structure':
+                        emit_list_grouping(lines, get_list_grouping_value(s), lsi)
             else:
                 # Полный каноничный скелет (умолчание, ~93% форм) — без изменений.
                 emit_filter(lines, s.get('filter'), lsi, block_view_mode='Normal', block_user_setting_id=CANON_FILTER_ID)
@@ -5270,6 +5330,8 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                     emit_data_parameters(lines, s.get('dataParameters'), lsi)
                 emit_order(lines, s.get('order'), lsi, block_view_mode='Normal', block_user_setting_id=CANON_ORDER_ID)
                 emit_conditional_appearance(lines, s.get('conditionalAppearance'), lsi, block_view_mode='Normal', block_user_setting_id=CANON_CA_ID)
+                # Группировка строк списка (авторинг без round-trip дескриптора) — после CA, до itemsViewMode
+                emit_list_grouping(lines, get_list_grouping_value(s), lsi)
                 lines.append(f'{lsi}<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>')
                 lines.append(f'{lsi}<dcsset:itemsUserSettingID>{CANON_ITEMS_ID}</dcsset:itemsUserSettingID>')
             if len(lines) - 1 == ls_open_idx:

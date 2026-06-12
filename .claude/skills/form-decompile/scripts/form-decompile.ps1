@@ -1,4 +1,4 @@
-﻿# form-decompile v0.111 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.112 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -118,7 +118,7 @@ function Test-ListSettingsHasContent {
 # полному каноничному скелету (компилятор регенерит сам) ИЛИ содержит неподдержанные top-level элементы
 # (item/dataParameters/viewMode/userSettingID/… → fallback на канон). Иначе — дескриптор для компилятора.
 function Get-ListSettingsShape {
-	param($lsNode)
+	param($lsNode, [bool]$hasGrouping = $false)
 	if (-not $lsNode) { return $null }
 	$shape = [ordered]@{}
 	foreach ($child in $lsNode.ChildNodes) {
@@ -130,12 +130,67 @@ function Get-ListSettingsShape {
 			$shape[$tag] = "$(if ($hasVM) {'v'})$(if ($hasUS) {'u'})"
 		} elseif ($tag -eq 'itemsViewMode') { $shape['itemsViewMode'] = $true }
 		elseif ($tag -eq 'itemsUserSettingID') { $shape['itemsUserSettingID'] = $true }
-		else { return $null }  # item/dataParameters/itemsUserSettingPresentation/… → канон-fallback
+		elseif ($tag -eq 'item') { if ($hasGrouping) { $shape['structure'] = $true } else { return $null } }
+		else { return $null }  # dataParameters/itemsUserSettingPresentation/… → канон-fallback
 	}
 	# Полный каноничный скелет → опускаем (компилятор регенерит)
 	if ($shape.Count -eq 5 -and $shape['filter'] -eq 'vu' -and $shape['order'] -eq 'vu' -and `
 		$shape['conditionalAppearance'] -eq 'vu' -and $shape['itemsViewMode'] -eq $true -and $shape['itemsUserSettingID'] -eq $true) { return $null }
 	return $shape
+}
+
+# Группировка строк динамического списка: цепочка <dcsset:item StructureItemGroup> (каждый уровень =
+# один groupItems-field; вложенность через дочерний <dcsset:item>). Возвращает ПЛОСКИЙ массив уровней
+# (string для дефолтного поля; объект {field,groupType?,periodAdditionType?,periodAdditionBegin?,periodAdditionEnd?}
+# для нестандартного) ИЛИ $null, если структура не «чистая линейная цепочка одно-польных уровней»
+# (ветвление/мультиполе/доп.содержимое) → честный fallback на канон (LOST), а не тихая порча.
+function Build-GroupLevel {
+	param($fn)
+	$field = Get-Child $fn 'field'
+	$gt = Get-Child $fn 'groupType'
+	$pat = Get-Child $fn 'periodAdditionType'
+	$pabN = $fn.SelectSingleNode("dcsset:periodAdditionBegin", $ns)
+	$paeN = $fn.SelectSingleNode("dcsset:periodAdditionEnd", $ns)
+	$pab = $null; $pae = $null
+	if ($pabN) { $pt = $pabN.GetAttribute("type", $NS_XSI); $pv = $pabN.InnerText; if (($pt -match 'Field$') -or ($pv -and $pv -ne '0001-01-01T00:00:00')) { $pab = $pv } }
+	if ($paeN) { $pt = $paeN.GetAttribute("type", $NS_XSI); $pv = $paeN.InnerText; if (($pt -match 'Field$') -or ($pv -and $pv -ne '0001-01-01T00:00:00')) { $pae = $pv } }
+	$isDefault = ((-not $gt) -or $gt -eq 'Items') -and ((-not $pat) -or $pat -eq 'None') -and (-not $pab) -and (-not $pae)
+	if ($isDefault) { return $field }
+	$o = [ordered]@{ field = $field }
+	if ($gt -and $gt -ne 'Items') { $o['groupType'] = $gt }
+	if ($pat -and $pat -ne 'None') { $o['periodAdditionType'] = $pat }
+	if ($pab) { $o['periodAdditionBegin'] = $pab }
+	if ($pae) { $o['periodAdditionEnd'] = $pae }
+	return $o
+}
+
+function Build-ListGrouping {
+	param($itemNode)
+	$levels = New-Object System.Collections.ArrayList
+	$cur = $itemNode
+	while ($cur) {
+		if (($cur.GetAttribute("type", $NS_XSI)) -notmatch 'StructureItemGroup$') { return $null }
+		$gi = $null; $nested = @()
+		foreach ($ch in $cur.ChildNodes) {
+			if ($ch.NodeType -ne [System.Xml.XmlNodeType]::Element) { continue }
+			switch ($ch.LocalName) {
+				'groupItems' { if ($gi) { return $null }; $gi = $ch }
+				'item'       { $nested += $ch }
+				default      { return $null }  # use/name/filter/order/… — здесь не поддержано
+			}
+		}
+		if (-not $gi) { return $null }
+		$fieldItems = @($gi.SelectNodes("dcsset:item", $ns))
+		if ($fieldItems.Count -ne 1) { return $null }
+		$fn = $fieldItems[0]
+		if (($fn.GetAttribute("type", $NS_XSI)) -notmatch 'GroupItemField$') { return $null }
+		[void]$levels.Add((Build-GroupLevel $fn))
+		if ($nested.Count -eq 0) { break }
+		if ($nested.Count -gt 1) { return $null }  # ветвление — не линейно
+		$cur = $nested[0]
+	}
+	if ($levels.Count -eq 0) { return $null }
+	return ,@($levels)
 }
 
 # --- 1b. Ring-3 scan: конструкции вне зоны поддержки (draft list) ---
@@ -2562,7 +2617,12 @@ if ($attrsNode) {
 				}
 				# Форма скелета ListSettings: дескриптор только для НЕ-каноничных форм (частичные/минимальные).
 				# Канон → $null (компилятор регенерит полный скелет, как раньше).
-				$lsShape = Get-ListSettingsShape $lsNode
+				# Группировка строк списка: прямой <dcsset:item> ListSettings (не в filter/order/CA).
+				$grpItemNode = $lsNode.SelectSingleNode("dcsset:item", $ns)
+				$grouping = $null
+				if ($grpItemNode) { $grouping = Build-ListGrouping $grpItemNode }
+				if ($null -ne $grouping) { $so['grouping'] = $grouping }
+				$lsShape = Get-ListSettingsShape $lsNode ($null -ne $grouping)
 				if ($null -ne $lsShape) { $so['listSettings'] = $lsShape }
 			}
 			if ($so.Count -gt 0) { $ao['settings'] = $so }

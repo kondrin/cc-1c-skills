@@ -20,6 +20,7 @@
       { "name": "Список", "type": "DynamicList", "useAlways": ["~Артикул", "Список.Code", "Description"], "settings": {
         "mainTable": "Catalog.Товары", "dynamicDataRead": true, "autoSaveUserSettings": false,
         "parameters": [ { "name": "ВыборТовара", "type": "CatalogRef.Товары", "valueListAllowed": true, "value": null } ],
+        "grouping": "Description > Code",
         "order": [ "Description", "Code desc" ],
         "filter": [ "Артикул = _ @off @user", "Артикул like %тест%", "Description подобно %abc%",
           { "field": "Code", "op": "=", "userSettingID": "auto", "userSettingPresentation": "Код товара" },

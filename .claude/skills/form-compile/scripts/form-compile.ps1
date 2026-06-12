@@ -1,4 +1,4 @@
-﻿# form-compile v1.138 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.139 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -2004,6 +2004,67 @@ function Emit-ConditionalAppearance {
 		X "$indent`t<dcsset:userSettingID>$(Esc-Xml $uid)</dcsset:userSettingID>"
 	}
 	X "$indent</$wrapTag>"
+}
+
+# === Группировка строк динамического списка (DCS-структура ListSettings) ===
+# Линейная цепочка <dcsset:item StructureItemGroup> (каждый уровень = одно поле в groupItems;
+# вложенность — через дочерний <dcsset:item>). Зеркало skd Emit-GroupItems/Emit-StructureItem,
+# но плоская модель уровней (список всегда линеен, без selection/order/children).
+function Get-ListGroupingValue {
+	param($st)
+	foreach ($k in 'grouping','structure','группировка') {
+		if ($st.PSObject.Properties[$k] -and $st.$k) { return $st.$k }
+	}
+	return $null
+}
+
+function Parse-ListGrouping {
+	param($grouping)
+	# Шорткат "A > B > C" → массив имён; массив строк/объектов → как есть.
+	# Unary comma: иначе PS разворачивает одноэлементный массив при return → строка → индексация даёт char.
+	if (-not $grouping) { return ,@() }
+	if ($grouping -is [string]) { return ,@($grouping -split '\s*>\s*' | Where-Object { "$_" -ne '' }) }
+	return ,@($grouping)
+}
+
+function Emit-GroupItemField {
+	param($level, [string]$indent)
+	if ($level -is [string]) {
+		$field = $level; $gt = 'Items'; $pat = 'None'; $pab = '0001-01-01T00:00:00'; $pae = '0001-01-01T00:00:00'
+	} else {
+		$field = "$($level.field)"
+		$gt  = if ($level.groupType) { "$($level.groupType)" } else { 'Items' }
+		$pat = if ($level.periodAdditionType) { "$($level.periodAdditionType)" } else { 'None' }
+		$pab = if ($level.periodAdditionBegin) { "$($level.periodAdditionBegin)" } else { '0001-01-01T00:00:00' }
+		$pae = if ($level.periodAdditionEnd)   { "$($level.periodAdditionEnd)"   } else { '0001-01-01T00:00:00' }
+	}
+	X "$indent<dcsset:item xsi:type=`"dcsset:GroupItemField`">"
+	X "$indent`t<dcsset:field>$(Esc-Xml $field)</dcsset:field>"
+	X "$indent`t<dcsset:groupType>$(Esc-Xml $gt)</dcsset:groupType>"
+	X "$indent`t<dcsset:periodAdditionType>$(Esc-Xml $pat)</dcsset:periodAdditionType>"
+	# Авто-детект: ISO-дата → xs:dateTime, иначе путь → dcscor:Field.
+	$pabT = if ($pab -match '^\d{4}-\d{2}-\d{2}T') { 'xs:dateTime' } else { 'dcscor:Field' }
+	$paeT = if ($pae -match '^\d{4}-\d{2}-\d{2}T') { 'xs:dateTime' } else { 'dcscor:Field' }
+	X "$indent`t<dcsset:periodAdditionBegin xsi:type=`"$pabT`">$(Esc-Xml $pab)</dcsset:periodAdditionBegin>"
+	X "$indent`t<dcsset:periodAdditionEnd xsi:type=`"$paeT`">$(Esc-Xml $pae)</dcsset:periodAdditionEnd>"
+	X "$indent</dcsset:item>"
+}
+
+function Emit-ListGroupingLevels {
+	param($levels, [int]$i, [string]$indent)
+	X "$indent<dcsset:item xsi:type=`"dcsset:StructureItemGroup`">"
+	X "$indent`t<dcsset:groupItems>"
+	Emit-GroupItemField $levels[$i] "$indent`t`t"
+	X "$indent`t</dcsset:groupItems>"
+	if ($i -lt $levels.Count - 1) { Emit-ListGroupingLevels $levels ($i + 1) "$indent`t" }
+	X "$indent</dcsset:item>"
+}
+
+function Emit-ListGrouping {
+	param($grouping, [string]$indent)
+	$levels = Parse-ListGrouping $grouping
+	if ($levels.Count -eq 0) { return }
+	Emit-ListGroupingLevels $levels 0 $indent
 }
 
 # --- 5. Type emitter ---
@@ -5517,6 +5578,7 @@ function Emit-Attributes {
 						'conditionalAppearance' { $bus = if ($meta -match 'u') { $script:CANON_CA_ID } else { $null }; Emit-ConditionalAppearance -items $st.conditionalAppearance -indent $lsi -blockViewMode $bvm -blockUserSettingID $bus }
 						'itemsViewMode'         { X "$lsi<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>" }
 						'itemsUserSettingID'    { X "$lsi<dcsset:itemsUserSettingID>$($script:CANON_ITEMS_ID)</dcsset:itemsUserSettingID>" }
+						'structure'             { Emit-ListGrouping (Get-ListGroupingValue $st) $lsi }
 					}
 				}
 			} else {
@@ -5526,6 +5588,8 @@ function Emit-Attributes {
 				if ($st.PSObject.Properties['dataParameters']) { Emit-DataParameters -items $st.dataParameters -indent $lsi }
 				Emit-Order -items $st.order -indent $lsi -blockViewMode 'Normal' -blockUserSettingID $script:CANON_ORDER_ID
 				Emit-ConditionalAppearance -items $st.conditionalAppearance -indent $lsi -blockViewMode 'Normal' -blockUserSettingID $script:CANON_CA_ID
+				# Группировка строк списка (авторинг без round-trip дескриптора) — после CA, до itemsViewMode
+				Emit-ListGrouping (Get-ListGroupingValue $st) $lsi
 				X "$lsi<dcsset:itemsViewMode>Normal</dcsset:itemsViewMode>"
 				X "$lsi<dcsset:itemsUserSettingID>$($script:CANON_ITEMS_ID)</dcsset:itemsUserSettingID>"
 			}
