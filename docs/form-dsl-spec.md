@@ -83,8 +83,8 @@
 | `showTitle` | `<ShowTitle>` | `true` / `false` — показывать заголовок формы |
 | `conversationsRepresentation` | `<ConversationsRepresentation>` | `Auto`, `Show`, `DontShow` — отображение панели обсуждений; pass-through (редкое) |
 | `collapseItemsByImportanceVariant` | `<CollapseItemsByImportanceVariant>` | `DontUse`, `Use` — сворачивание элементов по важности; pass-through (редкое) |
-| `groupList` | `<GroupList>` | Ссылка на группу списка (`2:<GUID>` или имя), pass-through verbatim (редкое) |
-| `customSettingsFolder` | `<CustomSettingsFolder>` | Группа, куда генерируются пользовательские настройки компоновщика (форма отчёта со СКД). Имя группы или `N:<GUID>`, pass-through verbatim. 1С-синоним «Группа пользовательских настроек» |
+| `groupList` | `<GroupList>` | Ссылка на группу списка **по имени**. Форма `N:<GUID>` (ссылка по id) НЕ воспроизводима — id переназначаются при компиляции (часто такая ссылка dangling, платформа сама её не разрешает → пустой список); декомпилятор опускает её с предупреждением. Задавайте по имени |
+| `customSettingsFolder` | `<CustomSettingsFolder>` | Группа, куда генерируются пользовательские настройки компоновщика (форма отчёта со СКД) — **по имени**. 1С-синоним «Группа пользовательских настроек». Форма `N:<GUID>` не воспроизводима (как `groupList`) — опускается с предупреждением |
 
 Нераспознанные ключи преобразуются с автоматическим PascalCase (первая буква в верхний регистр).
 

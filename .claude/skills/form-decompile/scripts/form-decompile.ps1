@@ -1,4 +1,4 @@
-﻿# form-decompile v0.121 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.122 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -2038,7 +2038,8 @@ function Decompile-Element {
 				# RowPictureDataPath: инверсия умного дефолта <Список>.DefaultPicture
 				if ($null -eq $rpdp) { $obj['rowPictureDataPath'] = '' }
 				elseif ($rpdp -ne "$($obj['path']).DefaultPicture") { $obj['rowPictureDataPath'] = $rpdp }
-				$usg = Get-Child $node 'UserSettingsGroup'; if ($usg) { $obj['userSettingsGroup'] = $usg }
+				$usg = Get-Child $node 'UserSettingsGroup'
+				if ($usg) { if ($usg -match '^\d+:[0-9a-fA-F]{8}-') { [Console]::Error.WriteLine("form-decompile: UserSettingsGroup '$usg' ($name) — ссылка по id, не воспроизводима, опущена") } else { $obj['userSettingsGroup'] = $usg } }
 			} elseif ($rpdp) { $obj['rowPictureDataPath'] = $rpdp }
 			$csNode = $node.SelectSingleNode("lf:CommandSet", $ns)
 			if ($csNode) {
@@ -2102,7 +2103,8 @@ function Decompile-Element {
 		'ButtonGroup' {
 			$obj[$key] = $name
 			Add-CommonProps $obj $node $name
-			$cs = Get-Child $node 'CommandSource'; if ($cs) { $obj['commandSource'] = $cs }
+			$cs = Get-Child $node 'CommandSource'
+			if ($cs) { if ($cs -match '^\d+:[0-9a-fA-F]{8}-') { [Console]::Error.WriteLine("form-decompile: CommandSource '$cs' ($name) — ссылка по id, не воспроизводима, опущена") } else { $obj['commandSource'] = $cs } }
 			$rep = Get-Child $node 'Representation'; if ($rep) { $obj['representation'] = $rep }
 			$kids = Decompile-Children $node
 			if ($kids) { $obj['children'] = $kids }
@@ -2110,7 +2112,8 @@ function Decompile-Element {
 		'CommandBar' {
 			$obj[$key] = $name
 			Add-CommonProps $obj $node $name
-			$cs = Get-Child $node 'CommandSource'; if ($cs) { $obj['commandSource'] = $cs }
+			$cs = Get-Child $node 'CommandSource'
+			if ($cs) { if ($cs -match '^\d+:[0-9a-fA-F]{8}-') { [Console]::Error.WriteLine("form-decompile: CommandSource '$cs' ($name) — ссылка по id, не воспроизводима, опущена") } else { $obj['commandSource'] = $cs } }
 			$hl = Get-Child $node 'HorizontalLocation'; if ($hl) { $obj['horizontalLocation'] = $hl.ToLower() }
 			if ((Get-Child $node 'Autofill') -eq 'true') { $obj['autofill'] = $true }
 			$kids = Decompile-Children $node
@@ -2447,6 +2450,16 @@ foreach ($pn in $KNOWN_FORM_PROPS) {
 		elseif ($v -eq 'false') { $props[$camel] = $false }
 		elseif ($v -match '^\d+$') { $props[$camel] = [int]$v }
 		else { $props[$camel] = $v }
+	}
+}
+# Ссылка на члена формы по id ("N:uuid") в groupList/customSettingsFolder НЕ воспроизводима: наш
+# компилятор переназначает id, и ссылка указала бы не туда (либо вовсе dangling — платформа сама их
+# часто не разрешает). Резолв в имя ненадёжен (N не всегда соответствует named-элементу). Игнорируем
+# с предупреждением (имя задаётся вручную через form-edit). Имя-форма захватывается как есть.
+foreach ($refKey in 'groupList','customSettingsFolder') {
+	if ($props.Contains($refKey) -and "$($props[$refKey])" -match '^\d+:[0-9a-fA-F]{8}-') {
+		[Console]::Error.WriteLine("form-decompile: $refKey = '$($props[$refKey])' — ссылка на члена формы по id, не воспроизводима (id переназначаются), опущена. Задайте по имени через form-edit.")
+		$props.Remove($refKey)
 	}
 }
 # AutoTitle при наличии title: компилятор инъектит false (~95% форм). Зеркалим:
