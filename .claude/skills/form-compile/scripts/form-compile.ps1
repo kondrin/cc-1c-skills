@@ -1,4 +1,4 @@
-﻿# form-compile v1.153 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.154 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -5722,6 +5722,8 @@ function Emit-Attributes {
 			if ($st.keyType) { X "$si<KeyType>$(Esc-Xml "$($st.keyType)")</KeyType>" }
 			if ($st.keyFields) { foreach ($kf in @($st.keyFields)) { X "$si<KeyField>$(Esc-Xml "$kf")</KeyField>" } }
 			if ($st.mainTable) { X "$si<MainTable>$(Normalize-MetaTypeRef "$($st.mainTable)")</MainTable>" }
+			# GetInvisibleFieldPresentations — после MainTable (дефолт true; эмитим только при заданном ключе = отклонении false).
+			if ($null -ne $st.getInvisibleFieldPresentations) { X "$si<GetInvisibleFieldPresentations>$(if ($st.getInvisibleFieldPresentations){'true'}else{'false'})</GetInvisibleFieldPresentations>" }
 			# AutoSaveUserSettings — после MainTable (дефолт true; эмитим только при заданном ключе = отклонении).
 			if ($null -ne $st.autoSaveUserSettings) { X "$si<AutoSaveUserSettings>$(if ($st.autoSaveUserSettings){'true'}else{'false'})</AutoSaveUserSettings>" }
 			# ListSettings: filter/order/conditionalAppearance (skd-грамматика) + каноничные блок-GUID.

@@ -943,6 +943,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `keyType` | string | Тип ключа набора запросного списка (без `mainTable`): `FieldValue` / `RowKey` / `RowNumber` |
 | `keyFields` | array | Поля ключа набора (`<KeyField>`, 0+) — для запросного списка без `mainTable`. Эмитятся после параметров |
 | `autoSaveUserSettings` | bool | Авто-сохранение пользовательских настроек дин-списка (`<AutoSaveUserSettings>`, после `MainTable`). **Умолчание `true`** — указывать только для отключения (`false`) |
+| `getInvisibleFieldPresentations` | bool | Получать представления невидимых полей (`<GetInvisibleFieldPresentations>`, после `MainTable`). **Умолчание `true`** — указывать только для отключения (`false`) |
 | `query` | string | Текст запроса (`ManualQuery=true`). Поддерживает `@file.sql` (путь относительно JSON) |
 | `dynamicDataRead` | bool | Динамическое считывание. **Умолчание `true`** — указывать только для отключения (`false`) |
 | `autoFillAvailableFields` | bool | Автозаполнение доступных полей (`<AutoFillAvailableFields>`). **Умолчание `true`** — указывать только для отключения (`false`; тогда поля берутся из явного запроса, не авто). Эмитится первым в `<Settings>` |

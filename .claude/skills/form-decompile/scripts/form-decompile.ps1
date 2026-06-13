@@ -1,4 +1,4 @@
-﻿# form-decompile v0.128 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.129 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -732,7 +732,25 @@ function Build-FilterItem {
 
 	$noValueOps = @('filled','notFilled')
 
-	if ($userPresNode -or $valueIsArrayFlag -or $valueTypeAttr -or $fiPres) {
+	# Пустой xs:string right (<dcsset:right xsi:type="xs:string"/>) ≠ отсутствие <right>:
+	# Get-FilterValueWithType маппит наличие пустого/nil right в value='_' (отсутствие → $null).
+	# Shorthand `_` неоднозначен (схлопывает оба, компилятор → нет right). Пробельные значения рвут
+	# shorthand-парсинг (split по пробелам). → форсим объектную форму (value='_' → self-closing;
+	# пробелы — как есть в <right>).
+	$valNeedsObj = $false
+	if ($rightNodes.Count -eq 1 -and -not $valueIsArrayFlag -and $op -notin $noValueOps) {
+		if ("$value" -eq '_') {
+			# Truly-empty <right xsi:type="xs:string"/> ИЛИ whitespace-only <right>   </right>
+			# (PreserveWhitespace=false стрипнул пробелы в '' → Get-FilterValueWithType вернул '_').
+			# Восстанавливаем реальные пробелы из WS-дока (как у whitespace-заголовков).
+			$ws = Resolve-WS $rightNodes[0]
+			if ($ws -and $ws.Length -gt 0 -and $ws.Trim() -eq '') { $value = $ws }
+			$valNeedsObj = $true
+		}
+		elseif ($null -ne $value -and "$value" -match '\s') { $valNeedsObj = $true }
+	}
+
+	if ($userPresNode -or $valueIsArrayFlag -or $valueTypeAttr -or $fiPres -or $valNeedsObj) {
 		$obj = [ordered]@{ field = $field; op = $op }
 		if ($op -notin $noValueOps -and $null -ne $value) {
 			if ($valueIsArrayFlag) {
@@ -2693,6 +2711,8 @@ if ($attrsNode) {
 			# AutoFillAvailableFields — дефолт true, платформа эмитит только отклонение (false). Захват «как есть».
 			$afaf = Get-Child $setNode 'AutoFillAvailableFields'; if ($null -ne $afaf) { $so['autoFillAvailableFields'] = ($afaf -eq 'true') }
 			$mt = Get-Child $setNode 'MainTable'; if ($mt) { $so['mainTable'] = $mt }
+			# GetInvisibleFieldPresentations — дефолт true, платформа эмитит только отклонение (false, корпус 20/20). Факт. значение.
+			$gifp = Get-Child $setNode 'GetInvisibleFieldPresentations'; if ($null -ne $gifp) { $so['getInvisibleFieldPresentations'] = ($gifp -eq 'true') }
 				# Ключ набора (query-based список): KeyType (RowNumber/FieldValue/RowKey) + KeyField* (0+).
 				$kt = Get-Child $setNode 'KeyType'; if ($kt) { $so['keyType'] = $kt }
 				$kfNodes = @($setNode.SelectNodes("lf:KeyField", $ns) | ForEach-Object { $_.InnerText })
