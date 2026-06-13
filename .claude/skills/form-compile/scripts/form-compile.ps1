@@ -1,4 +1,4 @@
-﻿# form-compile v1.168 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.169 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -4042,6 +4042,12 @@ function Normalize-ChoiceValue {
 	# ISO datetime ("2020-01-01T00:00:00") → xs:dateTime
 	if ($s -match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$') {
 		return @{ XsiType = "xs:dateTime"; Text = $s }
+	}
+
+	# Raw-ссылка по GUID (метаданные.значение, оба GUID): "GUID.GUID" → xr:DesignTimeRef
+	# (всегда ссылка, не строка; named-ссылки Enum.X.Y детектятся ниже).
+	if ($s -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.[0-9a-fA-F]{8}-[0-9a-fA-F-]+$') {
+		return @{ XsiType = "xr:DesignTimeRef"; Text = $s }
 	}
 
 	# Try to detect typed reference path: "<Root>.<Type>[.<Member>.<Value>]"
