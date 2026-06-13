@@ -1,4 +1,4 @@
-﻿# form-decompile v0.131 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.132 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -2722,7 +2722,12 @@ if ($attrsNode) {
 			# дефолт true → платформа эмитит отклонение). Захват факт. значения.
 			$asus = Get-Child $setNode 'AutoSaveUserSettings'; if ($null -ne $asus) { $so['autoSaveUserSettings'] = ($asus -eq 'true') }
 			$qtNode = $setNode.SelectSingleNode("lf:QueryText", $ns)
-			if ($qtNode -and $qtNode.InnerText) { $so['query'] = Maybe-ExternalizeQuery -queryText $qtNode.InnerText -listName "$($ao['name'])" }
+			$hasQ = [bool]($qtNode -and $qtNode.InnerText)
+			if ($hasQ) { $so['query'] = Maybe-ExternalizeQuery -queryText $qtNode.InnerText -listName "$($ao['name'])" }
+			# ManualQuery: компилятор выводит из наличия query (hasQuery → true). Платформа в редких
+			# случаях (корпус 16) хранит QueryText при ManualQuery=false → фиксируем отклонение от эвристики.
+			$mqV = Get-Child $setNode 'ManualQuery'
+			if ($null -ne $mqV) { $mqActual = ($mqV -eq 'true'); if ($mqActual -ne $hasQ) { $so['manualQuery'] = $mqActual } }
 			# DynamicDataRead: дефолт true → эмитим только false
 			if ((Get-Child $setNode 'DynamicDataRead') -eq 'false') { $so['dynamicDataRead'] = $false }
 			# Явные поля набора (редко, ~4.5%) — захват только при наличии Field

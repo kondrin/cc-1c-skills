@@ -956,7 +956,7 @@ Forgiving-синонимы типа: XML-имя (`SpreadSheetDocumentField`) и 
 | `conditionalAppearance` | array | Условное оформление списка (грамматика как в СКД) |
 | `grouping` | string \| array | Группировка строк списка (см. ниже). Forgiving-синонимы: `structure`, `группировка` |
 
-`ManualQuery` выводится из наличия `query` — отдельным ключом не задаётся.
+`ManualQuery` выводится из наличия `query` (есть `query` → `true`). Редкое отклонение — список с `query`, но `ManualQuery=false` (корпус 16): ключ `manualQuery: false` побеждает эвристику (декомпилятор ставит его только при таком отклонении).
 
 Пустой блок настроек компоновщика (`ListSettings`) генерируется автоматически (каноничный полный скелет платформы — filter+order+conditionalAppearance+itemsViewMode+itemsUserSettingID, ~93% форм); указывать ничего не нужно.
 

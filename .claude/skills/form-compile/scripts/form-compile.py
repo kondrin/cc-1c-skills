@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.156 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.157 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -5438,7 +5438,12 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                 lines.append(f'{si}<AutoFillAvailableFields>{"true" if s["autoFillAvailableFields"] else "false"}</AutoFillAvailableFields>')
             # Порядок платформы: ManualQuery, DynamicDataRead, QueryText, Field*, MainTable, ListSettings
             has_query = bool(s.get('query') and str(s['query']).strip())
-            mq = 'true' if (has_query or s.get('manualQuery')) else 'false'
+            # Явный ключ manualQuery (в т.ч. False) ПОБЕЖДАЕТ эвристику has_query (платформа изредка
+            # хранит QueryText при ManualQuery=false — декомпилятор фиксирует отклонение).
+            if s.get('manualQuery') is not None:
+                mq = 'true' if s['manualQuery'] else 'false'
+            else:
+                mq = 'true' if has_query else 'false'
             lines.append(f'{si}<ManualQuery>{mq}</ManualQuery>')
             # DynamicDataRead: дефолт true; false только при явном отключении
             ddr = 'false' if s.get('dynamicDataRead') is False else 'true'

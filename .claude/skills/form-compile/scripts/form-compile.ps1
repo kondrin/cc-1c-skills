@@ -1,4 +1,4 @@
-﻿# form-compile v1.156 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.157 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -5682,7 +5682,10 @@ function Emit-Attributes {
 			# AutoFillAvailableFields — дефолт true; эмитим только при заданном ключе (отклонение).
 			if ($null -ne $st.autoFillAvailableFields) { X "$si<AutoFillAvailableFields>$(if ($st.autoFillAvailableFields){'true'}else{'false'})</AutoFillAvailableFields>" }
 			$hasQuery = $st.query -and "$($st.query)".Trim()
-			$mq = if ($hasQuery -or $st.manualQuery -eq $true) { "true" } else { "false" }
+			# Явный ключ manualQuery (в т.ч. false) ПОБЕЖДАЕТ эвристику hasQuery (платформа изредка
+			# хранит QueryText при ManualQuery=false — декомпилятор фиксирует это отклонение).
+			$hasMQKey = ($st.PSObject.Properties['manualQuery']) -and ($null -ne $st.manualQuery)
+			$mq = if ($hasMQKey) { if ($st.manualQuery) { "true" } else { "false" } } elseif ($hasQuery) { "true" } else { "false" }
 			X "$si<ManualQuery>$mq</ManualQuery>"
 			# DynamicDataRead: дефолт true; false только при явном отключении
 			$ddr = if ($st.dynamicDataRead -eq $false) { "false" } else { "true" }
