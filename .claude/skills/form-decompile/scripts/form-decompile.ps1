@@ -1,4 +1,4 @@
-﻿# form-decompile v0.136 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.137 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -2671,11 +2671,12 @@ if ($attrsNode) {
 			if ($flds.Count -eq 1 -and $flds[0] -eq $nm) {
 				$ao['save'] = $true
 			} elseif ($flds.Count -gt 0) {
-				# Снимаем префикс "имя." ТОЛЬКО когда остаток — простое подполе без точки (компилятор
-				# реинъектит его). Многоуровневый путь "имя.Settings.Filter" компилятор по dot-правилу
-				# эмитит как есть (префикс не вернёт) → храним ПОЛНЫЙ путь, иначе префикс теряется.
+				# Снимаем префикс "имя." ТОЛЬКО когда остаток — простое подполе, которое компилятор
+				# реинъектит (зеркало его условия: ≠имя, без точки, не UUID-ссылка ^N/M). Многоуровневый
+				# путь "имя.Settings.Filter" и UUID-ссылка "имя.1/0:GUID" компилятор эмитит как есть
+				# (префикс не вернёт) → храним ПОЛНЫЙ путь, иначе префикс теряется.
 				$stripped = @($flds | ForEach-Object {
-					if ($_ -match "^$([regex]::Escape($nm))\.([^.]+)$") { $matches[1] } else { $_ }
+					if ($_ -match "^$([regex]::Escape($nm))\.([^.]+)$" -and $matches[1] -notmatch '^\d+/\d+') { $matches[1] } else { $_ }
 				})
 				if ($stripped.Count -eq 1) { $ao['save'] = $stripped[0] } else { $ao['save'] = $stripped }
 			}
