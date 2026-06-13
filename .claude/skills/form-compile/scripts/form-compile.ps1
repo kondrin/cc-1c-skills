@@ -1,4 +1,4 @@
-﻿# form-compile v1.170 — Compile 1C managed form from JSON or object metadata
+﻿# form-compile v1.171 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 param(
 	[string]$JsonPath,
@@ -5327,6 +5327,13 @@ function Emit-DLInputParameters {
 				}
 				X "$indent`t`t</dcscor:value>"
 			}
+		} elseif (Has-DLProp $item 'typeLink') {
+			# Связь по типу (dcscor:TypeLink) — field + linkItem (структурное значение параметра).
+			$tl = $item.typeLink
+			X "$indent`t`t<dcscor:value xsi:type=`"dcscor:TypeLink`">"
+			$tlf = Get-Prop $tl 'field'; if ($null -ne $tlf) { X "$indent`t`t`t<dcscor:field>$(Esc-Xml "$tlf")</dcscor:field>" }
+			$tli = Get-Prop $tl 'linkItem'; if ($null -ne $tli) { X "$indent`t`t`t<dcscor:linkItem>$(Esc-Xml "$tli")</dcscor:linkItem>" }
+			X "$indent`t`t</dcscor:value>"
 		} elseif (Has-DLProp $item 'value') {
 			$val = $item.value
 			if ($val -is [bool]) { X "$indent`t`t<dcscor:value xsi:type=`"xs:boolean`">$(if ($val) { 'true' } else { 'false' })</dcscor:value>" }
@@ -5762,11 +5769,16 @@ function Emit-Attributes {
 				foreach ($fld in $st.fields) {
 					# Тип поля набора: DataSetFieldField (дефолт) vs DataSetFieldNestedDataSet
 					# (поле-вложенный набор = реквизит табличной части; маркер nested).
-					$ftype = if ($fld.nested) { "DataSetFieldNestedDataSet" } else { "DataSetFieldField" }
+					# folder = папка-группировка полей (DataSetFieldFolder, без <field>); nested = вложенный набор.
+					$isFolder = [bool](Get-Prop $fld 'folder')
+					$ftype = if ($fld.nested) { "DataSetFieldNestedDataSet" } elseif ($isFolder) { "DataSetFieldFolder" } else { "DataSetFieldField" }
 					X "$si<Field xsi:type=`"dcssch:$ftype`">"
-					$dp = if ($fld.dataPath) { $fld.dataPath } else { $fld.field }
-					X "$si`t<dcssch:dataPath>$(Esc-Xml "$dp")</dcssch:dataPath>"
-					X "$si`t<dcssch:field>$(Esc-Xml "$($fld.field)")</dcssch:field>"
+					# dataPath: явный (включая пустой "" → self-closing <dcssch:dataPath/>) побеждает; иначе fallback на field.
+					if ($null -ne (Get-Prop $fld 'dataPath')) { $dp = "$($fld.dataPath)" }
+					elseif ($isFolder) { $dp = "" }
+					else { $dp = "$($fld.field)" }
+					if ($dp -eq "") { X "$si`t<dcssch:dataPath/>" } else { X "$si`t<dcssch:dataPath>$(Esc-Xml "$dp")</dcssch:dataPath>" }
+					if (-not $isFolder) { X "$si`t<dcssch:field>$(Esc-Xml "$($fld.field)")</dcssch:field>" }
 					if ($fld.title) {
 						X "$si`t<dcssch:title xsi:type=`"v8:LocalStringType`">"
 						Emit-MLItems -val $fld.title -indent "$si`t`t"

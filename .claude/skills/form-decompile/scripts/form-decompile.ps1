@@ -1,4 +1,4 @@
-﻿# form-decompile v0.146 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.147 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1423,6 +1423,13 @@ function Build-DLInputParameters {
 					[void]$cpls.Add($cpo)
 				}
 				$io['choiceParameterLinks'] = @($cpls)
+			} elseif ($vt -match 'TypeLink$') {
+				# Связь по типу (dcscor:TypeLink): field + linkItem — структурное значение,
+				# НЕ склеивать InnerText в строку ("СчетДт"+"1"="СчетДт1").
+				$tlo = [ordered]@{}
+				$tlf = Get-Child $valN 'field'; if ($null -ne $tlf) { $tlo['field'] = $tlf }
+				$tli = Get-Child $valN 'linkItem'; if ($null -ne $tli) { $tlo['linkItem'] = if ($tli -match '^-?\d+$') { [int]$tli } else { $tli } }
+				$io['typeLink'] = $tlo
 			} else {
 				if ($valN.GetAttribute("nil", $NS_XSI) -ne 'true') { $io['value'] = Convert-TypedValue -raw $valN.InnerText -xsiType $vt }
 			}
@@ -2798,10 +2805,12 @@ if ($attrsNode) {
 					$fld = Get-Child $fn 'field'
 					$dp  = Get-Child $fn 'dataPath'
 					if ($fld) { $fo['field'] = $fld }
-					if ($dp -and $dp -ne $fld) { $fo['dataPath'] = $dp }
+					if ((Has-Child $fn 'dataPath') -and $dp -ne $fld) { $fo['dataPath'] = $dp }
 					# Тип поля набора: DataSetFieldField (дефолт, компилятор хардкодит) vs
 					# DataSetFieldNestedDataSet (поле-вложенный набор = реквизит табличной части). Маркер nested.
-					if ($fn.GetAttribute("type", $NS_XSI) -match 'NestedDataSet$') { $fo['nested'] = $true }
+					$fTypeAttr = $fn.GetAttribute("type", $NS_XSI)
+						if ($fTypeAttr -match 'NestedDataSet$') { $fo['nested'] = $true }
+						elseif ($fTypeAttr -match 'Folder$') { $fo['folder'] = $true }
 					$ftn = $fn.SelectSingleNode("dcssch:title", $ns)
 					if ($ftn) { $t = Get-LangText $ftn; if ($null -ne $t) { $fo['title'] = $t } }
 					# valueType поля набора (тип значения; вычисляемые/кастомные поля). Грамматика типа.

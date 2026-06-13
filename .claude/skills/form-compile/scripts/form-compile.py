@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# form-compile v1.170 — Compile 1C managed form from JSON or object metadata
+# form-compile v1.171 — Compile 1C managed form from JSON or object metadata
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 import argparse
 import copy
@@ -5074,6 +5074,15 @@ def emit_dl_input_parameters(lines, ip, indent):
                     lines.append(f'{indent}\t\t\t\t<dcscor:mode xmlns:d8p1="http://v8.1c.ru/8.1/data/enterprise" xsi:type="d8p1:LinkedValueChangeMode">{mode}</dcscor:mode>')
                     lines.append(f'{indent}\t\t\t</dcscor:item>')
                 lines.append(f'{indent}\t\t</dcscor:value>')
+        elif 'typeLink' in item:
+            # Связь по типу (dcscor:TypeLink) — field + linkItem (структурное значение параметра).
+            tl = item.get('typeLink') or {}
+            lines.append(f'{indent}\t\t<dcscor:value xsi:type="dcscor:TypeLink">')
+            if tl.get('field') is not None:
+                lines.append(f'{indent}\t\t\t<dcscor:field>{esc_xml(str(tl.get("field")))}</dcscor:field>')
+            if tl.get('linkItem') is not None:
+                lines.append(f'{indent}\t\t\t<dcscor:linkItem>{esc_xml(str(tl.get("linkItem")))}</dcscor:linkItem>')
+            lines.append(f'{indent}\t\t</dcscor:value>')
         elif 'value' in item:
             val = item.get('value')
             if isinstance(val, bool):
@@ -5526,11 +5535,23 @@ def emit_attributes(lines, attrs, indent, conditional_appearance=None):
                 for fld in s['fields']:
                     # Тип поля набора: DataSetFieldField (дефолт) vs DataSetFieldNestedDataSet
                     # (поле-вложенный набор = реквизит табличной части; маркер nested).
-                    ftype = 'DataSetFieldNestedDataSet' if fld.get('nested') else 'DataSetFieldField'
+                    # folder = папка-группировка полей (DataSetFieldFolder, без <field>); nested = вложенный набор.
+                    is_folder = bool(fld.get('folder'))
+                    ftype = 'DataSetFieldNestedDataSet' if fld.get('nested') else ('DataSetFieldFolder' if is_folder else 'DataSetFieldField')
                     lines.append(f'{si}<Field xsi:type="dcssch:{ftype}">')
-                    dp = fld.get('dataPath') or fld.get('field')
-                    lines.append(f'{si}\t<dcssch:dataPath>{esc_xml(str(dp))}</dcssch:dataPath>')
-                    lines.append(f'{si}\t<dcssch:field>{esc_xml(str(fld.get("field", "")))}</dcssch:field>')
+                    # dataPath: явный (включая "" → self-closing) побеждает; иначе fallback на field.
+                    if fld.get('dataPath') is not None:
+                        dp = str(fld.get('dataPath'))
+                    elif is_folder:
+                        dp = ''
+                    else:
+                        dp = str(fld.get('field', ''))
+                    if dp == '':
+                        lines.append(f'{si}\t<dcssch:dataPath/>')
+                    else:
+                        lines.append(f'{si}\t<dcssch:dataPath>{esc_xml(dp)}</dcssch:dataPath>')
+                    if not is_folder:
+                        lines.append(f'{si}\t<dcssch:field>{esc_xml(str(fld.get("field", "")))}</dcssch:field>')
                     if fld.get('title'):
                         lines.append(f'{si}\t<dcssch:title xsi:type="v8:LocalStringType">')
                         emit_ml_items(lines, f'{si}\t\t', fld['title'])
