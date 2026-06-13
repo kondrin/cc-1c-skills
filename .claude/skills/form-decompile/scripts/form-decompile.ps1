@@ -1,4 +1,4 @@
-﻿# form-decompile v0.124 — Decompile 1C managed Form.xml to JSON DSL (draft)
+﻿# form-decompile v0.125 — Decompile 1C managed Form.xml to JSON DSL (draft)
 # Source: https://github.com/Nikolay-Shirokov/cc-1c-skills
 # ВНИМАНИЕ: раундтрип не гарантируется. Навык исключён из авто-использования моделью.
 param(
@@ -1097,7 +1097,7 @@ function Decompile-AttrColumn {
 	param($c)
 	$co = [ordered]@{}; $co['name'] = $c.GetAttribute("name")
 	$cty = Decompile-Type ($c.SelectSingleNode("lf:Type", $ns)); if ($cty) { $co['type'] = $cty }
-	$ctNode = $c.SelectSingleNode("lf:Title", $ns); if ($ctNode) { $t = Get-LangText $ctNode; if ($null -ne $t) { $co['title'] = $t } }
+	$ctNode = $c.SelectSingleNode("lf:Title", $ns); if ($ctNode) { $t = Get-LangTextWS $ctNode; if ($null -ne $t) { $co['title'] = $t } }
 	$cfo = Decompile-FunctionalOptions $c; if ($cfo) { $co['functionalOptions'] = $cfo }
 	# Ролевой доступ колонки (View/Edit) — xr-флаг, как у самого реквизита (bool | {common,roles})
 	$cv = Decompile-XrFlag $c 'View'; if ($null -ne $cv) { $co['view'] = $cv }
