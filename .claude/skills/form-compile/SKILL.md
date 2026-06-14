@@ -61,7 +61,7 @@ powershell.exe -NoProfile -File "${CLAUDE_SKILL_DIR}/scripts/form-compile.ps1" -
 
 | DSL ключ     | XML элемент       | Значение ключа                                    |
 |--------------|-------------------|---------------------------------------------------|
-| `"group"`    | UsualGroup        | `"horizontal"` / `"vertical"` / `"alwaysHorizontal"` / `"alwaysVertical"` / `"collapsible"` |
+| `"group"`    | UsualGroup        | ориентация: `"vertical"` / `"horizontalIfPossible"` / `"alwaysHorizontal"` (поведение — отдельный ключ `behavior`) |
 | `"columnGroup"` | ColumnGroup    | `"horizontal"` / `"vertical"` / `"inCell"` — только внутри `columns` таблицы |
 | `"input"`    | InputField        | имя элемента                                      |
 | `"check"`    | CheckBoxField     | имя                                               |
@@ -83,12 +83,13 @@ powershell.exe -NoProfile -File "${CLAUDE_SKILL_DIR}/scripts/form-compile.ps1" -
 
 | Ключ | Описание |
 |------|----------|
-| `name` | Переопределить имя (по умолчанию = значение ключа типа) |
+| `name` | Переопределить имя (по умолчанию = значение ключа типа). Имена уникальны во всех коллекциях формы (элементы, реквизиты, команды, колонки) |
 | `title` | Заголовок элемента |
+| `tooltip` | Всплывающая подсказка элемента (строка или `{ru,en}`) |
 | `visible: false` | Скрыть (синоним: `hidden: true`) |
 | `enabled: false` | Сделать недоступным (синоним: `disabled: true`) |
 | `readOnly: true` | Только чтение |
-| `events: {...}` | Обработчики событий: `{ "OnChange": "ИмяОбработчика" }`. Тот же формат, что у событий формы |
+| `events: {...}` | Обработчики событий: `{ "OnChange": "ИмяОбработчика" }`. Тот же формат, что у событий формы. Значение `null` → имя обработчика сгенерируется автоматически |
 
 ### Допустимые имена событий (`events`)
 
@@ -115,7 +116,7 @@ powershell.exe -NoProfile -File "${CLAUDE_SKILL_DIR}/scripts/form-compile.ps1" -
 | Ключ | Описание | Пример |
 |------|----------|--------|
 | `path` | DataPath — привязка к данным | `"Объект.Организация"` |
-| `titleLocation` | Размещение заголовка | `"none"`, `"left"`, `"top"` |
+| `titleLocation` | Размещение заголовка | `"none"`, `"left"`, `"right"`, `"top"`, `"bottom"`, `"auto"` |
 | `multiLine: true` | Многострочное поле | текстовое поле, комментарий |
 | `passwordMode: true` | Режим пароля (звёздочки) | поле ввода пароля |
 | `choiceButton: true` | Кнопка выбора ("...") | ссылочное поле |
@@ -178,13 +179,14 @@ powershell.exe -NoProfile -File "${CLAUDE_SKILL_DIR}/scripts/form-compile.ps1" -
 
 ### Группа (group)
 
-Значение ключа задаёт ориентацию: `"horizontal"`, `"vertical"`, `"alwaysHorizontal"`, `"alwaysVertical"`, `"collapsible"`.
+Значение ключа задаёт **ориентацию**: `"vertical"`, `"horizontalIfPossible"`, `"alwaysHorizontal"`.
 
 | Ключ | Описание |
 |------|----------|
+| `behavior` | Поведение группы: `"collapsible"` (сворачиваемая) / `"popup"` (всплывающая). Опустить = обычная |
 | `showTitle: true` | Показывать заголовок группы |
 | `united: false` | Левый край полей ввода выравнивается только в пределах этой группы (по умолчанию `true` — сквозное выравнивание по самому длинному заголовку, в т.ч. с соседними группами) |
-| `collapsed: true` | Только для `"group": "collapsible"` — группа создаётся свёрнутой |
+| `collapsed: true` | Для `behavior: "collapsible"` / `"popup"` — группа создаётся свёрнутой |
 | `representation` | `"none"`, `"normal"`, `"weak"`, `"strong"` |
 | `children: [...]` | Вложенные элементы |
 
@@ -201,8 +203,8 @@ powershell.exe -NoProfile -File "${CLAUDE_SKILL_DIR}/scripts/form-compile.ps1" -
 | `height` | Высота в строках таблицы |
 | `header: false` | Скрыть шапку |
 | `footer: true` | Показать подвал |
-| `commandBarLocation` | `"None"`, `"Top"`, `"Auto"` |
-| `searchStringLocation` | `"None"`, `"Top"`, `"Auto"` |
+| `commandBarLocation` | `"None"`, `"Top"`, `"Bottom"`, `"Auto"` |
+| `searchStringLocation` | `"None"`, `"Top"`, `"Bottom"`, `"CommandBar"`, `"PullFromTop"`, `"Auto"` |
 | `choiceMode: true` | Режим выбора (для форм выбора) |
 | `initialTreeView` | `"ExpandTopLevel"` и др. (иерархические списки) |
 | `enableDrag: true` | Разрешить перетаскивание |
@@ -520,6 +522,23 @@ PictureField, привязанный к булеву/числу, рисует и
   ]
 }
 ```
+
+## Продвинутые конструкции (по необходимости)
+
+Описанного выше хватает для большинства форм. Под конкретную задачу подгрузите файл из `references/`:
+
+- `dynamic-list.md` — форма списка: источник, отбор, сортировка, группировки, параметры запроса
+- `appearance.md` — условное и статическое оформление элементов (цвета/шрифты/рамки)
+- `choice-params.md` — параметры и связи выбора у полей ввода
+- `command-interface.md` — командный интерфейс формы
+- `roles-access.md` — пользовательская видимость и доступ по ролям
+- `companion-panels.md` — контент расширенной подсказки и контекстного меню
+- `special-fields.md` — поля документа/датчика (HTML, текст, индикатор, ползунок)
+- `charts.md` — диаграммы и планировщик
+- `report-form.md` — свойства формы отчёта
+- `type-system-advanced.md` — наборы и составные типы
+- `table-advanced.md` — расширенные свойства таблиц
+- `layout-advanced.md` — тонкая компоновка и геометрия
 
 ## Автогенерация
 

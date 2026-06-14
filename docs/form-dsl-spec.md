@@ -361,7 +361,7 @@ companion-панели с собственным контентом. Оба не
 #### group — UsualGroup
 
 ```json
-{ "group": "horizontal", "name": "ГруппаШапка", "children": [ ... ] }
+{ "group": "alwaysHorizontal", "name": "ГруппаШапка", "children": [ ... ] }
 ```
 
 | Свойство | Тип | Описание |
